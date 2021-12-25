@@ -338,6 +338,10 @@ void Costume::playChore(int num, uint msecs) {
 		Debug::warning(Debug::Chores, "Requested chore number %d is outside the range of chores (0-%d)", num, _numChores);
 		return;
 	}
+	//this is a fix for a Olivia's broken chore in the Blue Casket
+	if (getFilename().equalsIgnoreCase("olivia_idles.cos") && num == 0) {
+		return;
+	}
 	_chores[num]->play(msecs);
 	if (Common::find(_playingChores.begin(), _playingChores.end(), _chores[num]) == _playingChores.end())
 		_playingChores.push_back(_chores[num]);
@@ -469,7 +473,8 @@ void Costume::animate() {
 }
 
 void Costume::moveHead(bool entering, const Math::Vector3d &lookAt) {
-	_head->lookAt(entering, lookAt, _lookAtRate, _matrix);
+	if (!(_fname.equals("dom_isle_idles.cos") && _lookAtRate == 130))
+		_head->lookAt(entering, lookAt, _lookAtRate, _matrix);
 }
 
 int Costume::getHeadJoint() const {
