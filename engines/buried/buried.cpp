@@ -7,10 +7,10 @@
  * Additional copyright for this file:
  * Copyright (C) 1995 Presto Studios, Inc.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,8 +18,7 @@
  * GNU General Public License for more details.
 
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -61,6 +60,7 @@ BuriedEngine::BuriedEngine(OSystem *syst, const ADGameDescription *gameDesc) : E
 	_captureWindow = nullptr;
 	_pauseStartTime = 0;
 	_yielding = false;
+	_allowVideoSkip = true;
 
 	const Common::FSNode gameDataDir(ConfMan.get("path"));
 	SearchMan.addSubDirectoryMatching(gameDataDir, "WIN31/MANUAL", 0, 2); // v1.05 era
@@ -84,6 +84,9 @@ BuriedEngine::~BuriedEngine() {
 
 Common::Error BuriedEngine::run() {
 	setDebugger(new BuriedConsole(this));
+
+	ConfMan.registerDefault("skip_support", true);
+	_allowVideoSkip = ConfMan.getBool("skip_support");
 
 	if (isTrueColor()) {
 		initGraphics(640, 480, nullptr);
@@ -311,6 +314,36 @@ void BuriedEngine::postMessageToWindow(Window *dest, Message *message) {
 	_messageQueue.push_back(msg);
 }
 
+void BuriedEngine::processVideoSkipMessages(VideoWindow *video) {
+	assert(video);
+
+	for (MessageQueue::iterator it = _messageQueue.begin(); it != _messageQueue.end();) {
+		MessageType messageType = it->message->getMessageType();
+
+		if (messageType == kMessageTypeKeyUp) {
+			Common::KeyState keyState = ((KeyUpMessage *)it->message)->getKeyState();
+
+			// Send any skip video keyup events to the video player
+			if (keyState.keycode == Common::KEYCODE_ESCAPE) {
+				video->onKeyUp(keyState, ((KeyUpMessage *)it->message)->getFlags());
+				delete it->message;
+				it = _messageQueue.erase(it);
+			}
+		} else if (messageType == kMessageTypeKeyDown) {
+			Common::KeyState keyState = ((KeyDownMessage *)it->message)->getKeyState();
+
+			// Erase any skip video keydown events from the queue, to avoid
+			// interpreting them as game quit events after the video ends
+			if (keyState.keycode == Common::KEYCODE_ESCAPE) {
+				delete it->message;
+				it = _messageQueue.erase(it);
+			}
+		} else {
+			++it;
+		}
+	}
+}
+
 void BuriedEngine::sendAllMessages() {
 	while (!shouldQuit() && !_messageQueue.empty()) {
 		MessageInfo msg = _messageQueue.front();
@@ -387,7 +420,7 @@ bool BuriedEngine::hasMessage(Window *window, int messageBegin, int messageEnd) 
 	return false;
 }
 
-void BuriedEngine::yield() {
+void BuriedEngine::yield(VideoWindow *video) {
 	// A cut down version of the Win16 yield function. Win32 handles this
 	// asynchronously, which we don't want. Only needed for internal event loops.
 
@@ -398,8 +431,10 @@ void BuriedEngine::yield() {
 
 	pollForEvents();
 
-	// We don't send messages any messages from here. Otherwise, this is the same
+	// We only send video skipping messages from here. Otherwise, this is the same
 	// as our main loop.
+	if (video && _allowVideoSkip)
+		processVideoSkipMessages(video);
 
 	_gfx->updateScreen();
 	_system->delayMillis(10);

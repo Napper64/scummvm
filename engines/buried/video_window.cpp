@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
 
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,6 +24,7 @@
 #include "buried/video_window.h"
 
 #include "common/system.h"
+#include "common/keyboard.h"
 #include "graphics/surface.h"
 #include "video/avi_decoder.h"
 
@@ -190,6 +190,11 @@ void VideoWindow::onPaint() {
 		else
 			_vm->_gfx->crossBlit(_vm->_gfx->getScreen(), absoluteRect.left + _dstRect.left, absoluteRect.top + _dstRect.top, _dstRect.width(), _dstRect.height(), _lastFrame, _srcRect.left, _srcRect.top);
 	}
+}
+
+void VideoWindow::onKeyUp(const Common::KeyState &key, uint flags) {
+	if (key.keycode == Common::KEYCODE_ESCAPE)
+		stopVideo();
 }
 
 void VideoWindow::setSourceRect(const Common::Rect &srcRect) {

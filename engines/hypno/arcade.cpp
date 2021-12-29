@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -97,7 +96,8 @@ void HypnoEngine::loadArcadeLevel(const Common::String &arclevel, const Common::
 	parseArcadeShooting("", arclevel, arc);
 	ArcadeShooting *arcade = (ArcadeShooting *) _levels[arclevel]; 
 	arcade->shootSequence = parseShootList(arclevel, list);
-	arcade->prefix = prefix.c_str();
+	arcade->prefix = prefix;
+	arcade->levelIfWin = next;
 }
 
 void HypnoEngine::drawPlayer() { error("Function \"%s\" not implemented", __FUNCTION__); }
@@ -138,6 +138,7 @@ void HypnoEngine::runArcade(ArcadeShooting *arc) {
 	// Only used in spider
 	_currentPlayerPosition = PlayerLeft;
 	_lastPlayerPosition = PlayerLeft;
+	_skipLevel = false;
 
 	for (Frames::iterator it =_playerFrames.begin(); it != _playerFrames.end(); ++it) {
 		if ((*it)->getPixel(0, 0) == _pixelFormat.RGBToColor(0, 255, 255))
@@ -246,7 +247,7 @@ void HypnoEngine::runArcade(ArcadeShooting *arc) {
 			skipVideo(background);
 		}
 
-		if (!background.decoder || background.decoder->endOfVideo()) {
+		if (!background.decoder || background.decoder->endOfVideo() || _skipLevel) {
 			skipVideo(background);
 			if (!arc->nextLevelVideo.empty()) {
 				MVideo video(arc->nextLevelVideo, Common::Point(0, 0), false, false, false);
@@ -254,6 +255,8 @@ void HypnoEngine::runArcade(ArcadeShooting *arc) {
 			}
 			assert(!arc->levelIfWin.empty());
 			_nextLevel = arc->levelIfWin;
+			_arcadeMode = "";
+			_skipLevel = false;
 			debugC(1, kHypnoDebugArcade, "Wining level and jumping to %s", _nextLevel.c_str());
 			break;
 		}

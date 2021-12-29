@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -41,6 +40,8 @@ void SpiderEngine::runCode(Code *code) {
 		runFileCabinet(code);
 	else if (code->name == "<lock>") 
 		runLock(code);
+	else if (code->name == "<fuse_box>")
+		runFuseBox(code);
 	else if (code->name == "<credits>")
 		showCredits();
 	else
@@ -561,11 +562,14 @@ void SpiderEngine::runLock(Code *code) {
 	sel[4] = Common::Rect(552, 57, 601, 134);
 	Common::Rect act(345, 337, 537, 404);
 
-	Common::String intro = "spider/cine/spv051s.smk"; 
-	if (!_intros.contains(intro)) {
-		MVideo v(intro, Common::Point(0, 0), false, false, false);
+	if (_sceneState["GS_PUZZLELEVEL"] == 0) { // easy
+		MVideo v("spider/cine/spv051s.smk", Common::Point(0, 0), false, false, false);
 		runIntro(v);
-		_intros[intro] = true;
+		loadImage("spider/factory/elockbg.smk", 0, 0, false);
+	} else {
+		MVideo v("spider/cine/spv051as.smk", Common::Point(0, 0), false, false, false);
+		runIntro(v);
+		loadImage("spider/factory/hlockbg.smk", 0, 0, false);
 	}
 
 	Frames nums = decodeFrames("spider/factory/button.smk");
@@ -573,7 +577,6 @@ void SpiderEngine::runLock(Code *code) {
 		error("Invalid number of colors: %d", nums.size());
 
 	defaultCursor();
-	loadImage("spider/factory/elockbg.smk", 0, 0, false);
 	for (int i = 0; i < 5; i++) {
 		drawImage(*nums[comb[i]], sel[i].left, sel[i].top, true);
 	}
@@ -602,7 +605,11 @@ void SpiderEngine::runLock(Code *code) {
 						comb[i] = (comb[i] + 1) % 5;
 				}
 
-				loadImage("spider/factory/elockbg.smk", 0, 0, false);
+				if (_sceneState["GS_PUZZLELEVEL"] == 0) // easy
+					loadImage("spider/factory/elockbg.smk", 0, 0, false);
+				else 
+					loadImage("spider/factory/hlockbg.smk", 0, 0, false);
+
 				for (int i = 0; i < 5; i++) {
 					drawImage(*nums[comb[i]], sel[i].left, sel[i].top, true);
 				}
@@ -619,7 +626,176 @@ void SpiderEngine::runLock(Code *code) {
 }
 
 
+void SpiderEngine::runFuseBox(Code *code) {
+	changeScreenMode("640x480");
+	Common::Point mousePos;
+	Common::Event event;
+
+	defaultCursor();
+
+	bool hdata[8][9] = {};
+	bool vdata[9][8] = {};
+
+	bool vsol[9][8] = {
+		{0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 1, 1, 1, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 1, 1, 1, 0},
+		{0, 1, 1, 1, 1, 1, 1, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 1, 1, 1, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0},
+	};
+
+	bool hsol[8][9] = {
+		{0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 1, 0, 0, 1, 0, 0, 1, 0},
+		{0, 1, 0, 0, 1, 0, 0, 1, 0},
+		{0, 1, 0, 0, 1, 0, 0, 1, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 1, 0, 0, 1, 0, 0, 0, 0},
+		{0, 1, 0, 0, 1, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0},
+	};
+
+	Common::Rect matrix(289, 89, 551, 351);
+	Common::Point fuse(292, 87);
+	Common::Point vz(289, 89);
+	Common::Point hz(289, 89);
+
+	uint32 dxVert = 412 - 380;
+	uint32 dyVert = 120 - 88;
+
+	uint32 dxHoriz = 359 - 327;
+	uint32 dyHoriz = 146 - 114;
+
+	Common::Rect vcell(0, 0, 8, 32);
+	Common::Rect hcell(0, 0, 32, 8);
+
+	if (_sceneState["GS_PUZZLELEVEL"] == 0) { // easy
+		MVideo v("spider/cine/ppv011es.smk", Common::Point(0, 0), false, false, false);
+		runIntro(v);
+		loadImage("spider/movie2/efusebg.smk", 0, 0, false);
+	} else { // hard
+		MVideo v("spider/cine/ppv011hs.smk", Common::Point(0, 0), false, false, false);
+		runIntro(v);
+		loadImage("spider/movie2/hfusebg.smk", 0, 0, false);
+	}
+
+	Frames fuses = decodeFrames("spider/movie2/onoffuse.smk");
+
+	while (!shouldQuit()) {
+
+		while (g_system->getEventManager()->pollEvent(event)) {
+			mousePos = g_system->getEventManager()->getMousePos();
+			// Events
+			switch (event.type) {
+
+			case Common::EVENT_QUIT:
+			case Common::EVENT_RETURN_TO_LAUNCHER:
+				break;
+
+			case Common::EVENT_LBUTTONDOWN:
+				if (matrix.contains(mousePos)) {
+					if (_sceneState["GS_PUZZLELEVEL"] == 0) { // easy
+						loadImage("spider/movie2/efusebg.smk", 0, 0, false);
+					} else { // hard
+						loadImage("spider/movie2/hfusebg.smk", 0, 0, false);
+					}
+
+					debug("\nvdata:");
+					for (int i = 0; i < 9; i++) {
+						for (int j = 0; j < 8; j++) {
+							vcell.moveTo(vz.x + i*dxVert, vz.y + j*dyVert);
+							if (vcell.contains(mousePos.x, mousePos.y)) {
+								vdata[i][j] = !vdata[i][j];
+							}
+							debugN("%d, ", vdata[i][j]);
+						}
+						debugN("\n");
+					}
+
+					debug("\nhdata:");
+					for (int i = 0; i < 8; i++) {
+						for (int j = 0; j < 9; j++) {
+							hcell.moveTo(hz.x + i*dxHoriz, hz.y + j*dyHoriz);
+							if (hcell.contains(mousePos.x, mousePos.y)) {
+								hdata[i][j] = !hdata[i][j];
+							}
+							debugN("%d, ", hdata[i][j]);
+						}
+						debugN("\n");
+					}
+
+					for (int i = 0; i < 9; i++) {
+						for (int j = 0; j < 8; j++) {
+							if (vdata[i][j]) {
+								vcell.moveTo(i*dxVert, j*dyVert);
+								Graphics::Surface sub = fuses[0]->getSubArea(vcell);
+								drawImage(sub, vz.x + i*dxVert, vz.y + j*dyVert, true);
+							}
+						}
+					}
+
+					for (int i = 0; i < 8; i++) {
+						for (int j = 0; j < 9; j++) {	
+							if (hdata[i][j]) {
+								hcell.moveTo(i*dxHoriz, j*dyHoriz);
+								Graphics::Surface sub = fuses[0]->getSubArea(hcell);
+								drawImage(sub, hz.x + i*dxHoriz, hz.y + j*dyHoriz, true);
+								//debug("Found horizontal fuse between %d, %d and %d, %d", i, j, i + 1, j);
+							}
+						}
+					}
+				}
+				break;
+
+			default:
+				break;
+			}
+		}
+
+		bool hfound = true;
+		for (int i = 0; i < 8; i++) {
+			for (int j = 0; j < 9; j++) {
+				if (hdata[i][j] != hsol[i][j]) {
+					hfound = false;
+					break;
+				}
+			}
+			if (!hfound)
+				break;
+		}
+
+		bool vfound = true;
+		for (int i = 0; i < 9; i++) {
+			for (int j = 0; j < 8; j++) {
+				if (vdata[i][j] != vsol[i][j]) {
+					vfound = false;
+					break;
+				}
+			}
+			if (!vfound)
+				break;
+		}
+
+		if (hfound && vfound) {
+			_nextLevel = code->levelIfWin;
+			return;
+		}
+
+		drawScreen();
+		g_system->delayMillis(10);
+	}
+}
+
 void SpiderEngine::showCredits() {
+	if (_cheatsEnabled && !_arcadeMode.empty()) {
+		_skipLevel = true;
+		return;
+	}
+
 	changeScreenMode("640x480");
 	MVideo video("cine/credits.smk", Common::Point(0, 0), false, false, false);
 	runIntro(video);

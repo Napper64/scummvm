@@ -7,10 +7,10 @@
  * Additional copyright for this file:
  * Copyright (C) 1995 Presto Studios, Inc.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,8 +18,7 @@
  * GNU General Public License for more details.
 
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -134,7 +133,7 @@ int LairEntry::postEnterRoom(Window *viewWindow, const Location &priorLocation) 
 		}
 
 		_vm->_sound->timerCallback();
-		_vm->yield();
+		_vm->yield(nullptr);
 	}
 
 	_vm->_sound->stopSoundEffect(_currentSoundID);
@@ -163,7 +162,7 @@ int LairEntry::postEnterRoom(Window *viewWindow, const Location &priorLocation) 
 		}
 
 		_vm->_sound->timerCallback();
-		_vm->yield();
+		_vm->yield(nullptr);
 	}
 
 	_vm->_sound->stopSoundEffect(_currentSoundID);
@@ -337,7 +336,7 @@ int LairEntry::onCharacter(Window *viewWindow, const Common::KeyState &character
 					timerCallback(viewWindow);
 
 				_vm->_sound->timerCallback();
-				_vm->yield();
+				_vm->yield(nullptr);
 			}
 
 			_vm->_sound->stopSoundEffect(_currentSoundID);
@@ -578,7 +577,7 @@ int TransporterControls::onCharacter(Window *viewWindow, const Common::KeyState 
 					// Wait two seconds
 					uint32 startTime = g_system->getMillis();
 					while (!_vm->shouldQuit() && startTime + 2000 > g_system->getMillis())
-						_vm->yield();
+						_vm->yield(nullptr);
 
 					// Move to a different depth to enter the transporter
 					DestinationScene newScene;
@@ -630,7 +629,7 @@ int TransporterControls::onCharacter(Window *viewWindow, const Common::KeyState 
 			// Wait two seconds
 			uint32 startTime = g_system->getMillis();
 			while (!_vm->shouldQuit() && startTime + 2000 > g_system->getMillis())
-				_vm->yield();
+				_vm->yield(nullptr);
 
 			// Move to a different depth to enter the transporter
 			DestinationScene newScene;

@@ -7,10 +7,10 @@
  * Additional copyright for this file:
  * Copyright (C) 1995 Presto Studios, Inc.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,8 +18,7 @@
  * GNU General Public License for more details.
 
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -749,7 +748,7 @@ bool SceneViewWindow::timeSuitJump(int destination) {
 	jumpMovie->playToFrame(24);
 
 	while (!_vm->shouldQuit() && jumpMovie->getMode() != VideoWindow::kModeStopped && _vm->_sound->isInterfaceSoundPlaying()) {
-		_vm->yield();
+		_vm->yield(jumpMovie.get());
 		_vm->_sound->timerCallback();
 	}
 
@@ -796,7 +795,7 @@ bool SceneViewWindow::timeSuitJump(int destination) {
 	jumpMovie->playVideo();
 
 	while (!_vm->shouldQuit() && jumpMovie->getMode() != VideoWindow::kModeStopped)
-		_vm->yield();
+		_vm->yield(jumpMovie.get());
 
 	if (_vm->shouldQuit())
 		return true;
@@ -882,7 +881,7 @@ bool SceneViewWindow::timeSuitJump(int destination) {
 	jumpMovie->playToFrame(48);
 
 	while (!_vm->shouldQuit() && jumpMovie->getMode() != VideoWindow::kModeStopped && _vm->_sound->isInterfaceSoundPlaying()) {
-		_vm->yield();
+		_vm->yield(jumpMovie.get());
 		_vm->_sound->timerCallback();
 	}
 
@@ -1079,7 +1078,7 @@ bool SceneViewWindow::videoTransition(const Location &location, DestinationScene
 	animationMovie->playToFrame(destinationData.transitionStartFrame + destinationData.transitionLength - 1);
 
 	while (!_vm->shouldQuit() && animationMovie->getMode() != VideoWindow::kModeStopped) {
-		_vm->yield();
+		_vm->yield(animationMovie.get());
 		_vm->_sound->timerCallback();
 	}
 
@@ -1146,7 +1145,7 @@ bool SceneViewWindow::walkTransition(const Location &location, const Destination
 
 	_walkMovie->playToFrame(destinationData.transitionStartFrame + destinationData.transitionLength - 1);
 	while (!_vm->shouldQuit() && _walkMovie->getMode() != VideoWindow::kModeStopped) {
-		_vm->yield();
+		_vm->yield(_walkMovie);
 		_vm->_sound->timerCallback();
 	}
 
@@ -1187,7 +1186,7 @@ bool SceneViewWindow::pushTransition(Graphics::Surface *curBackground, Graphics:
 				memcpy(curBackground->getBasePtr(0, j), newBackground->getBasePtr(0, curBackground->h - (i + stripSize) + j), newBackground->w * newBackground->format.bytesPerPixel);
 
 			invalidateWindow(false);
-			_vm->yield();
+			_vm->yield(nullptr);
 		}
 		break;
 	case 1: // Push right
@@ -1198,7 +1197,7 @@ bool SceneViewWindow::pushTransition(Graphics::Surface *curBackground, Graphics:
 				memcpy(curBackground->getBasePtr(0, j), newBackground->getBasePtr(newBackground->w - (i + stripSize), j), stripSize * newBackground->format.bytesPerPixel);
 
 			invalidateWindow(false);
-			_vm->yield();
+			_vm->yield(nullptr);
 		}
 		break;
 	case 2: // Push left
@@ -1209,7 +1208,7 @@ bool SceneViewWindow::pushTransition(Graphics::Surface *curBackground, Graphics:
 				memcpy(curBackground->getBasePtr(curBackground->w - (int)stripSize, j), newBackground->getBasePtr(i, j), stripSize * newBackground->format.bytesPerPixel);
 
 			invalidateWindow(false);
-			_vm->yield();
+			_vm->yield(nullptr);
 		}
 		break;
 	case 3: // Push up
@@ -1220,7 +1219,7 @@ bool SceneViewWindow::pushTransition(Graphics::Surface *curBackground, Graphics:
 				memcpy(curBackground->getBasePtr(0, curBackground->h - stripSize + j), newBackground->getBasePtr(0, i + j), newBackground->w * newBackground->format.bytesPerPixel);
 
 			invalidateWindow(false);
-			_vm->yield();
+			_vm->yield(nullptr);
 		}
 		break;
 	}
@@ -1256,7 +1255,7 @@ bool SceneViewWindow::slideInTransition(Graphics::Surface *newBackground, int di
 				memcpy(_preBuffer->getBasePtr(0, j), newBackground->getBasePtr(0, DIB_FRAME_HEIGHT - j), newBackground->w * newBackground->format.bytesPerPixel);
 
 			invalidateWindow(false);
-			_vm->yield();
+			_vm->yield(nullptr);
 		}
 		break;
 	case 1: // Push right
@@ -1265,7 +1264,7 @@ bool SceneViewWindow::slideInTransition(Graphics::Surface *newBackground, int di
 				memcpy(_preBuffer->getBasePtr(0, j), newBackground->getBasePtr(DIB_FRAME_WIDTH - i, j), i * newBackground->format.bytesPerPixel);
 
 			invalidateWindow(false);
-			_vm->yield();
+			_vm->yield(nullptr);
 		}
 		break;
 	case 2: // Push left
@@ -1274,7 +1273,7 @@ bool SceneViewWindow::slideInTransition(Graphics::Surface *newBackground, int di
 				memcpy(_preBuffer->getBasePtr(0, DIB_FRAME_WIDTH - i), newBackground->getBasePtr(0, j), i * newBackground->format.bytesPerPixel);
 
 			invalidateWindow(false);
-			_vm->yield();
+			_vm->yield(nullptr);
 		}
 		break;
 	case 3: // Push up
@@ -1283,7 +1282,7 @@ bool SceneViewWindow::slideInTransition(Graphics::Surface *newBackground, int di
 				memcpy(_preBuffer->getBasePtr(0, DIB_FRAME_HEIGHT - j), newBackground->getBasePtr(0, j), newBackground->w * newBackground->format.bytesPerPixel);
 
 			invalidateWindow(false);
-			_vm->yield();
+			_vm->yield(nullptr);
 		}
 		break;
 	}
@@ -1309,7 +1308,7 @@ bool SceneViewWindow::slideOutTransition(Graphics::Surface *newBackground, int d
 			_vm->_gfx->crossBlit(_preBuffer, 0, 0, 432, 189, newBackground, 0, 0);
 			_vm->_gfx->crossBlit(_preBuffer, 0, i, 432, 189 - i, &curBackground, 0, 0);
 			invalidateWindow(false);
-			_vm->yield();
+			_vm->yield(nullptr);
 		}
 		break;
 	case 1: // Push right
@@ -1318,7 +1317,7 @@ bool SceneViewWindow::slideOutTransition(Graphics::Surface *newBackground, int d
 				_vm->_gfx->crossBlit(_preBuffer, i, 0, DIB_FRAME_WIDTH - i, 189, newBackground, i, 0);
 			_vm->_gfx->crossBlit(_preBuffer, 0, 0, i, 189, &curBackground, DIB_FRAME_WIDTH - i, 0);
 			invalidateWindow(false);
-			_vm->yield();
+			_vm->yield(nullptr);
 		}
 		break;
 	case 2: // Push left
@@ -1326,7 +1325,7 @@ bool SceneViewWindow::slideOutTransition(Graphics::Surface *newBackground, int d
 			_vm->_gfx->crossBlit(_preBuffer, 0, 0, i, 189, newBackground, 0, 0);
 			_vm->_gfx->crossBlit(_preBuffer, i, 0, 432 - i, 189, &curBackground, 0, 0);
 			invalidateWindow(false);
-			_vm->yield();
+			_vm->yield(nullptr);
 		}
 		break;
 	case 3: // Push up
@@ -1334,7 +1333,7 @@ bool SceneViewWindow::slideOutTransition(Graphics::Surface *newBackground, int d
 			_vm->_gfx->crossBlit(_preBuffer, 0, 0, 432, 189, newBackground, 0, 0);
 			_vm->_gfx->crossBlit(_preBuffer, 0, 189 - i, 432, i, &curBackground, 0, 0);
 			invalidateWindow(false);
-			_vm->yield();
+			_vm->yield(nullptr);
 		}
 		break;
 	}
@@ -1573,7 +1572,7 @@ bool SceneViewWindow::playSynchronousAnimation(int animationID) {
 	animationMovie->playToFrame(animDatabase[i].startFrame + animDatabase[i].frameCount - 1);
 
 	while (!_vm->shouldQuit() && animationMovie->getMode() != VideoWindow::kModeStopped) {
-		_vm->yield();
+		_vm->yield(animationMovie.get());
 		_vm->_sound->timerCallback();
 	}
 
@@ -1616,7 +1615,7 @@ bool SceneViewWindow::playSynchronousAnimationExtern(int animationID) {
 	animationMovie->playVideo();
 
 	while (!_vm->shouldQuit() && animationMovie->getMode() != VideoWindow::kModeStopped) {
-		_vm->yield();
+		_vm->yield(animationMovie.get());
 		_vm->_sound->timerCallback();
 	}
 
@@ -1680,7 +1679,7 @@ bool SceneViewWindow::playPlacedSynchronousAnimation(int animationID, int left, 
 	animationMovie->playToFrame(animDatabase[i].startFrame + animDatabase[i].frameCount - 1);
 
 	while (!_vm->shouldQuit() && animationMovie->getMode() != VideoWindow::kModeStopped) {
-		_vm->yield();
+		_vm->yield(animationMovie.get());
 		_vm->_sound->timerCallback();
 	}
 
@@ -1750,7 +1749,7 @@ bool SceneViewWindow::playClippedSynchronousAnimation(int animationID, int left,
 	animationMovie->playToFrame(animDatabase[i].startFrame + animDatabase[i].frameCount - 1);
 
 	while (!_vm->shouldQuit() && animationMovie->getMode() != VideoWindow::kModeStopped) {
-		_vm->yield();
+		_vm->yield(animationMovie.get());
 		_vm->_sound->timerCallback();
 	}
 
