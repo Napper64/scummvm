@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ScummVM 1.3.0svn\n"
 "Report-Msgid-Bugs-To: scummvm-devel@lists.scummvm.org\n"
-"POT-Creation-Date: 2021-12-28 13:02+0000\n"
-"PO-Revision-Date: 2021-12-24 17:26+0000\n"
+"POT-Creation-Date: 2022-01-16 20:20+0000\n"
+"PO-Revision-Date: 2022-01-06 13:06+0000\n"
 "Last-Translator: Walter Agazzi <tag2015@gmail.com>\n"
 "Language-Team: Italian <https://translations.scummvm.org/projects/scummvm/"
 "scummvm/it/>\n"
@@ -68,8 +68,8 @@ msgstr "Su"
 #: backends/events/default/default-events.cpp:194
 #: backends/events/default/default-events.cpp:218
 #: backends/platform/wii/options.cpp:47 engines/asylum/asylum.cpp:201
-#: engines/cine/saveload.cpp:863 engines/drascula/saveload.cpp:48
-#: engines/mohawk/myst_stacks/menu.cpp:283
+#: engines/buried/saveload.cpp:69 engines/cine/saveload.cpp:863
+#: engines/drascula/saveload.cpp:48 engines/mohawk/myst_stacks/menu.cpp:283
 #: engines/mohawk/myst_stacks/menu.cpp:300
 #: engines/mohawk/myst_stacks/menu.cpp:318
 #: engines/mohawk/riven_stacks/aspit.cpp:349
@@ -132,8 +132,8 @@ msgstr ""
 #: gui/filebrowser-dialog.cpp:136 gui/fluidsynth-dialog.cpp:217
 #: gui/launcher.cpp:392 gui/launcher.cpp:421 gui/launcher.cpp:464
 #: gui/options.cpp:3096 gui/options.cpp:3134 gui/saveload-dialog.cpp:343
-#: backends/events/default/default-events.cpp:194 engines/buried/buried.cpp:565
-#: engines/grim/grim.cpp:356 engines/kyra/gui/saveload_eob.cpp:595
+#: backends/events/default/default-events.cpp:194 engines/buried/buried.cpp:580
+#: engines/grim/grim.cpp:357 engines/kyra/gui/saveload_eob.cpp:595
 #: engines/kyra/gui/saveload_eob.cpp:628
 #: engines/parallaction/metaengine.cpp:145
 #: engines/sci/graphics/controls32.cpp:927
@@ -144,7 +144,7 @@ msgstr "Sì"
 #: gui/filebrowser-dialog.cpp:136 gui/fluidsynth-dialog.cpp:217
 #: gui/launcher.cpp:392 gui/launcher.cpp:421 gui/launcher.cpp:464
 #: gui/options.cpp:3096 gui/options.cpp:3134 gui/saveload-dialog.cpp:343
-#: engines/buried/buried.cpp:565 engines/grim/grim.cpp:356
+#: engines/buried/buried.cpp:580 engines/grim/grim.cpp:357
 #: engines/kyra/gui/saveload_eob.cpp:595 engines/kyra/gui/saveload_eob.cpp:628
 #: engines/parallaction/metaengine.cpp:151
 #: engines/sci/graphics/controls32.cpp:927
@@ -168,18 +168,19 @@ msgstr ""
 #: gui/massadd.cpp:88 gui/options.cpp:2140 gui/saveload-dialog.cpp:1187
 #: engines/engine.cpp:525 engines/engine.cpp:549
 #: backends/platform/wii/options.cpp:46 engines/agos/animation.cpp:558
-#: engines/drascula/saveload.cpp:48 engines/groovie/script.cpp:605
-#: engines/parallaction/saveload.cpp:270 engines/saga/music.cpp:99
-#: engines/sci/engine/kgraphics.cpp:75 engines/sci/graphics/controls32.cpp:924
-#: engines/scumm/dialogs.cpp:180 engines/scumm/scumm.cpp:1352
-#: engines/scumm/scumm.cpp:1378 engines/scumm/scumm.cpp:1400
-#: engines/scumm/scumm.cpp:1668 engines/scumm/scumm.cpp:2138
-#: engines/sky/compact.cpp:141 engines/sword1/animation.cpp:531
-#: engines/sword1/animation.cpp:552 engines/sword1/animation.cpp:568
-#: engines/sword1/animation.cpp:576 engines/sword1/control.cpp:888
-#: engines/sword1/logic.cpp:1634 engines/sword2/animation.cpp:428
-#: engines/sword2/animation.cpp:448 engines/sword2/animation.cpp:464
-#: engines/sword2/animation.cpp:474 engines/zvision/file/save_manager.cpp:225
+#: engines/buried/saveload.cpp:69 engines/drascula/saveload.cpp:48
+#: engines/groovie/script.cpp:613 engines/parallaction/saveload.cpp:270
+#: engines/saga/music.cpp:99 engines/sci/engine/kgraphics.cpp:75
+#: engines/sci/graphics/controls32.cpp:924 engines/scumm/dialogs.cpp:180
+#: engines/scumm/scumm.cpp:1352 engines/scumm/scumm.cpp:1378
+#: engines/scumm/scumm.cpp:1400 engines/scumm/scumm.cpp:1668
+#: engines/scumm/scumm.cpp:2138 engines/sky/compact.cpp:141
+#: engines/sword1/animation.cpp:531 engines/sword1/animation.cpp:552
+#: engines/sword1/animation.cpp:568 engines/sword1/animation.cpp:576
+#: engines/sword1/control.cpp:888 engines/sword1/logic.cpp:1634
+#: engines/sword2/animation.cpp:428 engines/sword2/animation.cpp:448
+#: engines/sword2/animation.cpp:464 engines/sword2/animation.cpp:474
+#: engines/zvision/file/save_manager.cpp:225
 msgid "OK"
 msgstr "OK"
 
@@ -226,7 +227,7 @@ msgid "Download complete, downloaded %d packs, %s %S"
 msgstr "Download completato, scaricato/i %d pacchetto/i, %s %S"
 
 #: gui/downloadiconsdialog.cpp:186 gui/downloadiconsdialog.cpp:303
-#: gui/gui-manager.cpp:219 gui/unknown-game-dialog.cpp:53
+#: gui/gui-manager.cpp:221 gui/unknown-game-dialog.cpp:53
 #: engines/nancy/dialogs.cpp:313 engines/scumm/help.cpp:124
 #: engines/scumm/help.cpp:139 engines/scumm/help.cpp:164
 #: engines/scumm/help.cpp:190 engines/scumm/help.cpp:208
@@ -322,7 +323,7 @@ msgid "Engine"
 msgstr "Motore"
 
 #: gui/editgamedialog.cpp:211 gui/options.cpp:1814 gui/options.cpp:1984
-#: backends/graphics/sdl/sdl-graphics.cpp:425
+#: backends/graphics/sdl/sdl-graphics.cpp:410
 msgid "Graphics"
 msgstr "Grafica"
 
@@ -648,19 +649,19 @@ msgstr ""
 "Sei sicuro di voler ripristinare tutte le impostazioni di FluidSynth al loro "
 "valore predefinito?"
 
-#: gui/gui-manager.cpp:210
+#: gui/gui-manager.cpp:212
 msgid "GUI"
 msgstr "Interfaccia"
 
-#: gui/gui-manager.cpp:214 engines/mohawk/myst.cpp:573
+#: gui/gui-manager.cpp:216 engines/mohawk/myst.cpp:573
 #: engines/mohawk/riven.cpp:837
 msgid "Interact"
 msgstr "Interazione"
 
-#: gui/gui-manager.cpp:225 engines/metaengine.cpp:109
+#: gui/gui-manager.cpp:227 engines/metaengine.cpp:109
 #: engines/dragons/metaengine.cpp:160 engines/glk/scott/scott.cpp:411
-#: engines/griffon/metaengine.cpp:95 engines/grim/grim.cpp:454
-#: engines/grim/grim.cpp:531 engines/twine/metaengine.cpp:329
+#: engines/griffon/metaengine.cpp:95 engines/grim/grim.cpp:455
+#: engines/grim/grim.cpp:536 engines/twine/metaengine.cpp:329
 #: engines/twine/metaengine.cpp:396 engines/wintermute/keymapper_tables.h:1262
 #: engines/wintermute/keymapper_tables.h:1372
 #: engines/wintermute/keymapper_tables.h:1843
@@ -668,10 +669,10 @@ msgstr "Interazione"
 msgid "Up"
 msgstr "Su"
 
-#: gui/gui-manager.cpp:230 engines/metaengine.cpp:114
+#: gui/gui-manager.cpp:232 engines/metaengine.cpp:114
 #: engines/dragons/metaengine.cpp:166 engines/glk/scott/scott.cpp:411
-#: engines/griffon/metaengine.cpp:101 engines/grim/grim.cpp:459
-#: engines/grim/grim.cpp:536 engines/twine/metaengine.cpp:336
+#: engines/griffon/metaengine.cpp:101 engines/grim/grim.cpp:460
+#: engines/grim/grim.cpp:541 engines/twine/metaengine.cpp:336
 #: engines/twine/metaengine.cpp:404 engines/wintermute/keymapper_tables.h:1268
 #: engines/wintermute/keymapper_tables.h:1379
 #: engines/wintermute/keymapper_tables.h:1849
@@ -679,9 +680,9 @@ msgstr "Su"
 msgid "Down"
 msgstr "Giù"
 
-#: gui/gui-manager.cpp:235 engines/metaengine.cpp:119
+#: gui/gui-manager.cpp:237 engines/metaengine.cpp:119
 #: engines/dragons/metaengine.cpp:172 engines/griffon/metaengine.cpp:107
-#: engines/grim/grim.cpp:464 engines/grim/grim.cpp:541
+#: engines/grim/grim.cpp:465 engines/grim/grim.cpp:546
 #: engines/twine/metaengine.cpp:351 engines/twine/metaengine.cpp:419
 #: engines/wintermute/keymapper_tables.h:320
 #: engines/wintermute/keymapper_tables.h:1274
@@ -691,9 +692,9 @@ msgstr "Giù"
 msgid "Left"
 msgstr "Sinistra"
 
-#: gui/gui-manager.cpp:240 engines/metaengine.cpp:124
+#: gui/gui-manager.cpp:242 engines/metaengine.cpp:124
 #: engines/dragons/metaengine.cpp:178 engines/griffon/metaengine.cpp:113
-#: engines/grim/grim.cpp:469 engines/grim/grim.cpp:546
+#: engines/grim/grim.cpp:470 engines/grim/grim.cpp:551
 #: engines/twine/metaengine.cpp:343 engines/twine/metaengine.cpp:412
 #: engines/wintermute/keymapper_tables.h:326
 #: engines/wintermute/keymapper_tables.h:1280
@@ -703,7 +704,7 @@ msgstr "Sinistra"
 msgid "Right"
 msgstr "Destra"
 
-#: gui/gui-manager.cpp:245 engines/pegasus/pegasus.cpp:2814
+#: gui/gui-manager.cpp:247 engines/pegasus/pegasus.cpp:2814
 #: engines/wintermute/keymapper_tables.h:305
 #: engines/wintermute/keymapper_tables.h:346
 #: engines/wintermute/keymapper_tables.h:381
@@ -836,14 +837,14 @@ msgid "Search:"
 msgstr "Cerca:"
 
 #: gui/launcher.cpp:272 engines/dialogs.cpp:97 engines/engine.cpp:864
-#: engines/buried/saveload.cpp:514 engines/pegasus/pegasus.cpp:383
-#: engines/trecision/saveload.cpp:252 engines/tsage/scenes.cpp:630
-#: engines/wage/saveload.cpp:741 engines/xeen/saves.cpp:255
+#: engines/pegasus/pegasus.cpp:383 engines/trecision/saveload.cpp:252
+#: engines/tsage/scenes.cpp:630 engines/wage/saveload.cpp:741
+#: engines/xeen/saves.cpp:255
 msgid "Load game:"
 msgstr "Carica gioco:"
 
 #: gui/launcher.cpp:272 engines/dialogs.cpp:97 engines/engine.cpp:864
-#: engines/buried/saveload.cpp:514 engines/parallaction/metaengine.cpp:127
+#: engines/parallaction/metaengine.cpp:127
 #: engines/parallaction/saveload.cpp:193 engines/pegasus/pegasus.cpp:383
 #: engines/scumm/dialogs.cpp:176 engines/trecision/saveload.cpp:252
 #: engines/tsage/scenes.cpp:630 engines/wage/saveload.cpp:741
@@ -1176,7 +1177,7 @@ msgstr "Ridimensiona:"
 msgid "Scaler:"
 msgstr "Scaler:"
 
-#: gui/options.cpp:1471 backends/graphics/sdl/sdl-graphics.cpp:416
+#: gui/options.cpp:1471 backends/graphics/sdl/sdl-graphics.cpp:401
 msgid "Fullscreen mode"
 msgstr "Modalità a schermo intero"
 
@@ -2481,16 +2482,15 @@ msgid "~R~eturn to Launcher"
 msgstr "~V~ai a elenco giochi"
 
 #: engines/dialogs.cpp:98 engines/engine.cpp:893 engines/agi/saveload.cpp:766
-#: engines/avalanche/parser.cpp:1918 engines/buried/saveload.cpp:533
-#: engines/cine/various.cpp:349 engines/dm/loadsave.cpp:199
-#: engines/drascula/saveload.cpp:382 engines/dreamweb/saveload.cpp:261
-#: engines/glk/streams.cpp:1432 engines/gnap/menu.cpp:465
-#: engines/groovie/script.cpp:781 engines/groovie/script.cpp:2069
-#: engines/hugo/file.cpp:297 engines/illusions/menusystem.cpp:702
-#: engines/kingdom/kingdom.cpp:736 engines/lab/savegame.cpp:242
-#: engines/mads/nebular/dialogs_nebular.cpp:349
+#: engines/avalanche/parser.cpp:1918 engines/cine/various.cpp:349
+#: engines/dm/loadsave.cpp:199 engines/drascula/saveload.cpp:382
+#: engines/dreamweb/saveload.cpp:261 engines/glk/streams.cpp:1432
+#: engines/gnap/menu.cpp:465 engines/groovie/script.cpp:796
+#: engines/groovie/script.cpp:2097 engines/hugo/file.cpp:297
+#: engines/illusions/menusystem.cpp:702 engines/kingdom/kingdom.cpp:736
+#: engines/lab/savegame.cpp:242 engines/mads/nebular/dialogs_nebular.cpp:349
 #: engines/neverhood/menumodule.cpp:889 engines/pegasus/pegasus.cpp:402
-#: engines/prince/saveload.cpp:54 engines/sci/engine/guest_additions.cpp:678
+#: engines/prince/saveload.cpp:54 engines/sci/engine/guest_additions.cpp:725
 #: engines/sci/engine/kfile.cpp:1079 engines/sherlock/scalpel/scalpel.cpp:1249
 #: engines/sherlock/tattoo/widget_files.cpp:74 engines/startrek/saveload.cpp:42
 #: engines/toltecs/menu.cpp:302 engines/toon/toon.cpp:3405
@@ -2501,18 +2501,17 @@ msgid "Save game:"
 msgstr "Salva gioco:"
 
 #: engines/dialogs.cpp:98 engines/engine.cpp:893 engines/agi/saveload.cpp:766
-#: engines/avalanche/parser.cpp:1918 engines/buried/saveload.cpp:533
-#: engines/cine/various.cpp:349 engines/dm/loadsave.cpp:199
-#: engines/drascula/saveload.cpp:382 engines/dreamweb/saveload.cpp:261
-#: engines/glk/streams.cpp:1432 engines/gnap/menu.cpp:465
-#: engines/groovie/script.cpp:776 engines/groovie/script.cpp:781
-#: engines/groovie/script.cpp:2069 engines/hugo/file.cpp:297
-#: engines/illusions/menusystem.cpp:702 engines/kingdom/kingdom.cpp:736
-#: engines/lab/savegame.cpp:237 engines/lab/savegame.cpp:242
-#: engines/mads/nebular/dialogs_nebular.cpp:349
+#: engines/avalanche/parser.cpp:1918 engines/cine/various.cpp:349
+#: engines/dm/loadsave.cpp:199 engines/drascula/saveload.cpp:382
+#: engines/dreamweb/saveload.cpp:261 engines/glk/streams.cpp:1432
+#: engines/gnap/menu.cpp:465 engines/groovie/script.cpp:791
+#: engines/groovie/script.cpp:796 engines/groovie/script.cpp:2097
+#: engines/hugo/file.cpp:297 engines/illusions/menusystem.cpp:702
+#: engines/kingdom/kingdom.cpp:736 engines/lab/savegame.cpp:237
+#: engines/lab/savegame.cpp:242 engines/mads/nebular/dialogs_nebular.cpp:349
 #: engines/neverhood/menumodule.cpp:889 engines/parallaction/metaengine.cpp:133
 #: engines/parallaction/saveload.cpp:208 engines/pegasus/pegasus.cpp:402
-#: engines/prince/saveload.cpp:54 engines/sci/engine/guest_additions.cpp:679
+#: engines/prince/saveload.cpp:54 engines/sci/engine/guest_additions.cpp:726
 #: engines/sci/engine/kfile.cpp:1079 engines/scumm/dialogs.cpp:175
 #: engines/sherlock/scalpel/scalpel.cpp:1249
 #: engines/sherlock/tattoo/widget_files.cpp:74 engines/startrek/saveload.cpp:42
@@ -2743,10 +2742,10 @@ msgstr "Clic centrale"
 msgid "Right Click"
 msgstr "Clic destro"
 
-#: engines/metaengine.cpp:77 engines/hdb/metaengine.cpp:238
-#: engines/mohawk/myst.cpp:596 engines/mohawk/riven.cpp:860
-#: engines/sky/metaengine.cpp:122 engines/twine/metaengine.cpp:99
-#: engines/wintermute/keymapper_tables.h:1531
+#: engines/metaengine.cpp:77 engines/grim/grim.cpp:523
+#: engines/hdb/metaengine.cpp:238 engines/mohawk/myst.cpp:596
+#: engines/mohawk/riven.cpp:860 engines/sky/metaengine.cpp:122
+#: engines/twine/metaengine.cpp:99 engines/wintermute/keymapper_tables.h:1531
 msgid "Pause"
 msgstr "Pausa"
 
@@ -2754,8 +2753,8 @@ msgstr "Pausa"
 msgid "Game menu"
 msgstr "Menù di gioco"
 
-#: engines/metaengine.cpp:88 engines/grim/grim.cpp:505
-#: engines/grim/grim.cpp:597 engines/mohawk/myst.cpp:567
+#: engines/metaengine.cpp:88 engines/grim/grim.cpp:506
+#: engines/grim/grim.cpp:602 engines/mohawk/myst.cpp:567
 #: engines/mohawk/riven.cpp:831 engines/wintermute/keymapper_tables.h:220
 #: engines/wintermute/keymapper_tables.h:1092
 #: engines/wintermute/keymapper_tables.h:1248
@@ -2774,7 +2773,7 @@ msgid "Predictive input dialog"
 msgstr "Finestra input predittivo"
 
 #: engines/metaengine.cpp:104 engines/griffon/metaengine.cpp:89
-#: engines/grim/grim.cpp:511 engines/grim/grim.cpp:603
+#: engines/grim/grim.cpp:512 engines/grim/grim.cpp:608
 #: engines/sky/metaengine.cpp:97 engines/wintermute/keymapper_tables.h:54
 msgid "Confirm"
 msgstr "Conferma"
@@ -3090,27 +3089,27 @@ msgid "Resolution: %dx%d"
 msgstr "Risoluzione: %dx%d"
 
 #: backends/graphics/openglsdl/openglsdl-graphics.cpp:740
-#: backends/graphics/surfacesdl/surfacesdl-graphics.cpp:2455
+#: backends/graphics/surfacesdl/surfacesdl-graphics.cpp:2450
 msgid "Enabled aspect ratio correction"
 msgstr "Correzione proporzioni attivata"
 
 #: backends/graphics/openglsdl/openglsdl-graphics.cpp:742
-#: backends/graphics/surfacesdl/surfacesdl-graphics.cpp:2461
+#: backends/graphics/surfacesdl/surfacesdl-graphics.cpp:2456
 msgid "Disabled aspect ratio correction"
 msgstr "Correzione proporzioni disattivata"
 
 #: backends/graphics/openglsdl/openglsdl-graphics.cpp:763
-#: backends/graphics/surfacesdl/surfacesdl-graphics.cpp:2477
+#: backends/graphics/surfacesdl/surfacesdl-graphics.cpp:2472
 msgid "Filtering enabled"
 msgstr "Filtro video attivato"
 
 #: backends/graphics/openglsdl/openglsdl-graphics.cpp:765
-#: backends/graphics/surfacesdl/surfacesdl-graphics.cpp:2479
+#: backends/graphics/surfacesdl/surfacesdl-graphics.cpp:2474
 msgid "Filtering disabled"
 msgstr "Filtro video disattivato"
 
 #: backends/graphics/openglsdl/openglsdl-graphics.cpp:794
-#: backends/graphics/surfacesdl/surfacesdl-graphics.cpp:2506
+#: backends/graphics/surfacesdl/surfacesdl-graphics.cpp:2501
 msgid "Stretch mode"
 msgstr "Ridimensionamento"
 
@@ -3118,33 +3117,33 @@ msgstr "Ridimensionamento"
 msgid "SDL Surface"
 msgstr "SDL Surface"
 
-#: backends/graphics/surfacesdl/surfacesdl-graphics.cpp:2421
+#: backends/graphics/surfacesdl/surfacesdl-graphics.cpp:2416
 msgid "Active graphics filter:"
 msgstr "Filtro grafico attivo:"
 
-#: backends/graphics/sdl/sdl-graphics.cpp:364
+#: backends/graphics/sdl/sdl-graphics.cpp:349
 #, c-format
 msgid "Saved screenshot '%s'"
 msgstr "Salvato screenshot '%s'"
 
-#: backends/graphics/sdl/sdl-graphics.cpp:373
+#: backends/graphics/sdl/sdl-graphics.cpp:358
 msgid "Could not save screenshot"
 msgstr "Non è stato possibile salvare lo screenshot"
 
-#: backends/graphics/sdl/sdl-graphics.cpp:418
+#: backends/graphics/sdl/sdl-graphics.cpp:403
 msgid "Windowed mode"
 msgstr "Modalità finestra"
 
-#: backends/graphics/sdl/sdl-graphics.cpp:429 engines/scumm/help.cpp:85
+#: backends/graphics/sdl/sdl-graphics.cpp:414 engines/scumm/help.cpp:85
 msgid "Toggle fullscreen"
 msgstr "Attiva/disattiva schermo intero"
 
-#: backends/graphics/sdl/sdl-graphics.cpp:436 engines/scumm/help.cpp:98
+#: backends/graphics/sdl/sdl-graphics.cpp:421 engines/scumm/help.cpp:98
 #: engines/wintermute/keymapper_tables.h:960
 msgid "Toggle mouse capture"
 msgstr "Attiva/disattiva cattura puntatore"
 
-#: backends/graphics/sdl/sdl-graphics.cpp:441
+#: backends/graphics/sdl/sdl-graphics.cpp:426
 #: engines/wintermute/keymapper_tables.h:646
 #: engines/wintermute/keymapper_tables.h:695
 #: engines/wintermute/keymapper_tables.h:1098
@@ -3157,31 +3156,31 @@ msgstr "Attiva/disattiva cattura puntatore"
 msgid "Save screenshot"
 msgstr "Salva screenshot"
 
-#: backends/graphics/sdl/sdl-graphics.cpp:447
+#: backends/graphics/sdl/sdl-graphics.cpp:432
 msgid "Toggle aspect ratio correction"
 msgstr "Attiva/disattiva correzione proporzioni"
 
-#: backends/graphics/sdl/sdl-graphics.cpp:454
+#: backends/graphics/sdl/sdl-graphics.cpp:439
 msgid "Toggle linear filtered scaling"
 msgstr "Attiva/disattiva filtro grafico"
 
-#: backends/graphics/sdl/sdl-graphics.cpp:461
+#: backends/graphics/sdl/sdl-graphics.cpp:446
 msgid "Cycle through stretch modes"
 msgstr "Itera tra le modalità di ridimensionamento immagine"
 
-#: backends/graphics/sdl/sdl-graphics.cpp:467
+#: backends/graphics/sdl/sdl-graphics.cpp:452
 msgid "Increase the scale factor"
 msgstr "Aumenta fattore di scala"
 
-#: backends/graphics/sdl/sdl-graphics.cpp:473
+#: backends/graphics/sdl/sdl-graphics.cpp:458
 msgid "Decrease the scale factor"
 msgstr "Riduci fattore di scala"
 
-#: backends/graphics/sdl/sdl-graphics.cpp:479
+#: backends/graphics/sdl/sdl-graphics.cpp:464
 msgid "Switch to the next scaler"
 msgstr "Passa alla modalità (scaler) successiva"
 
-#: backends/graphics/sdl/sdl-graphics.cpp:484
+#: backends/graphics/sdl/sdl-graphics.cpp:469
 msgid "Switch to the previous scaler"
 msgstr "Passa alla modalità (scaler) precedente"
 
@@ -4068,7 +4067,7 @@ msgstr "Non emulare gli artefatti NTSC nei testi"
 
 #: engines/agi/detection.cpp:86 engines/cine/detection.cpp:51
 #: engines/drascula/detection.cpp:298 engines/dreamweb/detection.cpp:54
-#: engines/groovie/detection.cpp:387 engines/neverhood/detection.cpp:134
+#: engines/groovie/detection.cpp:424 engines/neverhood/detection.cpp:134
 #: engines/sherlock/detection.cpp:58 engines/toltecs/detection.cpp:212
 #: engines/trecision/detection.cpp:219 engines/ultima/detection.cpp:55
 #: engines/ultima/detection.cpp:106 engines/zvision/detection_tables.h:50
@@ -4077,7 +4076,7 @@ msgstr "Usa schermate di salvataggio originali"
 
 #: engines/agi/detection.cpp:87 engines/cine/detection.cpp:52
 #: engines/drascula/detection.cpp:299 engines/dreamweb/detection.cpp:55
-#: engines/groovie/detection.cpp:388 engines/neverhood/detection.cpp:135
+#: engines/groovie/detection.cpp:425 engines/neverhood/detection.cpp:135
 #: engines/sherlock/detection.cpp:59 engines/toltecs/detection.cpp:213
 #: engines/trecision/detection.cpp:220 engines/ultima/detection.cpp:56
 #: engines/ultima/detection.cpp:107 engines/zvision/detection_tables.h:51
@@ -4153,13 +4152,13 @@ msgstr ""
 #: engines/cine/various.cpp:360 engines/dm/dm.cpp:273
 #: engines/dm/loadsave.cpp:187 engines/drascula/saveload.cpp:395
 #: engines/dreamweb/saveload.cpp:169 engines/glk/streams.cpp:1441
-#: engines/gnap/menu.cpp:474 engines/groovie/script.cpp:758
-#: engines/groovie/script.cpp:793 engines/groovie/script.cpp:2056
+#: engines/gnap/menu.cpp:474 engines/groovie/script.cpp:773
+#: engines/groovie/script.cpp:808 engines/groovie/script.cpp:2084
 #: engines/hugo/file.cpp:399 engines/illusions/menusystem.cpp:679
 #: engines/kingdom/kingdom.cpp:746 engines/lab/savegame.cpp:257
 #: engines/mads/nebular/dialogs_nebular.cpp:376
 #: engines/neverhood/menumodule.cpp:902 engines/prince/saveload.cpp:63
-#: engines/sci/engine/guest_additions.cpp:681 engines/sci/engine/kfile.cpp:1206
+#: engines/sci/engine/guest_additions.cpp:728 engines/sci/engine/kfile.cpp:1206
 #: engines/sherlock/scalpel/scalpel.cpp:1262
 #: engines/sherlock/tattoo/widget_files.cpp:93 engines/startrek/saveload.cpp:67
 #: engines/toltecs/menu.cpp:272 engines/toon/toon.cpp:3499
@@ -4171,14 +4170,14 @@ msgstr "Carica partita:"
 #: engines/cine/various.cpp:360 engines/dm/dm.cpp:273
 #: engines/dm/loadsave.cpp:187 engines/drascula/saveload.cpp:395
 #: engines/dreamweb/saveload.cpp:169 engines/glk/streams.cpp:1441
-#: engines/gnap/menu.cpp:474 engines/groovie/script.cpp:758
-#: engines/groovie/script.cpp:776 engines/groovie/script.cpp:793
-#: engines/groovie/script.cpp:2056 engines/hugo/file.cpp:399
+#: engines/gnap/menu.cpp:474 engines/groovie/script.cpp:773
+#: engines/groovie/script.cpp:791 engines/groovie/script.cpp:808
+#: engines/groovie/script.cpp:2084 engines/hugo/file.cpp:399
 #: engines/illusions/menusystem.cpp:679 engines/kingdom/kingdom.cpp:746
 #: engines/lab/savegame.cpp:237 engines/lab/savegame.cpp:257
 #: engines/mads/nebular/dialogs_nebular.cpp:376
 #: engines/neverhood/menumodule.cpp:902 engines/prince/saveload.cpp:63
-#: engines/sci/engine/guest_additions.cpp:682 engines/sci/engine/kfile.cpp:1206
+#: engines/sci/engine/guest_additions.cpp:729 engines/sci/engine/kfile.cpp:1206
 #: engines/sherlock/scalpel/scalpel.cpp:1262
 #: engines/sherlock/tattoo/widget_files.cpp:93 engines/startrek/saveload.cpp:67
 #: engines/toltecs/menu.cpp:272 engines/toon/toon.cpp:3499
@@ -4302,15 +4301,15 @@ msgstr ""
 msgid "Load anyway"
 msgstr "Carica comunque"
 
-#: engines/bladerunner/bladerunner.cpp:356
+#: engines/bladerunner/bladerunner.cpp:358
 msgid "Failed to initialize resources"
 msgstr "Inizializzazione risorse fallita"
 
-#: engines/bladerunner/bladerunner.cpp:1057
+#: engines/bladerunner/bladerunner.cpp:1059
 msgid "A required game resource was not found"
 msgstr "Una risorsa richiesta dal gioco non è stata trovata"
 
-#: engines/bladerunner/bladerunner.cpp:2300
+#: engines/bladerunner/bladerunner.cpp:2302
 msgid ""
 "WARNING: This game was saved in Restored Cut Content mode, but you are "
 "playing in Original Content mode. The mode will be adjusted to Restored Cut "
@@ -4321,7 +4320,7 @@ msgstr ""
 "con Contenuto Tagliato per questa sessione di gioco, fino all'uscita dal "
 "gioco definitiva."
 
-#: engines/bladerunner/bladerunner.cpp:2302
+#: engines/bladerunner/bladerunner.cpp:2304
 msgid ""
 "WARNING: This game was saved in Original Content mode, but you are playing "
 "in Restored Cut Content mode. The mode will be adjusted to Original Content "
@@ -4331,7 +4330,7 @@ msgstr ""
 "giocando in Modalità con Contenuto Tagliato. Si passerà alla Modalità "
 "Originale per questa sessione di gioco, fino all'uscita dal gioco definitiva."
 
-#: engines/bladerunner/bladerunner.cpp:2304
+#: engines/bladerunner/bladerunner.cpp:2306
 msgid "Continue"
 msgstr "Continua"
 
@@ -4405,7 +4404,7 @@ msgstr ""
 #: engines/mohawk/detection_tables.h:1109 engines/myst3/detection.cpp:142
 #: engines/neverhood/detection.cpp:120 engines/saga/detection_tables.h:186
 #: engines/saga/detection_tables.h:1219 engines/saga/detection_tables.h:1278
-#: engines/sci/detection_tables.h:4987 engines/sci/detection_tables.h:4995
+#: engines/sci/detection_tables.h:5005 engines/sci/detection_tables.h:5013
 #: engines/sherlock/detection_tables.h:223 engines/stark/detection.cpp:319
 #: engines/teenagent/detection.cpp:117 engines/trecision/detection.cpp:199
 #: engines/zvision/detection_tables.h:190
@@ -4413,17 +4412,36 @@ msgstr ""
 msgid "Missing game code"
 msgstr "Codice gioco mancante"
 
-#: engines/buried/biochip_view.cpp:622
-msgid "Your game is now Paused.  Click OK to continue."
-msgstr "Gioco in pausa.  Clicca OK per continuare."
-
-#: engines/buried/buried.cpp:565
+#: engines/buried/buried.cpp:580
 msgid "Are you sure you want to quit?"
 msgstr "Sei sicuro di voler uscire?"
 
-#: engines/buried/saveload.cpp:107
-msgid "Invalid save file name"
-msgstr "Nome salvataggio non valido"
+#: engines/buried/buried.cpp:590
+msgid "Your game is now Paused.  Click OK to continue."
+msgstr "Gioco in pausa.  Clicca OK per continuare."
+
+#: engines/buried/saveload.cpp:66
+msgid ""
+"ScummVM found that you have saved games that should be converted from the "
+"original saved game format.\n"
+"The original saved game format is no longer supported directly, so you will "
+"not be able to load your games if you don't convert them.\n"
+"\n"
+"Press OK to convert them now, otherwise you will be asked again the next "
+"time you start the game.\n"
+msgstr ""
+"ScummVM ha rilevato dei salvataggi che dovrebbero essere convertiti.\n"
+"Il formato originale dei salvataggi non è più supportato, quindi non potrai "
+"caricare i tuoi salvataggi senza prima convertirli.\n"
+"\n"
+"Premi OK per convertirli adesso, altrimenti ti verrà richiesto al prossimo "
+"avvio del gioco.\n"
+
+#: engines/buried/saveload.cpp:165
+msgid "Saved game was created with a newer version of ScummVM. Unable to load."
+msgstr ""
+"Questo salvataggio è stato creato con una versione più recente di ScummVM. "
+"Impossibile caricarlo."
 
 #: engines/cge/detection.cpp:113
 msgid "Color Blind Mode"
@@ -4522,7 +4540,7 @@ msgid "Change Command"
 msgstr "Cambia azione"
 
 #: engines/dragons/metaengine.cpp:149 engines/griffon/metaengine.cpp:126
-#: engines/grim/grim.cpp:494 engines/grim/grim.cpp:586
+#: engines/grim/grim.cpp:495 engines/grim/grim.cpp:591
 #: engines/hdb/metaengine.cpp:231 engines/nancy/dialogs.cpp:145
 #: engines/scumm/help.cpp:224 engines/scumm/help.cpp:233
 #: engines/scumm/help.cpp:240 engines/scumm/help.cpp:248
@@ -4947,7 +4965,7 @@ msgstr "Mostra contatore FPS"
 msgid "Show the current FPS-rate, while you play."
 msgstr "Mostra il contatore dei frame al secondo (FPS) durante il gioco."
 
-#: engines/grim/grim.cpp:351
+#: engines/grim/grim.cpp:352
 #, c-format
 msgid ""
 "ScummVM found some problems with your game data files.\n"
@@ -4959,49 +4977,49 @@ msgstr ""
 "blocchi improvvisi.\n"
 "Desideri comunque avviare %s?"
 
-#: engines/grim/grim.cpp:474 engines/grim/grim.cpp:561
+#: engines/grim/grim.cpp:475 engines/grim/grim.cpp:566
 msgid "Run"
 msgstr "Corri"
 
-#: engines/grim/grim.cpp:479 engines/scumm/help.cpp:238
+#: engines/grim/grim.cpp:480 engines/scumm/help.cpp:238
 #: engines/scumm/help.cpp:246
 msgid "Examine"
 msgstr "Esamina"
 
-#: engines/grim/grim.cpp:484 engines/grim/grim.cpp:576
+#: engines/grim/grim.cpp:485 engines/grim/grim.cpp:581
 msgid "Use/Talk"
 msgstr "Usa/Parla"
 
-#: engines/grim/grim.cpp:489 engines/grim/grim.cpp:581
+#: engines/grim/grim.cpp:490 engines/grim/grim.cpp:586
 msgid "Pick up/Put away"
 msgstr "Raccogli/Riponi"
 
-#: engines/grim/grim.cpp:499 engines/grim/grim.cpp:591
+#: engines/grim/grim.cpp:500 engines/grim/grim.cpp:596
 msgid "Skip dialog lines"
 msgstr "Salta battuta dialogo"
 
-#: engines/grim/grim.cpp:517 engines/grim/grim.cpp:609
+#: engines/grim/grim.cpp:518 engines/grim/grim.cpp:614
 #: engines/hdb/metaengine.cpp:244
 msgid "Menu"
 msgstr "Menu"
 
-#: engines/grim/grim.cpp:551
+#: engines/grim/grim.cpp:556
 msgid "Cycle Objects Up"
 msgstr "Passa all'oggetto precedente"
 
-#: engines/grim/grim.cpp:556
+#: engines/grim/grim.cpp:561
 msgid "Cycle Objects Down"
 msgstr "Passa all'oggetto successivo"
 
-#: engines/grim/grim.cpp:566
+#: engines/grim/grim.cpp:571
 msgid "Quick Room Exit"
 msgstr "Uscita rapida stanza"
 
-#: engines/grim/grim.cpp:571
+#: engines/grim/grim.cpp:576
 msgid "Examine/Look"
 msgstr "Esamina/Guarda"
 
-#: engines/grim/grim.cpp:1343
+#: engines/grim/grim.cpp:1350
 msgid "Error: the game could not be saved."
 msgstr "Errore: non è stato possibile salvare il gioco."
 
@@ -5098,29 +5116,29 @@ msgstr ""
 "In alternativa, le edizioni Steam e GOG contengono già il file FullMonkeyMap."
 "int completo"
 
-#: engines/groovie/detection.cpp:377
+#: engines/groovie/detection.cpp:414
 msgid "Fast movie speed"
 msgstr "Filmati ad alta velocità"
 
-#: engines/groovie/detection.cpp:378
+#: engines/groovie/detection.cpp:415
 msgid "Play movies at an increased speed"
 msgstr "Aumenta la velocità di riproduzione dei filmati"
 
-#: engines/groovie/detection.cpp:397
+#: engines/groovie/detection.cpp:434
 msgid "Easier AI"
 msgstr "IA facilitata"
 
-#: engines/groovie/detection.cpp:398
+#: engines/groovie/detection.cpp:435
 msgid "Decrease the difficulty of AI puzzles"
 msgstr ""
 "Riduce le prestazioni dell'Intelligenza Artificiale, rendendo alcuni puzzle "
 "più semplici"
 
-#: engines/groovie/detection.cpp:407
+#: engines/groovie/detection.cpp:444
 msgid "Updated Credits Music"
 msgstr "Musica alternativa nei Credits"
 
-#: engines/groovie/detection.cpp:408
+#: engines/groovie/detection.cpp:445
 msgid ""
 "Play the song The Final Hour during the credits instead of reusing MIDI songs"
 msgstr ""
@@ -5131,31 +5149,25 @@ msgstr ""
 msgid "GroovieV2 support is not compiled in"
 msgstr "Il supporto per GroovieV2 non è stato incluso nella compilazione"
 
-#: engines/groovie/script.cpp:605
+#: engines/groovie/script.cpp:613
 msgid "Failed to save game"
 msgstr "Impossibile salvare la partita"
 
-#: engines/groovie/script.cpp:776 engines/lab/savegame.cpp:237
+#: engines/groovie/script.cpp:791 engines/lab/savegame.cpp:237
 msgid "Would you like to save or restore a game?"
 msgstr "Desideri salvare o caricare il gioco?"
 
 #: engines/hadesch/rooms/daedalus.cpp:213
-#, fuzzy
-#| msgid "This game is not supported."
 msgid "The Minotaur minigame is not supported yet. Skipping"
-msgstr "Questo gioco non è supportato."
+msgstr "Il minigioco del Minotauro non è ancora supportato e verrà saltato."
 
 #: engines/hadesch/rooms/medisle.cpp:647
-#, fuzzy
-#| msgid "This game is not supported."
 msgid "The Medusa minigame is not supported yet. Skipping"
-msgstr "Questo gioco non è supportato."
+msgstr "Il minigioco di Medusa non è ancora supportato e verrà saltato."
 
 #: engines/hadesch/rooms/troy.cpp:505
-#, fuzzy
-#| msgid "This game is not supported."
 msgid "The Troy minigame is not supported yet. Skipping"
-msgstr "Questo gioco non è supportato."
+msgstr "Il minigioco di Troia non è ancora supportato e verrà saltato."
 
 #: engines/hdb/detection.cpp:123
 msgid "Enable cheat mode"
@@ -5212,7 +5224,7 @@ msgstr "Abilita cheat"
 
 #: engines/hypno/detection.cpp:170
 msgid "Allow cheats using the C key."
-msgstr ""
+msgstr "Permette l'uso dei cheat premendo il tasto C."
 
 #. I18N: Studio audience adds an applause and cheering sounds whenever
 #. Malcolm makes a joke.
@@ -5344,13 +5356,13 @@ msgstr "Il supporto per Eye of Beholder non è stato incluso nella compilazione"
 
 #: engines/kyra/engine/eobcommon.cpp:367 engines/kyra/engine/lol.cpp:453
 #: engines/ultima/ultima4/meta_engine.cpp:224
-#: engines/ultima/ultima8/meta_engine.cpp:135
+#: engines/ultima/ultima8/meta_engine.cpp:142
 msgid "Interact via Left Click"
 msgstr "Interazione tramite Clic Sinistro"
 
 #: engines/kyra/engine/eobcommon.cpp:368 engines/kyra/engine/lol.cpp:454
 #: engines/ultima/ultima4/meta_engine.cpp:230
-#: engines/ultima/ultima8/meta_engine.cpp:141
+#: engines/ultima/ultima8/meta_engine.cpp:148
 msgid "Interact via Right Click"
 msgstr "Interazione tramite Clic Destro"
 
@@ -6304,12 +6316,12 @@ msgstr ""
 msgid "Error loading game resources."
 msgstr "Errore nel caricamento delle risorse del gioco."
 
-#: engines/sci/detection_tables.h:4332
+#: engines/sci/detection_tables.h:4350
 msgid "Incomplete game detected. You have to copy data from all the CDs."
 msgstr ""
 "Rilevato gioco incompleto. Assicurati di avere copiato i dati da tutti i CD."
 
-#: engines/sci/engine/kfile.cpp:484 engines/sci/metaengine.cpp:371
+#: engines/sci/engine/kfile.cpp:484 engines/sci/metaengine.cpp:366
 msgid "(Autosave)"
 msgstr "(Autosalvataggio)"
 
@@ -6330,17 +6342,17 @@ msgstr ""
 "stata implementata. Attualmente è presente una logica rudimentale, dove le "
 "azioni degli avversari sono scelte casualmente"
 
-#: engines/sci/engine/savegame.cpp:1434
+#: engines/sci/engine/savegame.cpp:1446
 msgid "The format of this saved game is obsolete, unable to load it"
 msgstr "Il formato di questo salvataggio è obsoleto, impossibile caricarlo"
 
-#: engines/sci/engine/savegame.cpp:1436
+#: engines/sci/engine/savegame.cpp:1448
 #, c-format
 msgid "Savegame version is %d, maximum supported is %0d"
 msgstr ""
 "La versione del salvataggio è %d, la versione più recente supportata è %0d"
 
-#: engines/sci/engine/savegame.cpp:1447
+#: engines/sci/engine/savegame.cpp:1459
 msgid ""
 "This saved game was created with a different version of the game, unable to "
 "load it"
@@ -6356,7 +6368,7 @@ msgstr ""
 "Non è possibile riprodurre un filmato a %dbpp su di un sistema con "
 "profondità di colore massima di 8bpp"
 
-#: engines/sci/metaengine.cpp:296
+#: engines/sci/metaengine.cpp:298
 msgid "SCI32 support not compiled in"
 msgstr "Il supporto per SCI32 non è stato incluso nella compilazione"
 
@@ -7282,7 +7294,7 @@ msgstr ""
 "Il supporto nativo MIDI richiede il Roland Upgrade della LucasArts,\n"
 "ma %s non è presente. Verrà usato AdLib."
 
-#: engines/scumm/scumm.cpp:3068
+#: engines/scumm/scumm.cpp:3064
 msgid ""
 "Usually, Maniac Mansion would start now. But for that to work, the game "
 "files for Maniac Mansion have to be in the 'Maniac' directory inside the "
@@ -7938,16 +7950,24 @@ msgid "Replaces game fonts with rendered fonts"
 msgstr "Usa font renderizzati in sostituzione dei font normali"
 
 #. I18N: Silencer is the player-character in Crusader games, known as the Avatar in Ultima series.
-#: engines/ultima/detection.cpp:129
+#: engines/ultima/detection.cpp:128
 msgid "Camera moves with Silencer"
 msgstr "Centra inquadratura su Silencer"
 
-#: engines/ultima/detection.cpp:130
+#: engines/ultima/detection.cpp:129
 msgid ""
 "Camera tracks the player movement rather than snapping to defined positions."
 msgstr ""
 "La visuale segue il movimento del giocatore anzichè spostarsi a posizioni "
 "predefinite."
+
+#: engines/ultima/detection.cpp:142
+msgid "Always enable Christmas easter-egg"
+msgstr "Easter egg di Natale sempre attivo"
+
+#: engines/ultima/detection.cpp:143
+msgid "Enable the Christmas music at any time of year."
+msgstr "Riproduce sempre la musica natalizia, indipendentemente dalla data."
 
 #: engines/ultima/shared/early/ultima_early.cpp:70
 msgid "Could not find correct ultima.dat datafile"
@@ -7983,19 +8003,19 @@ msgstr "Salvataggio Originale"
 msgid "Transfer Character"
 msgstr "Trasferisci personaggio"
 
-#: engines/ultima/ultima8/meta_engine.cpp:128
+#: engines/ultima/ultima8/meta_engine.cpp:135
 msgid "Ultima VIII"
 msgstr "Ultima VIII"
 
-#: engines/ultima/ultima8/meta_engine.cpp:128
+#: engines/ultima/ultima8/meta_engine.cpp:135
 msgid "Crusader"
 msgstr "Crusader"
 
-#: engines/ultima/ultima8/meta_engine.cpp:171
+#: engines/ultima/ultima8/meta_engine.cpp:178
 msgid "Ultima VIII Cheats"
 msgstr "Cheat per Ultima VIII"
 
-#: engines/ultima/ultima8/meta_engine.cpp:186
+#: engines/ultima/ultima8/meta_engine.cpp:193
 msgid "Ultima VIII Debug"
 msgstr "Debug per Ultima VIII"
 
@@ -8753,6 +8773,9 @@ msgstr ""
 "GNU. Ti serviranno tutti i font presenti nel pacchetto di tua preferenza, "
 "precisamente: LiberationMono, LiberationSans e LiberationSerif; oppure "
 "FreeMono, FreeSans e FreeSerif."
+
+#~ msgid "Invalid save file name"
+#~ msgstr "Nome salvataggio non valido"
 
 #~ msgid "Enable cross fade"
 #~ msgstr "Abilita dissolvenze"

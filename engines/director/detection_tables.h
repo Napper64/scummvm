@@ -542,6 +542,8 @@ static const PlainGameDescriptor directorGames[] = {
 	{ "trekomni",			"Star Trek Omnipedia" },
 	{ "trekpedia98",		"Star Trek Encyclopedia 1998" },
 	{ "trektech",			"Star Trek: The Next Generation Interactive Technical Manual" },
+	{ "trekchair",          "Star Trek: Captain's Chair"},
+	{ "trekshipcreate",     "Star Trek: Starship Creator"},
 	{ "truthsfictions",		"Truths & Fictions: A Journey from Documentary to Digital Photography" },
 	{ "universe",			"Invisible Universe" },
 	{ "unwrap",				"Unwrap the Magic: Holiday 2000 Interactive CD-ROM" }, // J.C.Penney
@@ -619,6 +621,7 @@ static const PlainGameDescriptor directorGames[] = {
 	{ "chaquico1000",		"Craig Chaquico: A Thousand Pictures" },
 	{ "concentration",		"Solitudes: Natural Concentration" },
 	{ "girlsaloudbox",		"Girls Aloud: The Singles Box Set" },
+	{ "ebntelebreakdown",	"EBN: Telecommunication Breakdown" },
 	{ "imesceneryfish",		"I Mother Earth: Scenery and Fish" },
 	{ "princerave",			"Prince: Rave Un2 the Joy Fantastic" },
 	{ "relaxation",			"Solitudes: Natural Relaxation" },
@@ -1919,8 +1922,9 @@ static const DirectorGameDescription gameDescriptions[] = {
 	MACGAME1("jman", "", "Journeyman.16 MB", "1ae45c23586b41997ba52e2e7c771c4c", 437743, 300),
 	MACDEMO1("jman", "Sneak Preview", "Journeyman Sneak Preview", "9f0bb7ec7720e4f680ee3aa3d22c1c9d", 6222889, 300),
 	MACDEMO1("jman", "CD Demo", "Journeyman Demo", "424093b2bc04a1bfa4376c878f67a364", 3083188, 300),
+	MACDEMO1("jman", "v1.2 Demo", "Journeyman Demo", "1ae45c23586b41997ba52e2e7c771c4c", 3077381, 311),
 	MACDEMO1("jman", "IMG CD Demo", "Journeyman Demo", "1ae45c23586b41997ba52e2e7c771c4c", 2880877, 311),
-	MACDEMO1("jman", "Looping Demo", "Journeyman Looping Demo", "1ae45c23586b41997ba52e2e7c771c4c", 3077658, 300),
+	MACDEMO1("jman", "Looping Demo", "Journeyman Looping Demo", "1ae45c23586b41997ba52e2e7c771c4c", 3077402, 311),
 	WINGAME1("jman", "", "JMAN.EXE", "7c8230a804abf9353b05627a675b5ffb", 375282, 300),
 	WINGAME1_l("jman", "", "JOURNEY.EXE", "65d06b5fef155a2473434571aff5bc29", -1, Common::JA_JPN, 300),
 	WINDEMO1("jman", "Demo", "JMDEMO.EXE", "7c8230a804abf9353b05627a675b5ffb", 375305, 300),
@@ -2853,6 +2857,9 @@ static const DirectorGameDescription gameDescriptions[] = {
 
 	MACGAME1("easyitalian", "", "Easy Cooking Italian", "a8e65a2268226bd59f12ebdc58a221f3", 483746, 404),
 	WINGAME1("easyitalian", "", "ITALIAN.EXE", "acec057095e38421040129da764e0e16", 698291, 404),
+
+	MACGAME1("ebntelebreakdown", "", "EBNTBeCD.MAC", "51f11d985a921c2cfcf2b763b7b9c2e3", 499512, 404),
+	WINGAME1t("ebntelebreakdown", "", "EBNTBCDW.EXE", "77399581d91215a1149dcf08411d2f63", 2631477, 404),
 
 	MACGAME1("edh", "", "Executive Diet Helper CD", "7e1e1bad51542c9a3b484b1dacdf47fc", 635872, 404),
 	WINGAME1("edh", "", "EDHCD.EXE", "fdeadce56c6654312bf280eb21f36692", 9841489, 404),
@@ -3946,6 +3953,7 @@ static const DirectorGameDescription gameDescriptions[] = {
 	MACGAME1("trektech", "", "STNG Technical Manual (PowerPC)", "a9bd9f3a82fcde6e4d151868e256aec7", 525946, 400),
 	MACDEMO1("trektech", "Demo", "TrekForMac", "68ed73866232194a9a5609040dc1f242", 289696, 403),
 	WINGAME1("trektech", "", "NCC1701D.EXE", "02aec408cee26413a096aec9b1cb1878", 720249, 400),
+	WINGAME1_l("trektech", "", "NCC1701D.EXE", "dc960a161de1883867030b3612313f06", 726723, Common::DE_DEU, 400),
 
 	// Bilingual English/Spanish
 	MACGAME1("truthsfictions", "", "Truths & Fictions", "4577dd3eadc467a986ab172d90871b22", 534968, 404),
@@ -4852,6 +4860,8 @@ static const DirectorGameDescription gameDescriptions[] = {
 	// Found on Revolutionary War Picture CD from Holiday Digital Pictures
 	MACGAME1("ssrevwar", "", "Revolutionary War Screen Saver", "43234754a346ed7ac25b581f6d106866", 218094, 500),
 
+	WINGAME1("trekchair", "", "Cap_win.exe", "a28313a078c0cd3cebdf505af1d63d88", 1399089, 400),
+
 	// Mac version requires installation
 	// Preview is from X-Fools disc
 	// Win/Mac previews from Microshaft Winblows are D6
@@ -5558,6 +5568,8 @@ static const DirectorGameDescription gameDescriptions[] = {
 	MACGAME1("trekpedia98", "", "Ency98 Player", "b0b0e36586489ca6070d20feeff52fa5", 1091806, 600),
 	WINGAME1("trekpedia98", "", "ENCY98.EXE", "35f1550747fcf691283b0f2486144e2b", 1707566, 600),
 
+    WINGAME1("trekshipcreate", "", "sscreate.exe", "47bc209c111f45781336fb582354f2f2", 1910562, 400),
+
 	// Overview of Tutti's Magical Stories series
 	WINGAME1_l("tutti", "", "TUTTI.EXE", "a593079aecf5bd938ce75264cac24b2d", 14715583, Common::RU_RUS, 600),
 
@@ -5605,8 +5617,7 @@ static const DirectorGameDescription gameDescriptions[] = {
 	WINGAME2_l("affaires1", "", "StartMe.exe", "7c18c9a6af2694156bf09ed195c1ab09", 1819926,
 								"Main - 7.dxr", "ad34b9d4987fc84c238f0e88b174fbc9", 13068061, Common::FR_FRA, 702),
 
-	WINGAME2t_l("allthelunar", "Installer", "install.exe", "f670d62dfbf3f42c475b4f09c68f1888", 1743796,
-											"AUTORUN.INF", "63155cbab5873483a1241ab629c447da", 51, Common::JA_JPN, 701),
+	// Installer also uses Director
 	MACGAME1_l("allthelunar", "Gallery", "xn--2bkwb2jyaf2iv50xg56c", "91723348f6414e84d024183554385275", 110811, Common::JA_JPN, 701),
 	WINGAME1t_l("allthelunar", "Gallery", "gallery.exe", "dc43ed7868f092e8f59a640766438b38", 13403016, Common::JA_JPN, 701),
 	MACGAME1_l("allthelunar", "Daifugo", "xn--pss84d253e", "d2404d3c2d1df0ca4125e85b1ca97e96", 22329996, Common::JA_JPN, 701),

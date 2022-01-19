@@ -28,15 +28,18 @@ namespace Hypno {
 
 //Actions
 
-void HypnoEngine::runMenu(Hotspots hs) {
-	const Hotspot h = *hs.begin();
-	assert(h.type == MakeMenu);
-	debugC(1, kHypnoDebugScene, "hotspot actions size: %d", h.actions.size());
-	for (Actions::const_iterator itt = h.actions.begin(); itt != h.actions.end(); ++itt) {
+void HypnoEngine::runMenu(Hotspots *hs) {
+	Hotspot *h = hs->begin();
+	assert(h->type == MakeMenu);
+	debugC(1, kHypnoDebugScene, "hotspot actions size: %d", h->actions.size());
+	for (Actions::const_iterator itt = h->actions.begin(); itt != h->actions.end(); ++itt) {
 		Action *action = *itt;
 		switch (action->type) {
 			case QuitAction:
 				runQuit((Quit *)action);
+			break;
+			case TimerAction:
+				runTimer((Timer *)action);
 			break;
 			case BackgroundAction:
 				runBackground((Background *)action);
@@ -47,13 +50,14 @@ void HypnoEngine::runMenu(Hotspots hs) {
 			case AmbientAction: 
 				runAmbient((Ambient *)action);
 			break;
-			case CutsceneAction: {
-				// Should not repeat the same
-				Cutscene *cutscene = (Cutscene *) action; 
-				if (!_intros.contains(cutscene->path))
-				 	runCutscene(cutscene);
-				_intros[cutscene->path] = true;
-			}
+			case IntroAction:
+				runIntro((Intro *)action);
+			break;
+			case CutsceneAction:
+				runCutscene((Cutscene *)action);
+			break;
+			case PaletteAction:
+				runPalette((Palette *)action);
 			break;
 
 			default:
@@ -64,10 +68,27 @@ void HypnoEngine::runMenu(Hotspots hs) {
 		//	runMice(h, (Mice*) action);
 	}
 
-	//if (h.stype == "SINGLE_RUN")
-	//	loadImage("int_main/mainbutt.smk", 0, 0);
-	if (h.stype == "AUTO_BUTTONS" && _conversation.empty())
-		loadImage("int_main/resume.smk", 0, 0, true);
+	Graphics::Surface *menu = nullptr;
+	bool transparent = false;
+	if (_conversation.empty()) {
+		if (h->flags[0] == "HINTS" || h->flags[1] == "HINTS" || h->flags[2] == "HINTS") {
+			menu = decodeFrame("int_main/hint1.smk", 0);
+		} else if (h->flags[0] == "AUTO_BUTTONS" || h->flags[0] == "SINGLE_RUN") {
+			if (isDemo()) {
+				if (_currentLevel != "sixdemo/mis/demo.mis" && _currentLevel != "sixdemo/mis/order.mis") {
+					menu = decodeFrame("int_main/resume.smk", 0);
+					transparent = true;
+				}
+			} else {
+				menu = decodeFrame("int_main/menu.smk", 0);
+			}
+		} 
+
+		if (menu) {
+			h->rect = Common::Rect(0, 0, menu->w, menu->h);
+			drawImage(*menu, 0, 0, transparent);
+		}
+	}
 }
 
 void HypnoEngine::runBackground(Background *a) {	
@@ -84,6 +105,17 @@ void HypnoEngine::runBackground(Background *a) {
 	loadImage(a->path, a->origin.x, a->origin.y, false);
 }
 
+void HypnoEngine::runTimer(Timer *a) {
+	if (_timerStarted)
+		return; // Do not start another timer
+
+	uint32 delay = a->delay/1000;
+	debugC(1, kHypnoDebugScene, "Starting timer with %d secons", delay);
+
+	if (delay == 0 || !startCountdown(delay))
+		error("Failed to start countdown");
+}
+
 void HypnoEngine::runOverlay(Overlay *a) {
 	loadImage(a->path, a->origin.x, a->origin.y, false);
 }
@@ -92,11 +124,26 @@ void HypnoEngine::runMice(Mice *a) {
 	changeCursor(a->path, a->index);
 }
 
+void HypnoEngine::runPalette(Palette *a) {
+	loadPalette(a->path);
+}
+
 void HypnoEngine::runEscape() {
 	_nextHotsToRemove = stack.back();
 	_nextSequentialVideoToPlay = _escapeSequentialVideoToPlay;
 	_escapeSequentialVideoToPlay.clear();
 }
+
+void HypnoEngine::runIntro(Intro *a) {
+	// Should not repeat the same
+	if (_intros.contains(a->path))
+		return;
+
+	_intros[a->path] = true;
+	MVideo v(a->path, Common::Point(0, 0), false, true, false);
+	runIntro(v);
+}
+
 
 void HypnoEngine::runCutscene(Cutscene *a) {
 	stopSound();
@@ -106,7 +153,7 @@ void HypnoEngine::runCutscene(Cutscene *a) {
 }
 
 bool HypnoEngine::runGlobal(Global *a) {
-	debugC(1, kHypnoDebugScene, "Runing global with command %s and variable %s", a->command.c_str(), a->variable.c_str());
+	debugC(1, kHypnoDebugScene, "Runing global with command '%s' and variable '%s'", a->command.c_str(), a->variable.c_str());
 	if (a->command == "TURNON")
 		_sceneState[a->variable] = 1;
 	else if (a->command == "TURNOFF")
@@ -121,6 +168,9 @@ bool HypnoEngine::runGlobal(Global *a) {
 		if (_sceneState[a->variable]) // Clear any video to play
 			_nextSequentialVideoToPlay.clear();
 		return !_sceneState[a->variable];
+	} else if (a->command == "CLEAR") {
+		resetSceneState();
+		return true;
 	} else
 		error("Invalid command %s", a->command.c_str());
 	return true;
@@ -139,16 +189,21 @@ void HypnoEngine::runPlay(Play *a) {
 
 void HypnoEngine::runAmbient(Ambient *a) {
 	if (a->flag == "/BITMAP") {
-		Graphics::Surface *frame = decodeFrame(a->path, a->frameNumber, true);
+		Graphics::Surface *frame = decodeFrame(a->path, a->frameNumber);
 		Graphics::Surface *sframe;
 		if (a->fullscreen)
 			sframe = frame->scale(_screenW, _screenH);
 		else
 			sframe = frame;
 		drawImage(*sframe, a->origin.x, a->origin.y, true);
-		//loadImage(a->path, a->origin.x, a->origin.y, false, a->frameNumber);
 	} else {
-		_nextSequentialVideoToPlay.push_back(MVideo(a->path, a->origin, false, a->fullscreen, a->flag == "/LOOP"));
+		bool loop = a->flag == "/LOOP";
+		if (loop) { // Avoid re-adding the same looping video
+			if (_intros.contains(a->path))
+				return;
+			_intros[a->path] = true;
+		}
+		_nextSequentialVideoToPlay.push_back(MVideo(a->path, a->origin, false, a->fullscreen, loop));
 	}
 }
 
@@ -162,6 +217,21 @@ void HypnoEngine::runWalN(WalN *a) {
 		_escapeSequentialVideoToPlay.push_back(MVideo(a->path, a->origin, false, false, false));
 	else
 		error("Invalid WALN command: %s", a->wn.c_str());
+}
+
+void HypnoEngine::runSave(Save *a) {
+	// TODO: enable this when saving in the main menu is available
+	//saveGameDialog();
+}
+
+void HypnoEngine::runLoad(Load *a) {
+	loadGameDialog();
+}
+
+void HypnoEngine::runLoadCheckpoint(LoadCheckpoint *a) {
+	if (_checkpoint.empty())
+		error("Invalid checkpoint!");
+	loadGame(_checkpoint, _sceneState["GS_PUZZLELEVEL"], _sceneState["GS_COMBATLEVEL"]);
 }
 
 void HypnoEngine::runQuit(Quit *a) {

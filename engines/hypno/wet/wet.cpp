@@ -67,7 +67,7 @@ void WetEngine::loadAssetsDemoDisc() {
 	if (missions->listMembers(files) == 0)
 		error("Failed to load any files from missions.lib");
 
-	Hotspot h(MakeMenu, "");
+	Hotspot h(MakeMenu);
 	Hotspots hs;
 	Ambient *a = new Ambient("movie/selector.smk", Common::Point(0, 0), "/LOOP");
 	a->fullscreen = true;
@@ -248,7 +248,7 @@ void WetEngine::runMainMenu(Code *code) {
 	Common::Event event;
 	_font = FontMan.getFontByUsage(Graphics::FontManager::kConsoleFont);
 	uint32 c = _pixelFormat.RGBToColor(0, 252, 0);
-	Graphics::Surface *frame = decodeFrame("c_misc/menus.smk", 16, true);
+	Graphics::Surface *frame = decodeFrame("c_misc/menus.smk", 16);
 	Common::String _name = "";
 	drawImage(*frame, 0, 0, false);
 	_font->drawString(_compositeSurface, "ENTER NAME :", 48, 50, 100, c);

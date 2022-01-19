@@ -19,11 +19,12 @@
  *
  */
 
-#ifndef GRAPHICS_OPENGL_FRAMEBUFFER_H
-#define GRAPHICS_OPENGL_FRAMEBUFFER_H
+#ifndef BACKENDS_GRAPHICS3D_OPENGL_FRAMEBUFFER_H
+#define BACKENDS_GRAPHICS3D_OPENGL_FRAMEBUFFER_H
 
 #include "graphics/opengl/system_headers.h"
-#include "graphics/opengl/texture.h"
+
+#include "backends/graphics3d/opengl/texture.h"
 
 #if defined(USE_OPENGL_GAME) || defined(USE_OPENGL_SHADERS)
 
@@ -55,7 +56,7 @@ private:
 	GLint _prevStateViewport[4];
 };
 
-#if !defined(USE_GLES2) && !defined(AMIGAOS) && !defined(__MORPHOS__)
+#if !USE_FORCED_GLES2 && !defined(AMIGAOS) && !defined(__MORPHOS__)
 class MultiSampleFrameBuffer : public FrameBuffer {
 public:
 	MultiSampleFrameBuffer(uint width, uint height, int samples);

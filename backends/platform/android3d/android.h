@@ -33,7 +33,7 @@
 #include "graphics/palette.h"
 #include "graphics/surface.h"
 #include "graphics/opengl/system_headers.h"
-#include "graphics/opengl/framebuffer.h"
+#include "backends/graphics3d/opengl/framebuffer.h"
 #include "backends/modular-backend.h"
 #include "backends/plugins/posix/posix-provider.h"
 #include "backends/fs/posix/posix-fs-factory.h"
@@ -99,6 +99,8 @@ extern void checkGlError(const char *expr, const char *file, int line);
 #define GLCALL(x) do { (x); } while (false)
 #define GLTHREADCHECK do {  } while (false)
 #endif
+
+void *androidGLgetProcAddress(const char *name);
 
 class OSystem_Android : public ModularGraphicsBackend, Common::EventSource {
 private:

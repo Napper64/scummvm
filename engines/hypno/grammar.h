@@ -34,13 +34,28 @@
 
 namespace Hypno {
 
+typedef Common::String Filename;
+typedef Common::List<Filename> Filenames;
+
 class HypnoSmackerDecoder : public Video::SmackerDecoder {
 public:
 	bool loadStream(Common::SeekableReadStream *stream) override;
 };
 
-typedef Common::String Filename;
-typedef Common::List<Filename> Filenames;
+class MVideo {
+public:
+	MVideo(Filename, Common::Point, bool, bool, bool);
+	Filename path;
+	Common::Point position;
+	bool scaled;
+	bool transparent;
+	bool loop;
+	bool palette;
+	HypnoSmackerDecoder *decoder;
+	const Graphics::Surface *currentFrame;
+};
+
+typedef Common::Array<MVideo> Videos;
 
 enum HotspotType {
 	MakeMenu,
@@ -49,13 +64,18 @@ enum HotspotType {
 
 enum ActionType {
 	MiceAction,
+	TimerAction,	
 	PaletteAction,
 	BackgroundAction,
 	OverlayAction,
 	EscapeAction,
+	SaveAction,
+	LoadAction,
+	LoadCheckpointAction,
 	QuitAction,
 	CutsceneAction,
 	PlayAction,
+	IntroAction,
 	AmbientAction,
 	WalNAction,
 	GlobalAction,
@@ -76,31 +96,15 @@ class Hotspot;
 typedef Common::Array<Hotspot> Hotspots;
 typedef Common::Array<Hotspots *> HotspotsStack;
 
-class MVideo {
-public:
-	MVideo(Filename, Common::Point, bool, bool, bool);
-	Filename path;
-	Common::Point position;
-	bool scaled;
-	bool transparent;
-	bool loop;
-	HypnoSmackerDecoder *decoder;
-	const Graphics::Surface *currentFrame;
-};
-
-typedef Common::Array<MVideo> Videos;
-
 class Hotspot {
 public:
-	Hotspot(HotspotType type_, Common::String stype_, Common::Rect rect_ = Common::Rect(0, 0, 0, 0)) {
+	Hotspot(HotspotType type_, Common::Rect rect_ = Common::Rect(0, 0, 0, 0)) {
 		type = type_;
-		stype = stype_;
 		rect = rect_;
 		smenu = nullptr;
 	}
 	HotspotType type;
-	Common::String stype;
-	Common::String stypeFlag;
+	Common::String flags[3];
 	Common::Rect rect;
 	Common::String setting;
 	Actions actions;
@@ -116,6 +120,15 @@ public:
 	}
 	Filename path;
 	uint32 index;
+};
+
+class Timer : public Action {
+public:
+	Timer(uint32 delay_) {
+		type = TimerAction;
+		delay = delay_;
+	}
+	uint32 delay;
 };
 
 class Palette : public Action {
@@ -164,6 +177,27 @@ public:
 	}
 };
 
+class Save : public Action {
+public:
+	Save() {
+		type = SaveAction;
+	}
+};
+
+class Load : public Action {
+public:
+	Load() {
+		type = LoadAction;
+	}
+};
+
+class LoadCheckpoint : public Action {
+public:
+	LoadCheckpoint() {
+		type = LoadCheckpointAction;
+	}
+};
+
 class Quit : public Action {
 public:
 	Quit() {
@@ -175,6 +209,15 @@ class Cutscene : public Action {
 public:
 	Cutscene(Filename path_) {
 		type = CutsceneAction;
+		path = path_;
+	}
+	Filename path;
+};
+
+class Intro : public Action {
+public:
+	Intro(Filename path_) {
+		type = IntroAction;
 		path = path_;
 	}
 	Filename path;
@@ -310,6 +353,13 @@ public:
 	Shoot() {
 		destroyed = false;
 		video = nullptr;
+		timesToShoot = 0;
+		pointsToShoot = 0;
+		attackWeight = 0;
+		paletteOffset = 0;
+		paletteSize = 0;
+		attackFrame = 0;
+		explosionFrame = 0;
 	}
 	Common::String name;
 	Filename animation;
@@ -319,6 +369,10 @@ public:
 	uint32 timesToShoot;
 	uint32 pointsToShoot;
 	uint32 attackWeight;
+
+	// Palette
+	uint32 paletteOffset;
+	uint32 paletteSize;
 
 	// Sounds
 	Filename deathSound;
@@ -360,6 +414,7 @@ public:
 
 	Filename background;
 	Filename player;
+	Filename palette;
 	int health;
 	Shoots shoots;
 	ShootSequence shootSequence;
