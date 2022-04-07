@@ -104,7 +104,7 @@ void OSystem_MacOSX::initBackend() {
 	TransMan.setLanguage(ConfMan.get("gui_language").c_str());
 #endif // USE_TRANSLATION
 
-	// Replace the SDL generated menu items with our own translated ones on Mac OS X
+	// Replace the SDL generated menu items with our own translated ones on macOS
 	replaceApplicationMenuItems();
 
 #ifdef USE_SPARKLE
@@ -269,12 +269,15 @@ Common::String OSystem_MacOSX::getDefaultLogFileName() {
 }
 
 Common::String OSystem_MacOSX::getScreenshotsPath() {
-	Common::String path = ConfMan.get("screenshotpath");
-	if (path.empty())
-		path = getDesktopPathMacOSX();
-	if (!path.empty() && !path.hasSuffix("/"))
-		path += "/";
-	return path;
+	// If the user has configured a screenshots path, use it
+	const Common::String path = OSystem_SDL::getScreenshotsPath();
+	if (!path.empty())
+		return path;
+
+	Common::String desktopPath = getDesktopPathMacOSX();
+	if (!desktopPath.empty() && !desktopPath.hasSuffix("/"))
+		desktopPath += "/";
+	return desktopPath;
 }
 
 AudioCDManager *OSystem_MacOSX::createAudioCDManager() {

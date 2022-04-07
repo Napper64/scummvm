@@ -173,7 +173,7 @@ static LingoV4TheEntity lingoV4TheEntity[] = {
 
 	{ 0x04, 0x01, kTheSoundEntity,		kTheVolume,			true, kTEAItemId },
 
-	{ 0x06, 0x01, kTheSprite,			kTheCursor,			true, kTEAItemId },
+	{ 0x06, 0x01, kTheSprite,			kTheType,			true, kTEAItemId },
 	{ 0x06, 0x02, kTheSprite,			kTheBackColor,		true, kTEAItemId },
 	{ 0x06, 0x03, kTheSprite,			kTheBottom,			true, kTEAItemId },
 	{ 0x06, 0x04, kTheSprite,			kTheCastNum,		true, kTEAItemId },
@@ -220,10 +220,10 @@ static LingoV4TheEntity lingoV4TheEntity[] = {
 	{ 0x07, 0x0a, kTheFullColorPermit,	kTheNOField,		true, kTEANOArgs },
 	{ 0x07, 0x0b, kTheImageDirect,		kTheNOField,		true, kTEANOArgs },
 	{ 0x07, 0x0c, kTheDoubleClick,		kTheNOField,		true, kTEANOArgs },
-//	{ 0x07, 0x0d, ???,					kTheNOField,		true, kTEANOArgs },
+//	{ 0x07, 0x0d, ???,					kTheNOField,		true, kTEANOArgs }, // key
 	{ 0x07, 0x0e, kTheLastClick,		kTheNOField,		true, kTEANOArgs },
 	{ 0x07, 0x0f, kTheLastEvent,		kTheNOField,		true, kTEANOArgs },
-//	{ 0x07, 0x10, ???,					kTheNOField,		true, kTEANOArgs },
+//	{ 0x07, 0x10, ???,					kTheNOField,		true, kTEANOArgs }, // keyCode
 	{ 0x07, 0x11, kTheLastKey,			kTheNOField,		true, kTEANOArgs },
 	{ 0x07, 0x12, kTheLastRoll,			kTheNOField,		true, kTEANOArgs },
 	{ 0x07, 0x13, kTheTimeoutLapsed,	kTheNOField,		true, kTEANOArgs },
@@ -235,7 +235,7 @@ static LingoV4TheEntity lingoV4TheEntity[] = {
 	{ 0x07, 0x19, kTheSoundEnabled,		kTheNOField,		true, kTEANOArgs },
 	{ 0x07, 0x1a, kTheSoundLevel,		kTheNOField,		true, kTEANOArgs },
 	{ 0x07, 0x1b, kTheStageColor,		kTheNOField,		true, kTEANOArgs },
-//	{ 0x07, 0x1c, ????,					kTheNOField,		true, kTEANOArgs },
+//	{ 0x07, 0x1c, ????,					kTheNOField,		true, kTEANOArgs }, // indicates dontPassEvent was called
 	{ 0x07, 0x1d, kTheSwitchColorDepth,	kTheNOField,		true, kTEANOArgs },
 	{ 0x07, 0x1e, kTheTimeoutKeyDown,	kTheNOField,		true, kTEANOArgs },
 	{ 0x07, 0x1f, kTheTimeoutLength,	kTheNOField,		true, kTEANOArgs },
@@ -250,6 +250,11 @@ static LingoV4TheEntity lingoV4TheEntity[] = {
 
 	{ 0x09, 0x01, kTheCast,				kTheName,			true, kTEAItemId },
 	{ 0x09, 0x02, kTheCast,				kTheText,			true, kTEAItemId },
+	{ 0x09, 0x03, kTheCast,	 			kTheTextStyle,		true, kTEAItemId },
+	{ 0x09, 0x04, kTheCast,	 			kTheTextFont,		true, kTEAItemId },
+	{ 0x09, 0x05, kTheCast,	 			kTheTextHeight,		true, kTEAItemId },
+	{ 0x09, 0x06, kTheCast,	 			kTheTextAlign,		true, kTEAItemId },
+	{ 0x09, 0x07, kTheCast,	 			kTheTextSize,		true, kTEAItemId },
 	{ 0x09, 0x08, kTheCast,				kThePicture,		true, kTEAItemId },
 	{ 0x09, 0x09, kTheCast,				kTheHilite,			true, kTEAItemId },
 	{ 0x09, 0x0a, kTheCast,				kTheNumber,			true, kTEAItemId },
@@ -573,6 +578,7 @@ void LC::cb_varrefpush() {
 }
 
 void LC::cb_theassign() {
+	// cb_theassign is for setting script/factory-level properties
 	Common::String name = g_lingo->readString();
 	Datum value = g_lingo->pop();
 	if (g_lingo->_currentMe.type == OBJECT) {
@@ -587,9 +593,19 @@ void LC::cb_theassign() {
 }
 
 void LC::cb_theassign2() {
+	// cb_theassign2 is for setting movie-level properties
 	Common::String name = g_lingo->readString();
 	Datum value = g_lingo->pop();
-	warning("STUB: cb_theassign2(%s, %s)", name.c_str(), value.asString().c_str());
+
+	if (g_lingo->_theEntities.contains(name)) {
+		TheEntity *entity = g_lingo->_theEntities[name];
+		Datum id;
+		id.u.i = 0;
+		id.type = VOID;
+		g_lingo->setTheEntity(entity->entity, id, kTEANOArgs, value);
+	} else {
+		warning("LC::cb_theassign2 Can't assign theEntity: (%s)", name.c_str());
+	}
 }
 
 void LC::cb_thepush() {
@@ -1176,7 +1192,12 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 	bool skipdump = false;
 
 	if (ConfMan.getBool("dump_scripts")) {
-		Common::String buf = dumpScriptName(encodePathForDump(archName).c_str(), scriptType, castId, "lscr");
+		Common::String buf;
+		if (scriptFlags & kScriptFlagFactoryDef) {
+			buf = dumpFactoryName(encodePathForDump(archName).c_str(), factoryName.c_str(), "lscr");
+		} else {
+			buf = dumpScriptName(encodePathForDump(archName).c_str(), scriptType, castId, "lscr");
+		}
 
 		if (!out.open(buf, true)) {
 			warning("Lingo::addCodeV4(): Can not open dump file %s", buf.c_str());

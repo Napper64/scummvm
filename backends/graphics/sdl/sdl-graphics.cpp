@@ -221,8 +221,14 @@ bool SdlGraphicsManager::notifyMousePosition(Common::Point &mouse) {
 	if (_activeArea.drawRect.contains(mouse)) {
 		_cursorLastInActiveArea = true;
 	} else {
-		mouse.x = CLIP<int>(mouse.x, _activeArea.drawRect.left, _activeArea.drawRect.right - 1);
-		mouse.y = CLIP<int>(mouse.y, _activeArea.drawRect.top, _activeArea.drawRect.bottom - 1);
+		// The right/bottom edges are not part of the drawRect. As the clipping
+		// is done in drawable area coordinates, but the mouse position is set
+		// in window coordinates, we need to subtract as many pixels from the
+		// edges as corresponds to one pixel in the window coordinates.
+		mouse.x = CLIP<int>(mouse.x, _activeArea.drawRect.left,
+							_activeArea.drawRect.right - (int)(1 * dpiScale + 0.5f));
+		mouse.y = CLIP<int>(mouse.y, _activeArea.drawRect.top,
+							_activeArea.drawRect.bottom - (int)(1 * dpiScale + 0.5f));
 
 		if (_window->mouseIsGrabbed() ||
 			// Keep the mouse inside the game area during dragging to prevent an
@@ -384,12 +390,14 @@ bool SdlGraphicsManager::notifyEvent(const Common::Event &event) {
 }
 
 void SdlGraphicsManager::toggleFullScreen() {
+	/* Don't use g_system for kFeatureOpenGLForGame as it's always supported
+	 * We want to check if we are a 3D graphics manager */
+	bool is3D = hasFeature(OSystem::kFeatureOpenGLForGame);
+
 	if (!g_system->hasFeature(OSystem::kFeatureFullscreenMode) ||
-	   (!g_system->hasFeature(OSystem::kFeatureFullscreenToggleKeepsContext) && g_system->hasFeature(OSystem::kFeatureOpenGLForGame))) {
+	   (!g_system->hasFeature(OSystem::kFeatureFullscreenToggleKeepsContext) && is3D)) {
 		return;
 	}
-
-	bool is3D = g_system->hasFeature(OSystem::kFeatureOpenGLForGame);
 
 	if (!is3D)
 		beginGFXTransaction();

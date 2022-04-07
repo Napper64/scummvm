@@ -157,12 +157,15 @@ endif
 
 ifdef USE_OPENGL
 MODULE_OBJS += \
-	graphics/openglsdl/openglsdl-graphics.o \
 	graphics3d/opengl/framebuffer.o \
 	graphics3d/opengl/surfacerenderer.o \
 	graphics3d/opengl/texture.o \
-	graphics3d/opengl/tiledsurface.o \
+	graphics3d/opengl/tiledsurface.o
+ifdef SDL_BACKEND
+MODULE_OBJS += \
+	graphics/openglsdl/openglsdl-graphics.o \
 	graphics3d/openglsdl/openglsdl-graphics3d.o
+endif
 endif
 
 ifdef USE_DISCORD
@@ -244,16 +247,6 @@ MODULE_OBJS += \
 	graphics3d/opengl/texture.o \
 	graphics3d/opengl/tiledsurface.o \
 	mutex/pthread/pthread-mutex.o
-endif
-
-ifeq ($(BACKEND),android3d)
-MODULE_OBJS += \
-	mutex/pthread/pthread-mutex.o
-endif
-
-ifeq ($(BACKEND),androidsdl)
-MODULE_OBJS += \
-	events/androidsdl/androidsdl-events.o
 endif
 
 ifdef AMIGAOS

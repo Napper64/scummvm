@@ -31,7 +31,70 @@ namespace Hypno {
 static const int oIndexYB[9] = {0, 1, 2, 7, 8, 3, 6, 5, 4};
 static const int oIndexYE[9] = {4, 3, 2, 1, 0};
 static const int shootOriginIndex[9][2] = {
-	{41, 3}, {51, 3}, {65, 6}, {68, 9}, {71, 22}, {57, 20}, {37, 14}, {37, 11}, {57, 20}};
+	{41, 3}, {51, 3}, {65, 6}, {40, 16}, {58, 20}, {67, 10}, {37, 14}, {37, 15}, {67, 22}};
+
+void SpiderEngine::runBeforeArcade(ArcadeShooting *arc) {
+	_checkpoint = _currentLevel;
+	assert(!arc->player.empty());
+	_playerFrames = decodeFrames(arc->player);
+	_playerFrameSep = 0;
+
+	for (Frames::iterator it =_playerFrames.begin(); it != _playerFrames.end(); ++it) {
+		if ((*it)->getPixel(0, 0) == 255)
+			break;
+		if ((*it)->getPixel(0, 0) == 252)
+			break;
+
+		_playerFrameSep++;
+	}
+
+	if (_playerFrameSep == (int)_playerFrames.size()) {
+		debugC(1, kHypnoDebugArcade, "No player separator frame found in %s! (size: %d)", arc->player.c_str(), _playerFrames.size());
+	} else
+		debugC(1, kHypnoDebugArcade, "Separator frame found at %d", _playerFrameSep);
+
+	_playerFrameIdx = -1;
+	_currentPlayerPosition = kPlayerLeft;
+	_lastPlayerPosition = kPlayerLeft;
+}
+
+void SpiderEngine::runAfterArcade(ArcadeShooting *arc) {
+	if (_health <= 0) {
+		assert(_score >= _bonus);
+		_score -= _bonus;
+	}
+}
+
+void SpiderEngine::initSegment(ArcadeShooting *arc) {
+	_segmentShootSequenceOffset = 0;
+	_segmentShootSequenceMax = 0;
+
+	uint32 randomSegmentShootSequence = _segmentShootSequenceOffset + _rnd->getRandomNumber(_segmentShootSequenceMax);
+	SegmentShoots segmentShoots = arc->shootSequence[randomSegmentShootSequence];
+	_shootSequence = segmentShoots.shootSequence;
+	_segmentRepetitionMax = segmentShoots.segmentRepetition; // Usually zero
+	_segmentRepetition = 0;
+	_segmentOffset = 0;
+	_segmentIdx = _segmentOffset;
+}
+
+void SpiderEngine::findNextSegment(ArcadeShooting *arc) {
+	_segmentIdx = _segmentIdx + 1;
+}
+
+
+void SpiderEngine::hitPlayer() {
+	if (_playerFrameSep < (int)_playerFrames.size()) {
+		if (_playerFrameIdx < _playerFrameSep)
+			_playerFrameIdx = _playerFrameSep;
+	} else {
+		uint32 c = 250; // red
+		_compositeSurface->fillRect(Common::Rect(0, 0, 640, 480), c);
+		drawScreen();
+	}
+	if (!_hitSound.empty())
+		playSound(_soundPath + _hitSound, 1, 11025);
+}
 
 void SpiderEngine::drawShoot(const Common::Point &target) {
 	uint32 c = 248; // white
@@ -40,12 +103,12 @@ void SpiderEngine::drawShoot(const Common::Point &target) {
 
 	if (_arcadeMode == "YC" || _arcadeMode == "YD") {
 		return; // Nothing to shoot
-	} else if (_arcadeMode == "YE" || _arcadeMode == "YF") { 
-		ox = _screenW/2;
-		oy = _screenH - _playerFrames[0]->h/2;
+	} else if (_arcadeMode == "YE" || _arcadeMode == "YF") {
+		ox = _screenW / 2;
+		oy = _screenH - _playerFrames[0]->h / 2;
 	} else if (_arcadeMode == "YB") {
 		uint32 idx = MIN(2, target.x / (_screenW / 3)) + 3 * MIN(2, target.y / (_screenH / 3));
-		ox = 60  + shootOriginIndex[idx][0];
+		ox = 60 + shootOriginIndex[idx][0];
 		oy = 129 + shootOriginIndex[idx][1];
 	} else
 		error("Invalid arcade mode %s", _arcadeMode.c_str());
@@ -70,73 +133,104 @@ void SpiderEngine::drawPlayer() {
 			_playerFrameIdx = 0;
 		else if (_lastPlayerPosition != _currentPlayerPosition && (_playerFrameIdx % 4 == 0 || _playerFrameIdx % 4 == 3)) {
 
-			switch(_lastPlayerPosition) {
-				case PlayerLeft:
-					switch(_currentPlayerPosition) {
-						case PlayerTop:
-							_lastPlayerPosition = _currentPlayerPosition;
-							_playerFrameIdx = 1;
-						break;
-						case PlayerBottom:
-							_lastPlayerPosition = _currentPlayerPosition;
-							_playerFrameIdx = 13;
-						break;
-						case PlayerRight:
-							_lastPlayerPosition = _currentPlayerPosition;
-							_playerFrameIdx = 45;
-						break;
-					}
+			switch (_lastPlayerPosition) {
+			case kPlayerLeft:
+				switch (_currentPlayerPosition) {
+				case kPlayerTop:
+					_lastPlayerPosition = _currentPlayerPosition;
+					_playerFrameIdx = 1;
+					break;
+				case kPlayerBottom:
+					_lastPlayerPosition = _currentPlayerPosition;
+					_playerFrameIdx = 13;
+					break;
+				case kPlayerRight:
+					_lastPlayerPosition = _currentPlayerPosition;
+					_playerFrameIdx = 45;
+					break;
+				}
 				break;
-				case PlayerRight:
-					switch(_currentPlayerPosition) {
-						case PlayerTop:
-							_lastPlayerPosition = _currentPlayerPosition;
-							_playerFrameIdx = 5;
-						break;
-						case PlayerBottom:
-							_lastPlayerPosition = _currentPlayerPosition;
-							_playerFrameIdx = 17;
-						break;
-						case PlayerLeft:
-							_lastPlayerPosition = _currentPlayerPosition;
-							_playerFrameIdx = 33;
-						break;
-					}
+			case kPlayerRight:
+				switch (_currentPlayerPosition) {
+				case kPlayerTop:
+					_lastPlayerPosition = _currentPlayerPosition;
+					_playerFrameIdx = 5;
+					break;
+				case kPlayerBottom:
+					_lastPlayerPosition = _currentPlayerPosition;
+					_playerFrameIdx = 17;
+					break;
+				case kPlayerLeft:
+					_lastPlayerPosition = _currentPlayerPosition;
+					_playerFrameIdx = 33;
+					break;
+				}
 				break;
-				case PlayerBottom:
-					switch(_currentPlayerPosition) {
-						case PlayerTop:
-							_lastPlayerPosition = _currentPlayerPosition;
-							_playerFrameIdx = 9;
-						break;
-						case PlayerLeft:
-							_lastPlayerPosition = _currentPlayerPosition;
-							_playerFrameIdx = 29;
-						break;
-						case PlayerRight:
-							_lastPlayerPosition = _currentPlayerPosition;
-							_playerFrameIdx = 41;
-						break;
-					}
+			case kPlayerBottom:
+				switch (_currentPlayerPosition) {
+				case kPlayerTop:
+					_lastPlayerPosition = _currentPlayerPosition;
+					_playerFrameIdx = 9;
+					break;
+				case kPlayerLeft:
+					_lastPlayerPosition = _currentPlayerPosition;
+					_playerFrameIdx = 29;
+					break;
+				case kPlayerRight:
+					_lastPlayerPosition = _currentPlayerPosition;
+					_playerFrameIdx = 41;
+					break;
+				}
 				break;
-				case PlayerTop:
-					switch(_currentPlayerPosition) {
-						case PlayerBottom:
-							_playerFrameIdx = 21;
-						break;
-						case PlayerLeft:
-							_playerFrameIdx = 25;
-						break;
-						case PlayerRight:
-							_playerFrameIdx = 37;
-						break;
-					}
+			case kPlayerTop:
+				switch (_currentPlayerPosition) {
+				case kPlayerBottom:
+					_playerFrameIdx = 21;
+					break;
+				case kPlayerLeft:
+					_playerFrameIdx = 25;
+					break;
+				case kPlayerRight:
+					_playerFrameIdx = 37;
+					break;
+				}
 				break;
 			}
 			_lastPlayerPosition = _currentPlayerPosition;
-		} else if (_playerFrameIdx % 4 != 0 && _playerFrameIdx % 4 != 3) {
+		} else if (_playerFrameIdx < 48 && _playerFrameIdx % 4 != 0 && _playerFrameIdx % 4 != 3) {
 			_playerFrameIdx++;
 			_lastPlayerPosition = _currentPlayerPosition;
+		} else {
+			if (_arcadeMode == "YD") {
+				switch (_lastPlayerPosition) {
+				case kPlayerTop:
+					if ((_playerFrameIdx <= 11 && (_playerFrameIdx % 4 == 0 || _playerFrameIdx % 4 == 3)) || _playerFrameIdx >= 54)
+						_playerFrameIdx = 49;
+					else
+						_playerFrameIdx++;
+					break;
+
+				case kPlayerBottom:
+					if ((_playerFrameIdx <= 23  && (_playerFrameIdx % 4 == 0 || _playerFrameIdx % 4 == 3)) || _playerFrameIdx >= 65)
+						_playerFrameIdx = 60;
+					else
+						_playerFrameIdx++;
+					break;
+				case kPlayerLeft:
+					if ((_playerFrameIdx <= 35 && (_playerFrameIdx % 4 == 0 || _playerFrameIdx % 4 == 3)) || _playerFrameIdx >= 77)
+						_playerFrameIdx = 72;
+					else
+						_playerFrameIdx++;
+					break;
+
+				case kPlayerRight:
+					if ((_playerFrameIdx <= 47 && (_playerFrameIdx % 4 == 0 || _playerFrameIdx % 4 == 3)) || _playerFrameIdx >= 89)
+						_playerFrameIdx = 84;
+					else
+						_playerFrameIdx++;
+					break;
+				}
+			}
 		}
 	} else if (_arcadeMode == "YE" || _arcadeMode == "YF") {
 		Common::Point mousePos = g_system->getEventManager()->getMousePos();
@@ -156,7 +250,7 @@ void SpiderEngine::drawPlayer() {
 			if (_playerFrameIdx >= (int)_playerFrames.size())
 				_playerFrameIdx = 0;
 		}
-	}  else
+	} else
 		error("Invalid arcade mode %s", _arcadeMode.c_str());
 
 	drawImage(*_playerFrames[_playerFrameIdx], ox, oy, true);
@@ -172,40 +266,21 @@ void SpiderEngine::drawHealth() {
 	Common::Rect r;
 	uint32 c;
 	int d = (22 * (_maxHealth - _health) / _maxHealth);
-
+	if (d >= 22)
+		return;
 	r = Common::Rect(256, 152 + d, 272, 174);
 	if (d >= 11)
-		c = 250; // green
+		c = 250; // red
 	else
-		c = 251; // red
+		c = 251; // green
 
 	_compositeSurface->fillRect(r, c);
 
 	r = Common::Rect(256, 152, 272, 174);
-	c = 252;  // blue
+	c = 252; // blue
 	_compositeSurface->frameRect(r, c);
 
-	_font->drawString(_compositeSurface, "ENERGY", 248, 180, 38, c);
-}
-
-bool SpiderEngine::checkArcadeLevelCompleted(MVideo &background) {
-	if (_skipLevel)
-		return true;
-
-	if (_arcadeMode == "YF") {
-		if (!background.decoder || background.decoder->endOfVideo())
-			_health = 0;
-
-		if (_shoots.size() == 0)
-			return false;
-
-		for (Shoots::iterator it = _shoots.begin(); it != _shoots.end(); ++it)
-			if (!it->destroyed)
-				return false;
-
-		return true;
-	} 
-	return !background.decoder || background.decoder->endOfVideo();
+	drawString("block05.fgx", "ENERGY", 248, 180, 38, c);
 }
 
 } // End of namespace Hypno

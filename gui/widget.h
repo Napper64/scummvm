@@ -121,6 +121,7 @@ public:
 	void init();
 
 	void setNext(Widget *w) { _next = w; }
+	void setBoss(GuiObject *newBoss) { _boss = newBoss; }
 	Widget *next() { return _next; }
 
 	int16	getAbsX() const override	{ return _x + _boss->getChildX(); }
@@ -528,7 +529,7 @@ private:
 };
 
 ButtonWidget *addClearButton(GuiObject *boss, const Common::String &name, uint32 cmd, int x=0, int y=0, int w=0, int h=0);
-const Graphics::ManagedSurface *scaleGfx(const Graphics::ManagedSurface *gfx, int w, int h);
+const Graphics::ManagedSurface *scaleGfx(const Graphics::ManagedSurface *gfx, int w, int h, bool filtering = false);
 
 } // End of namespace GUI
 

@@ -22,7 +22,7 @@
 #if defined(POSIX) || defined(PLAYSTATION3) || defined(PSP2) || defined(__DS__)
 
 // Re-enable some forbidden symbols to avoid clashes with stat.h and unistd.h.
-// Also with clock() in sys/time.h in some Mac OS X SDKs.
+// Also with clock() in sys/time.h in some macOS SDKs.
 #define FORBIDDEN_SYMBOL_EXCEPTION_time_h
 #define FORBIDDEN_SYMBOL_EXCEPTION_unistd_h
 #define FORBIDDEN_SYMBOL_EXCEPTION_mkdir
@@ -271,6 +271,12 @@ AbstractFSNode *POSIXFilesystemNode::getParent() const {
 	if (_path.size() == 3 && _path.hasSuffix(":/"))
 		// This is a root directory of a drive
 		return makeNode("/");   // return a virtual root for a list of drives
+#elif defined(ANDROID_PLAIN_PORT)
+	Common::String pathCopy = _path;
+	pathCopy.trim();
+	if (pathCopy.empty()) {
+		return makeNode("/");   // return a virtual root for a list of drives
+	}
 #endif
 
 	const char *start = _path.c_str();

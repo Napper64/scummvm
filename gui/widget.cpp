@@ -50,9 +50,7 @@ Widget::Widget(GuiObject *boss, const Common::String &name, const Common::U32Str
 }
 
 void Widget::init() {
-	// Insert into the widget list of the boss
-	_next = _boss->_firstWidget;
-	_boss->_firstWidget = this;
+	_next = _boss->addChild(this);
 	_needsRedraw = true;
 }
 
@@ -106,7 +104,8 @@ void Widget::draw() {
 		_y = getAbsY();
 
 		Common::Rect activeRect = g_gui.theme()->getClipRect();
-		oldClip = g_gui.theme()->swapClipRect(_boss->getClipRect().findIntersectingRect(activeRect));
+		Common::Rect clip = _boss->getClipRect().findIntersectingRect(activeRect);
+		oldClip = g_gui.theme()->swapClipRect(clip);
 
 		if (g_gui.useRTL()) {
 			_x = g_system->getOverlayWidth() - _x - _w;
@@ -118,10 +117,8 @@ void Widget::draw() {
 				_x = _x + g_gui.getOverlayOffset();
 			}
 
-			Common::Rect r = _boss->getClipRect();
-			r.moveTo(_x, r.top);
-
-			g_gui.theme()->swapClipRect(r);
+			clip.moveTo(_x, clip.top);
+			g_gui.theme()->swapClipRect(clip);
 		}
 
 		// Draw border
@@ -546,7 +543,7 @@ void DropdownButtonWidget::drawWidget() {
 
 #pragma mark -
 
-const Graphics::ManagedSurface *scaleGfx(const Graphics::ManagedSurface *gfx, int w, int h) {
+const Graphics::ManagedSurface *scaleGfx(const Graphics::ManagedSurface *gfx, int w, int h, bool filtering) {
 	int nw = w, nh = h;
 
 	// Maintain aspect ratio
@@ -566,7 +563,7 @@ const Graphics::ManagedSurface *scaleGfx(const Graphics::ManagedSurface *gfx, in
 
 	Graphics::ManagedSurface tmp(*gfx);
 
-	const Graphics::ManagedSurface *tmp2 = new Graphics::ManagedSurface(tmp.surfacePtr()->scale(w, h, false));
+	const Graphics::ManagedSurface *tmp2 = new Graphics::ManagedSurface(tmp.surfacePtr()->scale(w, h, filtering));
 	tmp.free();
 
 	return tmp2;
@@ -694,6 +691,7 @@ void CheckboxWidget::handleMouseUp(int x, int y, int button, int clickCount) {
 	if (isEnabled() && _duringPress && x >= 0 && x < _w && y >= 0 && y < _h) {
 		toggleState();
 	}
+	setUnpressedState();
 	_duringPress = false;
 }
 
@@ -760,6 +758,7 @@ void RadiobuttonWidget::handleMouseUp(int x, int y, int button, int clickCount) 
 	if (isEnabled() && _duringPress && x >= 0 && x < _w && y >= 0 && y < _h) {
 		toggleState();
 	}
+	setUnpressedState();
 	_duringPress = false;
 }
 
@@ -1045,10 +1044,15 @@ void OptionsContainerWidget::reflowLayout() {
 	}
 
 	Widget *w = _firstWidget;
+	int16 minY = getAbsY();
+	int maxY = minY + _h;
 	while (w) {
 		w->reflowLayout();
+		minY = MIN(minY, w->getAbsY());
+		maxY = MAX(maxY, w->getAbsY() + w->getHeight());
 		w = w->next();
 	}
+	_h = maxY - minY;
 }
 
 bool OptionsContainerWidget::containsWidget(Widget *widget) const {

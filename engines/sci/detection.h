@@ -111,6 +111,7 @@ enum SciGameId {
 	GID_QFG4,
 	GID_QFG4DEMO,	// We have a separate ID for QFG4 demo, because it's actually a completely different game (SCI1.1 vs SCI2/SCI2.1)
 	GID_RAMA,
+	GID_REALM,
 	GID_SHIVERS,
 	//GID_SHIVERS2,	// Not SCI
 	GID_SLATER,
@@ -141,8 +142,8 @@ enum SciVersion {
 	SCI_VERSION_2, // GK1, PQ4 floppy, QFG4 floppy
 	SCI_VERSION_2_1_EARLY, // GK2 demo, KQ7 1.4/1.51, LSL6 hires, PQ4CD, QFG4CD
 	SCI_VERSION_2_1_MIDDLE, // GK2, Hoyle 5, KQ7 2.00b, MUMG Deluxe, Phantasmagoria 1, PQ:SWAT, Shivers 1, SQ6, Torin
-	SCI_VERSION_2_1_LATE, // demos and Mac versions of LSL7, Lighthouse, RAMA
-	SCI_VERSION_3 // LSL7, Lighthouse, RAMA, Phantasmagoria 2
+	SCI_VERSION_2_1_LATE, // Demos and Mac versions of LSL7, Lighthouse, RAMA
+	SCI_VERSION_3 // LSL7, Lighthouse, RAMA, Phantasmagoria 2, interactive Lighthouse demos
 };
 
 /** MIDI devices */

@@ -209,6 +209,32 @@ private:
 	int _difficulty;
 };
 
+/**
+ * Options widget for EGA Loom.
+ */
+class LoomEgaGameOptionsWidget : public GUI::OptionsContainerWidget {
+public:
+	LoomEgaGameOptionsWidget(GuiObject *boss, const Common::String &name, const Common::String &domain);
+	~LoomEgaGameOptionsWidget() override {};
+
+	void load() override;
+	bool save() override;
+
+private:
+	enum {
+		kOvertureTicksChanged = 'OTCH'
+	};
+
+	void defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const override;
+	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
+
+	GUI::CheckboxWidget *_enableEnhancements;
+	GUI::SliderWidget *_overtureTicksSlider;
+	GUI::StaticTextWidget *_overtureTicksValue;
+
+	void updateOvertureTicksValue();
+};
+
 } // End of namespace Scumm
 
 #endif

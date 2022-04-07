@@ -26,6 +26,7 @@
 
 #include <limits.h>
 
+#include "engines/advancedDetector.h"
 #include "engines/metaengine.h"
 #include "base/commandLine.h"
 #include "base/plugins.h"
@@ -33,6 +34,7 @@
 
 #include "common/config-manager.h"
 #include "common/fs.h"
+#include "common/md5.h"
 #include "common/rendermode.h"
 #include "common/savefile.h"
 #include "common/system.h"
@@ -98,13 +100,15 @@ static const char HELP_STRING[] =
 	"  -c, --config=CONFIG      Use alternate configuration file\n"
 #if defined(SDL_BACKEND)
 	"  -l, --logfile=PATH       Use alternate path for log file\n"
+	"  --screenshotpath=PATH    Specify path where screenshot files are created\n"
 #endif
 	"  -p, --path=PATH          Path to where the game is installed\n"
 	"  -x, --save-slot[=NUM]    Save game slot to load (default: autosave)\n"
 	"  -f, --fullscreen         Force full-screen mode\n"
 	"  -F, --no-fullscreen      Force windowed mode\n"
 	"  -g, --gfx-mode=MODE      Select graphics mode\n"
-	"  --stretch-mode=MODE      Select stretch mode (center, integral, fit, stretch)\n"
+	"  --stretch-mode=MODE      Select stretch mode (center, pixel-perfect, even-pixels,\n"
+	"                           fit, stretch, fit_force_aspect)\n"
 	"  --scaler=MODE            Select graphics scaler (normal,hq,edge,advmame,sai,\n"
 	"                           supersai,supereagle,pm,dotmatrix,tv2x)\n"
 	"  --scale-factor=FACTOR    Factor to scale the graphics by\n"
@@ -156,6 +160,9 @@ static const char HELP_STRING[] =
 #ifndef DISABLE_NUKED_OPL
 																	 ", nuked"
 #endif
+#ifdef USE_ALSA
+																	 ", alsa"
+#endif
 #ifdef ENABLE_OPL2LPT
 																	 ", opl2lpt"
 #endif
@@ -202,6 +209,18 @@ static const char HELP_STRING[] =
 	"  --engine-speed=NUM       Set frame per second limit (0 - 100), 0 = no limit\n"
 	"                           (default: 60)\n"
 	"                           Grim Fandango or Escape from Monkey Island\n"
+	"  --md5                    Shows MD5 hash of the file given by --md5-path=PATH\n"
+	"                           If --md5-length=NUM is passed then it shows the MD5 hash of\n"
+	"                           the first NUM bytes of the file given by PATH\n"
+    "                           If --md5-engine=ENGINE_ID is passed, it fetches the MD5 length\n"
+    "                           automatically, overriding --md5-length\n"
+	"  --md5-path=PATH          Used with --md5 to specify path of file to calculate MD5 hash of\n"
+	"  --md5-length=NUM         Used with --md5 to specify the number of bytes to be hashed.\n"
+	"                           Use negative number for calculating tail md5.\n"
+    "                           Is overriden when used with --md5-engine\n"
+    "  --md5-engine=ENGINE_ID   Used with --md5 to specify the engine for which number of bytes\n"
+    "                           to be hashed must be calculated. This option overrides --md5-length\n"
+    "                           if used along with it. Use --list-engines to find all engineIds\n"
 	"\n"
 	"The meaning of boolean long options can be inverted by prefixing them with\n"
 	"\"no-\", e.g. \"--no-aspect-ratio\".\n"
@@ -523,7 +542,7 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			// We defer checking whether this is a valid target to a later point.
 			return s;
 		} else {
-			// On MacOS X prior to 10.9 the OS is sometimes adding a -psn_X_XXXXXX argument (where X are digits)
+			// On macOS prior to 10.9 the OS is sometimes adding a -psn_X_XXXXXX argument (where X are digits)
 			// to pass the process serial number. We need to ignore it to avoid an error.
 			// When using XCode it also adds -NSDocumentRevisionsDebugMode YES argument if XCode option
 			// "Allow debugging when using document Versions Browser" is on (which is the default).
@@ -576,6 +595,9 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			DO_LONG_COMMAND("auto-detect")
 			END_COMMAND
 
+			DO_LONG_COMMAND("md5")
+			END_COMMAND
+
 #ifdef DETECTOR_TESTING_HACK
 			// HACK FIXME TODO: This command is intentionally *not* documented!
 			DO_LONG_COMMAND("test-detector")
@@ -596,6 +618,15 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 
 #if defined(SDL_BACKEND)
 			DO_OPTION('l', "logfile")
+			END_OPTION
+
+			DO_LONG_OPTION("screenshotpath")
+				Common::FSNode path(option);
+				if (!path.exists()) {
+					usage("Non-existent game path '%s'", option);
+				} else if (!path.isWritable()) {
+					usage("Non-writable screenshot path '%s'", option);
+				}
 			END_OPTION
 #endif
 
@@ -769,7 +800,7 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			END_OPTION
 
 			DO_LONG_OPTION("renderer")
-				Graphics::RendererType renderer = Graphics::parseRendererTypeCode(option);
+				Graphics::RendererType renderer = Graphics::Renderer::parseTypeCode(option);
 				if (renderer == Graphics::kRendererTypeDefault)
 					usage("Unrecognized renderer type '%s'", option);
 			END_OPTION
@@ -793,6 +824,20 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 				} else if (!path.isReadable()) {
 					usage("Non-readable extra path '%s'", option);
 				}
+			END_OPTION
+
+			DO_LONG_OPTION("md5-path")
+				Common::FSNode path(option);
+				if (!path.exists()) {
+					usage("Non-existent file path '%s'", option);
+				} else if (path.isDirectory()) {
+					usage("'%s' is a directory, not a file path!", option);
+				} else if (!path.isReadable()) {
+					usage("Non-readable file path '%s'", option);
+				}
+			END_OPTION
+
+			DO_LONG_OPTION("md5-engine")
 			END_OPTION
 
 			DO_LONG_OPTION_INT("talkspeed")
@@ -844,6 +889,9 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 #endif
 
 			DO_LONG_OPTION_INT("engine-speed")
+			END_OPTION
+
+			DO_LONG_OPTION_INT("md5-length")
 			END_OPTION
 
 #ifdef IPHONE
@@ -1325,6 +1373,29 @@ static int recAddGames(const Common::FSNode &dir, const Common::String &engineId
 	return count;
 }
 
+static void calcMD5(Common::FSNode &path, int32 length) {
+	Common::SeekableReadStream *stream = path.createReadStream();
+
+	if (stream) {
+		bool tail = false;
+
+		if (length < 0) {// Tail md5 is requested
+			length = -length;
+			tail = true;
+
+			if (stream->size() > length)
+				stream->seek(-length, SEEK_END);
+		}
+
+		Common::String md5 = Common::computeStreamMD5AsString(*stream, length);
+		printf("(hash) : %s, (filename) : %s, (bytes) : %d%s\n", md5.c_str(), path.getName().c_str(), length && length <= stream->size() ? (int32)length : (int32)stream->size(), tail ? ", tail" : "");
+
+		delete stream;
+	} else {
+		printf("Usage : --md5 --md5-path=<PATH> [--md5-length=NUM]\n");
+	}
+}
+
 static bool addGames(const Common::String &path, const Common::String &engineId, const Common::String &gameId, bool recursive) {
 	//Current directory
 	Common::FSNode dir(path);
@@ -1620,6 +1691,39 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 		return true;
 	} else if (command == "add") {
 		addGames(settings["path"], gameOption.engineId, gameOption.gameId, settings["recursive"] == "true");
+		return true;
+	} else if (command == "md5") {
+		Common::String filename = settings.getValOrDefault("md5-path", "scummvm");
+		Common::Path Filename(filename, '/');
+		Common::FSNode path(Filename);
+		int32 md5Length = 0;
+
+		if (settings.contains("md5-length"))
+			md5Length = strtol(settings["md5-length"].c_str(), nullptr, 10);
+
+		if (settings.contains("md5-engine")) {
+			Common::String engineID = settings["md5-engine"];
+			if (engineID == "scumm") {
+				// Hardcoding value as scumm doesn't use AdvancedMetaEngineDetection
+				md5Length = 1024 * 1024;
+			} else {
+				const Plugin *plugin = EngineMan.findPlugin(engineID);
+				if (!plugin) {
+					warning("'%s' is an invalid engine ID. Use the --list-engines command to list supported engine IDs", engineID.c_str());
+					return true;
+				}
+
+				const AdvancedMetaEngineDetection* advEnginePtr = dynamic_cast<AdvancedMetaEngineDetection*>(&(plugin->get<MetaEngineDetection>()));
+				if (advEnginePtr == nullptr) {
+					warning("The requested engine (%s) doesn't support MD5-based detection", engineID.c_str());
+					return true;
+				}
+				md5Length = (int32)advEnginePtr->getMD5Bytes();
+			}
+		}
+
+		calcMD5(path, md5Length);
+
 		return true;
 #ifdef DETECTOR_TESTING_HACK
 	} else if (command == "test-detector") {

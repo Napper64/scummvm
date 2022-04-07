@@ -67,7 +67,7 @@ struct SaveInfoSection {
 
 #define SaveInfoSectionSize (4+4+4 + 4+4 + 4+2)
 
-#define CURRENT_VER 103
+#define CURRENT_VER 104
 #define INFOSECTION_VERSION 2
 
 #pragma mark -
@@ -593,6 +593,8 @@ bool ScummEngine::loadState(int slot, bool compat, Common::String &filename) {
 			_sound->addSoundToQueue(VAR(224));
 		}
 	}
+
+	_sound->restoreAfterLoad();
 
 	return true;
 }
@@ -1575,6 +1577,15 @@ void ScummEngine_v5::saveLoadWithSerializer(Common::Serializer &s) {
 			redefineBuiltinCursorHotspot(1, 0, 0);
 		} else {
 			resetCursors();
+		}
+	}
+
+	// Reset Mac cursors for Loom and Indy 3, otherwise the cursor will be
+	// invisible after loading.
+
+	if (s.isLoading() && _game.platform == Common::kPlatformMacintosh) {
+		if ((_game.id == GID_LOOM && !_macCursorFile.empty()) || (_game.id == GID_INDY3 && _macScreen)) {
+			setBuiltinCursor(0);
 		}
 	}
 

@@ -142,6 +142,7 @@ _tremolo=no
 _flac=auto
 _mad=auto
 _opl2lpt=no
+_retrowave=no
 _alsa=auto
 _seq_midi=auto
 _sndio=auto
@@ -197,6 +198,7 @@ _cloud=auto
 _pandoc=no
 _curl=yes
 _lld=no
+_mold=no
 _gold=yes
 # Default vkeybd/eventrec options
 _vkeybd=no
@@ -811,7 +813,6 @@ Special configuration feature:
                                            android-arm64-v8a for Android ARMv8-A (arm64-v8a)
                                            android-x86 for Android x86
                                            android-x86_64 for Android x86_64
-                                           androidsdl for Android with SDL backend
                                            caanoo for Caanoo
                                            dingux for Dingux
                                            raspberrypi for Raspberry Pi
@@ -976,14 +977,17 @@ Optional Libraries:
 
   --with-ieee1284-prefix=DIR prefix where libieee1284 is installed (optional)
   --enable-opl2lpt         enable OPL2LPT support
+  
+  --with-retrowave-prefix=DIR prefix where libretrowave is installed (optional)
+  --enable-retrowave       enable RetroWave OPL3 support
 
   --with-sparkle-prefix=DIR    prefix where sparkle is installed
-                           (OS X/Windows only - optional)
+                           (macOS/Windows only - optional)
   --disable-sparkle        disable sparkle automatic update support
-                           [OS X/Windows only - autodetect]
+                           [macOS/Windows only - autodetect]
 
   --disable-osx-dock-plugin    disable the NSDockTilePlugin support
-                               [Mac OS X only - autodetect]
+                               [macOS only - autodetect]
 
   --with-sdl-prefix=DIR    prefix where the SDL package is installed (optional)
                            e.g., if sdl-config script is at:
@@ -1103,6 +1107,8 @@ for ac_option in $@; do
 	--disable-tremor)             _tremor=no             ;;
 	--enable-opl2lpt)             _opl2lpt=yes           ;;
 	--disable-opl2lpt)            _opl2lpt=no            ;;
+	--enable-retrowave)           _retrowave=yes         ;;
+	--disable-retrowave)          _retrowave=no          ;;
 	--enable-flac)                _flac=yes              ;;
 	--disable-flac)               _flac=no               ;;
 	--enable-mad)                 _mad=yes               ;;
@@ -1153,6 +1159,8 @@ for ac_option in $@; do
 	--disable-cloud)              _cloud=no              ;;
 	--enable-lld)                 _lld=yes               ;;
 	--disable-lld)                _lld=no                ;;
+	--enable-mold)                _mold=yes              ;;
+	--disable-mold)               _mold=no               ;;
 	--enable-gold)                _gold=yes              ;;
 	--disable-gold)               _gold=no               ;;
 	--enable-updates)             _updates=yes           ;;
@@ -1244,6 +1252,11 @@ for ac_option in $@; do
 		arg=`echo $ac_option | cut -d '=' -f 2`
 		IEEE1284_CFLAGS="-I$arg/include"
 		IEEE1284_LIBS="-L$arg/lib"
+		;;
+	--with-retrowave-prefix=*)
+		arg=`echo $ac_option | cut -d '=' -f 2`
+		RETROWAVE_CFLAGS="-I$arg/include"
+		RETROWAVE_LIBS="-L$arg/lib"
 		;;
 	--with-flac-prefix=*)
 		arg=`echo $ac_option | cut -d '=' -f 2`
@@ -1517,31 +1530,6 @@ android-x86)
 	;;
 android-x86_64)
 	_host_os=android
-	_host_cpu=x86_64
-	_host_alias=x86_64-linux-android
-	;;
-androidsdl-armeabi | androidsdl-armeabi-v7a)
-	_host_os=androidsdl
-	_host_cpu=arm
-	_host_alias=arm-linux-androideabi
-	;;
-androidsdl-arm64-v8a)
-	_host_os=androidsdl
-	_host_cpu=aarch64
-	_host_alias=aarch64-linux-android
-	;;
-androidsdl-mips)
-	_host_os=androidsdl
-	_host_cpu=mipsel
-	_host_alias=mipsel-linux-android
-	;;
-androidsdl-x86)
-	_host_os=androidsdl
-	_host_cpu=i686
-	_host_alias=i686-linux-android
-	;;
-androidsdl-x86_64)
-	_host_os=androidsdl
 	_host_cpu=x86_64
 	_host_alias=x86_64-linux-android
 	;;
@@ -1983,9 +1971,9 @@ if test -n "$CXX" && test_compiler "$CXX"; then
 	echo $CXX
 else
 	if test -n "$_host"; then
-		compilers="$_host_alias-g++ $_host_alias-c++ $_host-g++ $_host-c++"
+		compilers="$_host_alias-g++ $_host_alias-c++ $_host_alias-clang++ $_host-g++ $_host-c++ $_host-clang++"
 	else
-		compilers="g++ c++"
+		compilers="g++ c++ clang++"
 	fi
 
 	# Iterate over all candidates, pick the first working one
@@ -2174,7 +2162,7 @@ if test "$have_gcc" = yes ; then
 	case $_host_os in
 	# newlib-based system include files suppress non-C89 function
 	# declarations under __STRICT_ANSI__, undefine it
-	3ds | android | androidsdl | gamecube | psp | switch | wii)
+	3ds | android | gamecube | psp | switch | wii)
 		std_variant=gnu++
 		pedantic=no
 		;;
@@ -2268,6 +2256,10 @@ if test "$_debug_build" != no; then
 			append_var LDFLAGS "-fuse-ld=lld"
 			append_var LDFLAGS "-Wl,--gdb-index"
 			echo_n -- " + LLD"
+		elif test "$_mold" = yes && cc_check_no_clean $debug_mode -gsplit-dwarf -fuse-ld=mold -Wl,--gdb-index; then
+			append_var LDFLAGS "-fuse-ld=mold"
+			append_var LDFLAGS "-Wl,--gdb-index"
+			echo_n -- " + Mold"
 		elif test "$_gold" = yes && cc_check_no_clean $debug_mode -gsplit-dwarf -fuse-ld=gold -Wl,--gdb-index; then
 			append_var LDFLAGS "-fuse-ld=gold"
 			append_var LDFLAGS "-Wl,--gdb-index"
@@ -2287,6 +2279,13 @@ if ! echo "$LDFLAGS" | grep -q -e -fuse-ld; then
 	echo "Using LLD linker... $_lld"
 	if test "$_lld" = yes ; then
 		append_var LDFLAGS -fuse-ld=lld
+	fi
+fi
+
+if ! echo "$LDFLAGS" | grep -q -e -fuse-ld; then
+	echo "Using Mold linker... $_mold"
+	if test "$_mold" =  yes ; then
+		append_var LDFLAGS -fuse-ld=mold
 	fi
 fi
 
@@ -2527,7 +2526,7 @@ case $_host_cpu in
 			openpandora)
 				define_in_config_if_yes yes 'USE_ARM_NEON_ASPECT_CORRECTOR'
 				;;
-			androidsdl-armeabi | arm-*riscos | caanoo | gp2x | gp2xwiz | maemo )
+			arm-*riscos | caanoo | gp2x | gp2xwiz | maemo )
 				define_in_config_if_yes yes 'USE_ARM_SCALER_ASM'
 				define_in_config_if_yes yes 'USE_ARM_SMUSH_ASM'
 				define_in_config_if_yes yes 'USE_ARM_GFX_ASM'
@@ -3013,9 +3012,11 @@ EOF
 		append_var CXXFLAGS "-mcpu=cell -mno-fp-in-toc -I$PSL1GHT/ppu/include -I$PS3DEV/portlibs/ppu/include"
 		append_var LDFLAGS "-L$PSL1GHT/ppu/lib -L$PS3DEV/portlibs/ppu/lib"
 		# The network libraries are statically linked and need to be specified in the following order
-		append_var SDL_NET_LIBS "-lSDL_net -lnet -lsysmodule"
+		append_var SDL_NET_LIBS "-lSDL2_net -lnet -lnetctl -lsysmodule"
 		add_line_to_config_mk 'PLAYSTATION3 = 1'
 		add_line_to_config_h "#define PREFIX \"${prefix}\""
+		# PS3 has no OpenGL support at all even though it's SDL based
+		_opengl_mode=none
 		;;
 	psp2)
 		_freetypepath="$VITASDK/arm-vita-eabi/bin"
@@ -3153,22 +3154,11 @@ if test -n "$_host"; then
 			append_var LDFLAGS "-static-libstdc++"
 			HOSTEXEPRE=lib
 			HOSTEXEEXT=.so
-			if test "$_backend" != android3d; then
-				_backend="android"
-			fi
+			_backend="android"
 			_port_mk="backends/platform/$_backend/android.mk"
 			_build_aspect=no
 			_seq_midi=no
 			_timidity=no
-			;;
-		androidsdl | androidsdl-armeabi | androidsdl-armeabi-v7a | androidsdl-mips | androidsdl-x86 | androidsdl-arm64-v8a | androidsdl-x86_64)
-			DEFINES="$DEFINES -DANDROIDSDL"
-			_unix=yes
-			_build_aspect=no
-			_seq_midi=no
-			_timidity=no
-			_backend="androidsdl"
-			_port_mk="backends/platform/androidsdl/androidsdl.mk"
 			;;
 		arm-linux|arm*-linux-gnueabi|arm-*-linux)
 			;;
@@ -3619,7 +3609,7 @@ fi
 case $_backend in
 	3ds)
 		;;
-	android | android3d)
+	android)
 		append_var DEFINES "-DREDUCE_MEMORY_USAGE"
 		append_var DEFINES "-DNONSTANDARD_PORT"
 		append_var INCLUDES '-I$(srcdir)/backends/platform/'$_backend
@@ -3631,9 +3621,6 @@ case $_backend in
 		if test "$_host" = ouya; then
 			_sdlnet=no
 		fi
-		;;
-	androidsdl)
-		_sdl=auto
 		;;
 	dc)
 		append_var INCLUDES '-I$(srcdir)/backends/platform/dc'
@@ -3906,7 +3893,7 @@ fi
 # Enable 16bit support only for backends which support it
 #
 case $_backend in
-	3ds | android | android3d | androidsdl | dingux | dc | ds | gph | iphone | ios7 | maemo | null | opendingux | openpandora | psp | psp2 | samsungtv | sdl | switch | wii)
+	3ds | android | dingux | dc | ds | gph | iphone | ios7 | maemo | null | opendingux | openpandora | psp | psp2 | samsungtv | sdl | switch | wii)
 		if test "$_16bit" = auto ; then
 			_16bit=yes
 		else
@@ -3982,7 +3969,7 @@ case $_host_os in
 	amigaos* | cygwin* | dreamcast | ds | gamecube | mingw* | morphos | n64 | ps3 | psp2 | psp | riscos | wii)
 		_posix=no
 		;;
-	3ds | android | androidsdl | beos* | bsd* | darwin* | freebsd* | gnu* | gph-linux | haiku* | hpux* | iphone | ios7 | irix*| k*bsd*-gnu* | linux* | maemo | mint* | netbsd* | openbsd* | serenity* | solaris* | sunos* | switch | uclinux*)
+	3ds | android | beos* | bsd* | darwin* | freebsd* | gnu* | gph-linux | haiku* | hpux* | iphone | ios7 | irix*| k*bsd*-gnu* | linux* | maemo | mint* | netbsd* | openbsd* | serenity* | solaris* | sunos* | switch | uclinux*)
 		_posix=yes
 		;;
 	os2-emx*)
@@ -4458,6 +4445,27 @@ if test "$_opl2lpt" = yes; then
 fi
 define_in_config_if_yes "$_opl2lpt" 'ENABLE_OPL2LPT'
 echo "$_opl2lpt"
+
+#
+# Check for retrowave for RetroWave OPL3
+#
+echocheck "RetroWave OPL3"
+if test "$_retrowave" = yes ; then
+	_retrowave=no
+	cat > $TMPC << EOF
+#include <RetroWaveLib/RetroWave.h>
+RetroWaveContext context;
+int main(void) { retrowave_init(&context); return 0; }
+EOF
+	cc_check $RETROWAVE_CFLAGS $RETROWAVE_LIBS -lretrowave && \
+	_retrowave=yes
+fi
+if test "$_retrowave" = yes; then
+	append_var LIBS "$RETROWAVE_LIBS -lretrowave"
+	append_var INCLUDES "$RETROWAVE_CFLAGS"
+fi
+define_in_config_if_yes "$_retrowave" 'USE_RETROWAVE'
+echo "$_retrowave"
 
 #
 # Check for FLAC
@@ -4991,7 +4999,7 @@ define_in_config_if_yes $_cloud 'USE_CLOUD'
 #
 case $_host_os in
 	darwin*)
-		# NSDockTilePlugIn was added in OS X 10.6, so will not be available when compiling on older OS X versions.
+		# NSDockTilePlugIn was added in OS X 10.6, so will not be available when compiling on older macOS versions.
 		echocheck "DockTilePlugin"
 		if test "$_osxdockplugin" = auto ; then
 			_osxdockplugin=no
@@ -5336,11 +5344,6 @@ if test "$_opengl_mode" != none ; then
 			_opengl_mode=gles2
 			_opengl_glad=yes
 			;;
-		android3d)
-			# We require API level 16 while GLES2 APIs have been added in level 8 so we are safe for compilation
-			_opengl_mode=gles2
-			_opengl_glad=yes
-			;;
 		openpandora)
 			# Enable GLES only if user explicitely requested it
 			# Backend is SDL based so GLAD is supported
@@ -5358,7 +5361,7 @@ if test "$_opengl_mode" != none ; then
 
 				2.0.*)
 					# SDL2 supports both OpenGL + OpenGL ES contexts.
-					# However, Mac OS X only allows OpenGL context creation at
+					# However, macOS only allows OpenGL context creation at
 					# this time, thus we limit us to OpenGL on that platform.
 					case $_host_os in
 						darwin*)
@@ -5395,10 +5398,11 @@ fi
 if test "$_opengl_glad" = "no" -a "$_opengl_mode" != "none"; then
 	# Try different header filenames
 	# 1) GL/gl.h         This is usually used on POSIX and Windows systems
-	# 2) OpenGL/gl.h     This is used on Mac OS X
+	# 2) OpenGL/gl.h     This is used on macOS
 	# 3) GLES2/gl2.h     This is used for OpenGL ES 2.x
+	# 3) GLES/gl.h       This is used for OpenGL ES 1.x
 	_opengl_can_compile=no
-	for i in "GL/gl.h" "OpenGL/gl.h" "GLES2/gl2.h"; do
+	for i in "GL/gl.h" "OpenGL/gl.h" "GLES2/gl2.h" "GLES/gl.h"; do
 		# Test the current header for OpenGL
 		if test "$_opengl_mode" = "gl" -o "$_opengl_mode" = "any" ; then
 			cat > $TMPC << EOF
@@ -5446,6 +5450,11 @@ EOF
 					break
 				fi
 			done
+		elif test "$_opengl_mode" = "gles" ; then
+			OPENGL_LIBS="-lGLESv1_CM"
+			if cc_check_no_clean $DEFINES $OPENGL_CFLAGS $OPENGL_LIBS; then
+				_opengl_can_compile=yes
+			fi
 		else
 			case $_host_os in
 			darwin*)

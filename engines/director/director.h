@@ -35,6 +35,7 @@
 
 #include "director/types.h"
 #include "director/util.h"
+#include "director/debugger.h"
 #include "director/detection.h"
 
 namespace Common {
@@ -83,7 +84,8 @@ enum {
 	kDebugScreenshot	= 1 << 14,
 	kDebugDesktop		= 1 << 15,
 	kDebug32bpp			= 1 << 16,
-	kDebugEndVideo		= 1 << 17
+	kDebugEndVideo		= 1 << 17,
+	kDebugLingoStrict	= 1 << 18
 };
 
 struct MovieReference {
@@ -249,6 +251,7 @@ public:
 
 	// events.cpp
 	bool processEvents(bool captureClick = false);
+	void processEventQUIT();
 	uint32 getMacTicks();
 
 public:
@@ -296,6 +299,7 @@ private:
 };
 
 extern DirectorEngine *g_director;
+extern Debugger *g_debugger;
 extern uint32 wmMode;
 
 } // End of namespace Director

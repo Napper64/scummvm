@@ -19,23 +19,50 @@
  *
  */
 
+#include "common/bitarray.h"
 #include "common/events.h"
-#include "common/config-manager.h"
+#include "common/savefile.h"
 
 #include "hypno/hypno.h"
 
 namespace Hypno {
 
 static const chapterEntry rawChapterTable[] = {
-	{11, {44, 172}, {218, 172}, {0, 0}}, 		// c11
+	{11, {44, 172}, {218, 172}, {0,   0}}, 		// c11
+	{10, {19, 3},   {246, 3}, 	{246, 11}}, 	// c10
+	{21, {70, 160}, {180, 160}, {220, 185}}, 	// c21
+	{22, {70, 160}, {180, 160}, {220, 185}}, 	// c22
+	{23, {70, 160}, {180, 160}, {220, 185}}, 	// c23
+	{20, {128, 150}, {238, 150},{0,   0}}, 		// c20
 	{31, {70, 160}, {180, 160}, {220, 185}}, 	// c31
+	{32, {70, 160}, {180, 160}, {220, 185}}, 	// c32
+	{33, {70, 160}, {180, 160}, {220, 185}}, 	// c33
+	{30, {19, 3},   {246, 3}, 	{246, 11}}, 	// c30
+	{41, {70, 160}, {180, 160}, {220, 185}}, 	// c41
+	{42, {70, 160}, {180, 160}, {220, 185}}, 	// c42
+	{43, {70, 160}, {180, 160}, {220, 185}}, 	// c43
+	{44, {70, 160}, {180, 160}, {220, 185}}, 	// c44
+	{40, {19, 3},   {246, 3}, 	{246, 11}}, 	// c40
+	{51, {60, 167}, {190, 167}, {135, 187}}, 	// c51
 	{52, {60, 167}, {190, 167}, {135, 187}}, 	// c52
+	{50, {19, 3},   {246, 3}, 	{246, 11}}, 	// c50 (fixed)
+	{61, {44, 172}, {218, 172}, {0, 0}}, 		// c61
+	{60, {44, 172}, {218, 172}, {0, 0}}, 		// c60
 	{0,  {0,  0},   {0,   0},   {0,   0}}    	// NULL
 };
 
 WetEngine::WetEngine(OSystem *syst, const ADGameDescription *gd) : HypnoEngine(syst, gd) {
+	_screenW = 320;
+	_screenH = 200;
+	_lives = 2;
+	_lastLevel = 0;
+
+	_c40SegmentIdx = -1;
+	_c40lastTurn = -1;
+
     const chapterEntry *entry = rawChapterTable;
     while (entry->id) {
+		_ids.push_back(entry->id);
 		_chapterTable[entry->id] = entry;
 		entry++;
     }
@@ -62,7 +89,9 @@ void WetEngine::loadAssets() {
 
 
 void WetEngine::loadAssetsDemoDisc() {
-	LibFile *missions = loadLib("", "wetlands/c_misc/missions.lib", true);
+
+	bool encrypted = _language == Common::HE_ISR ? false : true;
+	LibFile *missions = loadLib("", "wetlands/c_misc/missions.lib", encrypted);
 	Common::ArchiveMemberList files;
 	if (missions->listMembers(files) == 0)
 		error("Failed to load any files from missions.lib");
@@ -102,7 +131,14 @@ void WetEngine::loadAssetsDemoDisc() {
 	start->hots = hs;
 	_levels["<start>"] = start;
 
-	Transition *intro = new Transition("c31");
+	Transition *intro;
+	if (_language == Common::EN_USA)
+		intro = new Transition("c31");
+	else if (_language == Common::HE_ISR)
+		intro = new Transition("c31.mis");
+	else
+		error("Unsupported language");
+
 	intro->intros.push_back("movie/nw_logo.smk");
 	intro->intros.push_back("movie/hypnotix.smk");
 	intro->intros.push_back("movie/wetlogo.smk");
@@ -131,16 +167,22 @@ void WetEngine::loadAssetsDemoDisc() {
 	movies->frameNumber = 0;
 	_levels["<movies>"] = movies;
 
-	loadArcadeLevel("c31.mi_", "c52", "wetlands");
-	_levels["c31.mi_"]->levelIfLose = "c52";
-	loadArcadeLevel("c52.mi_", "<gameover>", "wetlands");
-	_levels["c52.mi_"]->levelIfLose = "<gameover>";
+	if (_language == Common::EN_USA) {
+		loadArcadeLevel("c31.mi_", "c52", "c52", "wetlands");
+		loadArcadeLevel("c52.mi_", "<game_over>", "<quit>", "wetlands");
+	} else if (_language == Common::HE_ISR) {
+		loadArcadeLevel("c31.mis", "c52.mis", "c52.mis", "wetlands");
+		loadArcadeLevel("c52.mis", "<game_over>", "<quit>", "wetlands");
+	} else {
+		error("Unsupported language");
+	}
 
 	Transition *over = new Transition("<quit>");
 	over->intros.push_back("movie/gameover.smk");
-	_levels["<gameover>"] = over;
+	_levels["<game_over>"] = over;
 
 	loadLib("", "wetlands/c_misc/fonts.lib", true);
+	loadFonts();
 	loadLib("wetlands/sound/", "wetlands/c_misc/sound.lib", true);
 	_nextLevel = "<start>";
 }
@@ -156,16 +198,16 @@ void WetEngine::loadAssetsPCW() {
 	intro->intros.push_back("c_misc/nw_logo.smk");
 	intro->intros.push_back("c_misc/h.s");
 	intro->intros.push_back("c_misc/wet.smk");
-	intro->frameImage.clear();
 	_levels["<start>"] = intro;
 
-	loadArcadeLevel("c11.mis", "<gameover>", "");
+	loadArcadeLevel("c11.mis", "<quit>", "<check_lives>", "");
 
 	Transition *over = new Transition("<quit>");
-	over->intros.push_back("movie/gameover.smk");
-	_levels["<gameover>"] = over;
+	_levels["<game_over>"] = over;
 
 	loadLib("", "c_misc/sound.lib", false);
+	loadLib("", "c_misc/fonts.lib", true);
+	loadFonts();
 	_nextLevel = "<start>";
 }
 
@@ -180,16 +222,19 @@ void WetEngine::loadAssetsPCG() {
 	intro->intros.push_back("nw_logo.smk");
 	intro->intros.push_back("h.s");
 	intro->intros.push_back("wet.smk");
-	intro->frameImage.clear();
+	intro->frameImage = "c.s";
+	intro->frameNumber = 0;
 	_levels["<start>"] = intro;
 
-	loadArcadeLevel("c31.mis", "<gameover>", "");
+	loadArcadeLevel("c31.mis", "<quit>", "<check_lives>", "");
 
 	Transition *over = new Transition("<quit>");
-	over->intros.push_back("gameover.smk");
-	_levels["<gameover>"] = over;
+	over->intros.push_back("g.s");
+	_levels["<game_over>"] = over;
 
-	loadLib("", "sound.lib", false);
+	loadLib("sound/", "sound.lib", false);
+	loadLib("", "fonts.lib", true);
+	loadFonts();
 	_nextLevel = "<start>";
 }
 
@@ -206,90 +251,280 @@ void WetEngine::loadAssetsFullGame() {
 	logos->intros.push_back("c_misc/wetlogo.smk");
 	_levels["<start>"] = logos;
 
-	Code *menu = new Code();
-	menu->name = "<main_menu>";
+	Code *menu = new Code("<main_menu>");
 	_levels["<main_menu>"] = menu;
-	_levels["<main_menu>"]->levelIfWin = "c11";
+	_levels["<main_menu>"]->levelIfWin = "<intros>";
 
-	loadArcadeLevel("c110.mi_", "c20", "");
-	_levels["c110.mi_"]->intros.push_front("c_misc/intros.smk");
+	Code *level_menu = new Code("<level_menu>");
+	_levels["<level_menu>"] = level_menu;
+	_levels["<level_menu>"]->levelIfWin = "?";
 
-	loadArcadeLevel("c111.mi_", "c20", "");
-	_levels["c111.mi_"]->intros.push_front("c_misc/intros.smk");
+	Transition *over = new Transition("<quit>");
+	over->intros.push_back("c_misc/gameover.smk");
+	_levels["<game_over>"] = over;
 
-	loadArcadeLevel("c112.mi_", "c20", "");
-	_levels["c112.mi_"]->intros.push_front("c_misc/intros.smk");
+	Transition *intros = new Transition("<level_menu>");
+	intros->intros.push_back("c_misc/stardate.smk");
+	intros->intros.push_back("c_misc/intros.smk");
+	intros->intros.push_back("c_misc/confs.smk");
+	_levels["<intros>"] = intros;
 
-	loadArcadeLevel("c200.mi_", "???", "");
-	loadArcadeLevel("c201.mi_", "???", "");
-	loadArcadeLevel("c202.mi_", "???", "");
+	Code *check_lives = new Code("<check_lives>");
+	_levels["<check_lives>"] = check_lives;
 
-	//loadArcadeLevel("c20", "", "");
+	Code *end_credits = new Code("<credits>");
+	_levels["<credits>"] = end_credits;
+
+	loadArcadeLevel("c110.mi_", "c10", "<check_lives>", "");
+	loadArcadeLevel("c111.mi_", "c10", "<check_lives>", "");
+	loadArcadeLevel("c112.mi_", "c10", "<check_lives>", "");
+
+	loadArcadeLevel("c100.mi_", "c21", "<check_lives>", "");
+	loadArcadeLevel("c101.mi_", "c21", "<check_lives>", "");
+	loadArcadeLevel("c102.mi_", "c21", "<check_lives>", "");
+
+	loadArcadeLevel("c210.mi_", "c22", "<check_lives>", "");
+	loadArcadeLevel("c211.mi_", "c22", "<check_lives>", "");
+	loadArcadeLevel("c212.mi_", "c22", "<check_lives>", "");
+
+	loadArcadeLevel("c220.mi_", "c23", "<check_lives>", "");
+	loadArcadeLevel("c221.mi_", "c23", "<check_lives>", "");
+	loadArcadeLevel("c222.mi_", "c23", "<check_lives>", "");
+
+	loadArcadeLevel("c230.mi_", "c20", "<check_lives>", "");
+	loadArcadeLevel("c231.mi_", "c20", "<check_lives>", "");
+	loadArcadeLevel("c232.mi_", "c20", "<check_lives>", "");
+
+	loadArcadeLevel("c200.mi_", "c31", "<check_lives>", "");
+	loadArcadeLevel("c201.mi_", "c31", "<check_lives>", "");
+	loadArcadeLevel("c202.mi_", "c31", "<check_lives>", "");
+
+	loadArcadeLevel("c310.mi_", "c32", "<check_lives>", "");
+	loadArcadeLevel("c311.mi_", "c32", "<check_lives>", "");
+	loadArcadeLevel("c312.mi_", "c32", "<check_lives>", "");
+
+	loadArcadeLevel("c320.mi_", "c33", "<check_lives>", "");
+	loadArcadeLevel("c321.mi_", "c33", "<check_lives>", "");
+	loadArcadeLevel("c322.mi_", "c33", "<check_lives>", "");
+
+	loadArcadeLevel("c330.mi_", "c30", "<check_lives>", "");
+	loadArcadeLevel("c331.mi_", "c30", "<check_lives>", "");
+	loadArcadeLevel("c332.mi_", "c30", "<check_lives>", "");
+
+	loadArcadeLevel("c300.mi_", "c41", "<check_lives>", "");
+	ArcadeShooting *arc = (ArcadeShooting*) _levels["c300.mi_"];
+	arc->id = 30; // Fixed from the original (3)
+
+	loadArcadeLevel("c301.mi_", "c41", "<check_lives>", "");
+	arc = (ArcadeShooting*) _levels["c301.mi_"];
+	arc->id = 30; // Fixed from the original (3)
+
+	loadArcadeLevel("c302.mi_", "c41", "<check_lives>", "");
+	arc = (ArcadeShooting*) _levels["c302.mi_"];
+	arc->id = 30; // Fixed from the original (3)
+
+	loadArcadeLevel("c410.mi_", "c42", "<check_lives>", "");
+	loadArcadeLevel("c411.mi_", "c42", "<check_lives>", "");
+	loadArcadeLevel("c412.mi_", "c42", "<check_lives>", "");
+
+	loadArcadeLevel("c420.mi_", "c43", "<check_lives>", "");
+	loadArcadeLevel("c421.mi_", "c43", "<check_lives>", "");
+	loadArcadeLevel("c422.mi_", "c43", "<check_lives>", "");
+
+	loadArcadeLevel("c430.mi_", "c44", "<check_lives>", "");
+	loadArcadeLevel("c431.mi_", "c44", "<check_lives>", "");
+	loadArcadeLevel("c432.mi_", "c44", "<check_lives>", "");
+
+	loadArcadeLevel("c440.mi_", "c40", "<check_lives>", "");
+	loadArcadeLevel("c441.mi_", "c40", "<check_lives>", "");
+	loadArcadeLevel("c442.mi_", "c40", "<check_lives>", "");
+
+	loadArcadeLevel("c400.mi_", "c51", "<check_lives>", "");
+	arc = (ArcadeShooting*) _levels["c400.mi_"];
+	arc->id = 40; // Fixed from the original (4)
+
+	loadArcadeLevel("c401.mi_", "c51", "<check_lives>", "");
+	arc = (ArcadeShooting*) _levels["c401.mi_"];
+	arc->id = 40; // Fixed from the original (4)
+
+	loadArcadeLevel("c402.mi_", "c51", "<check_lives>", "");
+	arc = (ArcadeShooting*) _levels["c402.mi_"];
+	arc->id = 40; // Fixed from the original (4)
+
+	loadArcadeLevel("c510.mi_", "c52", "<check_lives>", "");
+	loadArcadeLevel("c511.mi_", "c52", "<check_lives>", "");
+	loadArcadeLevel("c512.mi_", "c52", "<check_lives>", "");
+
+	loadArcadeLevel("c520.mi_", "c50", "<check_lives>", "");
+	loadArcadeLevel("c521.mi_", "c50", "<check_lives>", "");
+	loadArcadeLevel("c522.mi_", "c50", "<check_lives>", "");
+
+	loadArcadeLevel("c500.mi_", "c61", "<check_lives>", "");
+	arc = (ArcadeShooting*) _levels["c500.mi_"];
+	arc->id = 50; // Fixed from the original (5)
+
+	loadArcadeLevel("c501.mi_", "c61", "<check_lives>", "");
+	arc = (ArcadeShooting*) _levels["c501.mi_"];
+	arc->id = 50; // Fixed from the original (5)
+
+	loadArcadeLevel("c502.mi_", "c61", "<check_lives>", "");
+	arc = (ArcadeShooting*) _levels["c502.mi_"];
+	arc->id = 50; // Fixed from the original (5)
+
+	loadArcadeLevel("c610.mi_", "c60", "<check_lives>", "");
+	loadArcadeLevel("c611.mi_", "c60", "<check_lives>", "");
+	loadArcadeLevel("c612.mi_", "c60", "<check_lives>", "");
+
+	loadArcadeLevel("c600.mi_", "<credits>", "<check_lives>", "");
+	loadArcadeLevel("c601.mi_", "<credits>", "<check_lives>", "");
+	loadArcadeLevel("c602.mi_", "<credits>", "<check_lives>", "");
 
 	loadLib("", "c_misc/fonts.lib", true);
+	loadFonts();
 	loadLib("sound/", "c_misc/sound.lib", true);
 	_nextLevel = "<start>";
 }
 
 void WetEngine::showCredits() {
-	MVideo video("c_misc/credits.smk", Common::Point(0, 0), false, false, false);
-	runIntro(video);
-}
+	if (_cheatsEnabled && !_arcadeMode.empty()) {
+		_skipLevel = true;
+		return;
+	}
 
-void WetEngine::runCode(Code *code) {
-	changeScreenMode("320x200");
-	if (code->name == "<main_menu>")
-		runMainMenu(code);
-	else
-		error("invalid hardcoded level: %s", code->name.c_str());
-}
-
-void WetEngine::runMainMenu(Code *code) {
-	Common::Event event;
-	_font = FontMan.getFontByUsage(Graphics::FontManager::kConsoleFont);
-	uint32 c = _pixelFormat.RGBToColor(0, 252, 0);
-	Graphics::Surface *frame = decodeFrame("c_misc/menus.smk", 16);
-	Common::String _name = "";
-	drawImage(*frame, 0, 0, false);
-	_font->drawString(_compositeSurface, "ENTER NAME :", 48, 50, 100, c);
-	while (!shouldQuit()) {
-
-		while (g_system->getEventManager()->pollEvent(event)) {
-			// Events
-			switch (event.type) {
-
-			case Common::EVENT_QUIT:
-			case Common::EVENT_RETURN_TO_LAUNCHER:
-				break;
-
-			case Common::EVENT_KEYDOWN:
-				if (event.kbd.keycode == Common::KEYCODE_BACKSPACE)
-					_name.deleteLastChar();
-				else if (event.kbd.keycode == Common::KEYCODE_RETURN && !_name.empty()) {
-					_nextLevel = code->levelIfWin;
-					return;
-				}
-				else if (Common::isAlnum(event.kbd.keycode)) {
-					_name = _name + char(event.kbd.keycode - 32);
-				}
-
-				drawImage(*frame, 0, 0, false);
-				_font->drawString(_compositeSurface, "ENTER NAME :", 48, 50, 100, c);
-				_font->drawString(_compositeSurface, _name, 140, 50, 170, c);
-				break;
-
-
-			default:
-				break;
-			}
-		}
-
-		drawScreen();
-		g_system->delayMillis(10);
+	if (!isDemo() || (_variant == "Demo" && _language == Common::EN_USA)) {
+		MVideo video("c_misc/credits.smk", Common::Point(0, 0), false, true, false);
+		runIntro(video);
 	}
 }
 
-Common::String WetEngine::findNextLevel(const Transition *trans) { 
+void WetEngine::loadFonts() {
+	Common::File file;
+
+	if (!file.open("block05.fgx"))
+		error("Cannot open font");
+
+	byte *font = (byte *)malloc(file.size());
+	file.read(font, file.size());
+
+	_font05.set_size(file.size()*8);
+	_font05.set_bits((byte *)font);
+
+	file.close();
+	free(font);
+	if (!file.open("scifi08.fgx"))
+		error("Cannot open font");
+
+	font = (byte *)malloc(file.size());
+	file.read(font, file.size());
+
+	_font08.set_size(file.size()*8);
+	_font08.set_bits((byte *)font);
+
+	free(font);
+}
+
+void WetEngine::drawString(const Common::String &font, const Common::String &str, int x, int y, int w, uint32 color) {
+	if (font == "block05.fgx") {
+		for (uint32 c = 0; c < str.size(); c++) {
+			for (int i = 0; i < 5; i++) {
+				for (int j = 0; j < 5; j++) {
+					if (!_font05.get(275 + 40*str[c] + j*8 + i))
+						_compositeSurface->setPixel(x + 5 - i + 6*c, y + j, color);
+				}
+			}
+		}
+	} else if (font == "scifi08.fgx") {
+		for (uint32 c = 0; c < str.size(); c++) {
+			if (str[c] == 0)
+				continue;
+			assert(str[c] >= 32);
+			for (int i = 0; i < 6; i++) {
+				for (int j = 0; j < 8; j++) {
+					if (!_font08.get(1554 + 72*(str[c]-32) + j*8 + i))
+						_compositeSurface->setPixel(x + 6 - i + 7*c, y + j, color);
+				}
+			}
+		}
+	} else
+		error("Invalid font: '%s'", font.c_str());
+}
+
+void WetEngine::saveProfile(const Common::String &name, int levelId) {
+	SaveStateList saves = getMetaEngine()->listSaves(_targetName.c_str());
+
+	// Find the correct level index to before saving
+	for (uint32 i = 0; i < _ids.size(); i++) {
+		if (levelId == _ids[i]) {
+			if (_lastLevel < int(i))
+				_lastLevel = int(i);
+			break;
+		}
+	}
+
+	uint32 slot = 0;
+	for (SaveStateList::iterator save = saves.begin(); save != saves.end(); ++save) {
+		if (save->getDescription() == name)
+			break;
+		slot++;
+	}
+
+	saveGameState(slot, name, false);
+}
+
+bool WetEngine::loadProfile(const Common::String &name) {
+	SaveStateList saves = getMetaEngine()->listSaves(_targetName.c_str());
+	uint32 slot = 0;
+	for (SaveStateList::iterator save = saves.begin(); save != saves.end(); ++save) {
+		if (save->getDescription() == name)
+			break;
+		slot++;
+	}
+
+	if (slot == saves.size()) {
+		debugC(1, kHypnoDebugMedia, "Failed to load %s", name.c_str());
+		return false;
+	}
+
+	loadGameState(slot);
+	return true;
+}
+
+Common::Error WetEngine::saveGameStream(Common::WriteStream *stream, bool isAutosave) {
+	if (isAutosave)
+		return Common::kNoError;
+
+	if (_lastLevel < 0 || _lastLevel >= 20)
+		error("Invalid last level!");
+
+	stream->writeString(_name);
+	stream->writeByte(0);
+
+	stream->writeString(_difficulty);
+	stream->writeByte(0);
+
+	stream->writeUint32LE(_lives);
+	stream->writeUint32LE(_score);
+
+	stream->writeUint32LE(_lastLevel);
+	return Common::kNoError;
+}
+
+Common::Error WetEngine::loadGameStream(Common::SeekableReadStream *stream) {
+	_name = stream->readString();
+	_difficulty = stream->readString();
+	_lives = stream->readUint32LE();
+	_score = stream->readUint32LE();
+	_lastLevel = stream->readUint32LE();
+
+	if (_lastLevel == 0)
+		_nextLevel = Common::String::format("c%d", _ids[0]);
+	else
+		_nextLevel = "<level_menu>";
+
+	return Common::kNoError;
+}
+
+Common::String WetEngine::findNextLevel(const Transition *trans) {
 	if (trans->nextLevel.empty())
 		error("Invalid transition!");
 	return trans->nextLevel;

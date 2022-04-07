@@ -317,7 +317,7 @@ void Score::update() {
 
 		if (_waitForChannel) {
 			if (_soundManager->isChannelActive(_waitForChannel)) {
-				keepWaiting = true; 
+				keepWaiting = true;
 			} else {
 				_waitForChannel = 0;
 			}
@@ -556,8 +556,22 @@ void Score::renderSprites(uint16 frameId, RenderMode mode) {
 		}
 
 		if (channel->isDirty(nextSprite) || widgetRedrawn || mode == kRenderForceUpdate) {
-			if (!currentSprite->_trails)
+			if (currentSprite && !currentSprite->_trails)
 				_window->addDirtyRect(channel->getBbox());
+
+			if (currentSprite->_cast && currentSprite->_cast->_erase) {
+				auto cast = currentSprite->_cast->getCast()->_loadedCast;
+				for (auto it = cast->begin(); it != cast->end(); ++it) {
+					if (it->_value == currentSprite->_cast) {
+						cast->erase(it);
+						currentSprite->_cast->_erase = false;
+						break;
+					}
+				}
+
+				currentSprite->setCast(currentSprite->_castId);
+				nextSprite->setCast(nextSprite->_castId);
+			}
 
 			channel->setClean(nextSprite, i);
 			// Check again to see if a video has just been started by setClean.
@@ -916,13 +930,30 @@ void Score::loadLabels(Common::SeekableReadStreamEndian &stream) {
 
 		stream.seek(stringPos);
 		Common::String label;
+		Common::String comment = "";
+		char ch;
 
-		for (uint32 j = stringPos; j < nextStringPos; j++) {
-			label += stream.readByte();
+		uint32 j = stringPos;
+		// handle label
+		while(j < nextStringPos) {
+			j++;
+			ch = stream.readByte();
+			if (ch == '\r')
+				break;
+			label += ch;
 		}
+		// handle label comments
+		while(j < nextStringPos) {
+			j++;
+			ch = stream.readByte();
+			if (ch == '\r')
+				ch = '\n';
+			comment += ch;
+		}
+
 		label = _movie->getCast()->decodeString(label).encode(Common::kUtf8);
 
-		_labels->insert(new Label(label, frame));
+		_labels->insert(new Label(label, frame, comment));
 		stream.seek(streamPos);
 
 		frame = nextFrame;
@@ -933,7 +964,7 @@ void Score::loadLabels(Common::SeekableReadStreamEndian &stream) {
 
 	debugC(2, kDebugLoading, "****** Loading labels");
 	for (j = _labels->begin(); j != _labels->end(); ++j) {
-		debugC(2, kDebugLoading, "Frame %d, Label '%s'", (*j)->number, utf8ToPrintable((*j)->name).c_str());
+		debugC(2, kDebugLoading, "Frame %d, Label '%s', Comment '%s'", (*j)->number, utf8ToPrintable((*j)->name).c_str(), (*j)->comment.c_str());
 	}
 }
 
@@ -961,7 +992,7 @@ void Score::loadActions(Common::SeekableReadStreamEndian &stream) {
 		stream.seek(stringPos);
 
 		Common::String script = stream.readString(0, nextStringPos - stringPos);
-		_actions[i] = script.decode(Common::kMacRoman).encode(Common::kUtf8);
+		_actions[i] = _movie->getCast()->decodeString(script).encode(Common::kUtf8);
 
 		debugC(3, kDebugLoading, "Action index: %d id: %d nextId: %d subId: %d, code: %s", i, id, nextId, subId, _actions[i].c_str());
 

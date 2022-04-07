@@ -699,4 +699,86 @@ void LoomTownsDifficultyDialog::handleCommand(GUI::CommandSender *sender, uint32
 	}
 }
 
+LoomEgaGameOptionsWidget::LoomEgaGameOptionsWidget(GuiObject *boss, const Common::String &name, const Common::String &domain) :
+		OptionsContainerWidget(boss, name, "LoomEgaGameOptionsDialog", false, domain) {
+	GUI::StaticTextWidget *text = new GUI::StaticTextWidget(widgetsBoss(), "LoomEgaGameOptionsDialog.OvertureTicksLabel", _("Overture Timing:"));
+
+	text->setAlign(Graphics::TextAlign::kTextAlignEnd);
+
+	_overtureTicksSlider = new GUI::SliderWidget(widgetsBoss(), "LoomEgaGameOptionsDialog.OvertureTicks", _("When using replacement music, this adjusts the time when the Overture changes to the scene with the Lucasfilm and Loom logotypes."), kOvertureTicksChanged);
+
+	// In the Ozawa recording, the transition happens at about 1:56. At is
+	// turns out, this is a fairly fast version of the tune. After checking
+	// a number of different recordings, I've settled on an interval of
+	// 1:40 - 2:50. This is larger than I had hoped, but I guess it's
+	// really necessary.
+	//
+	// Hopefully that still means you can set the slider back to its default
+	// value at most reasonable screen resolutions.
+
+	_overtureTicksSlider->setMinValue(-160);
+	_overtureTicksSlider->setMaxValue(540);
+
+	_overtureTicksValue = new GUI::StaticTextWidget(widgetsBoss(), "LoomEgaGameOptionsDialog.OvertureTicksValue", Common::U32String());
+
+	_overtureTicksValue->setFlags(GUI::WIDGET_CLEARBG);
+
+	// Normally this would be added as a static game settings widget, but
+	// I see no way to get both the dynamic and the static one, so we have
+	// to duplicate it here.
+
+	_enableEnhancements = new GUI::CheckboxWidget(widgetsBoss(), "LoomEgaGameOptionsDialog.EnableEnhancements", _("Enable game-specific enhancements"), _("Allow ScummVM to make small enhancements to the game, usually based on other versions of the same game."));
+}
+
+void LoomEgaGameOptionsWidget::load() {
+	int loomOvertureTicks = 0;
+
+	if (ConfMan.hasKey("loom_overture_ticks", _domain))
+		loomOvertureTicks = ConfMan.getInt("loom_overture_ticks", _domain);
+
+	_overtureTicksSlider->setValue(loomOvertureTicks);
+	updateOvertureTicksValue();
+
+	_enableEnhancements->setState(ConfMan.getBool("enable_enhancements", _domain));
+}
+
+bool LoomEgaGameOptionsWidget::save() {
+	ConfMan.setInt("loom_overture_ticks", _overtureTicksSlider->getValue(), _domain);
+	ConfMan.setBool("enable_enhancements", _enableEnhancements->getState(), _domain);
+	return true;
+}
+
+void LoomEgaGameOptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const {
+	layouts.addDialog(layoutName, overlayedLayout)
+		.addLayout(GUI::ThemeLayout::kLayoutVertical, 12)
+			.addPadding(0, 0, 0, 0)
+			.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
+				.addPadding(0, 0, 12, 0)
+				.addWidget("OvertureTicksLabel", "OptionsLabel")
+				.addWidget("OvertureTicks", "WideSlider")
+				.addWidget("OvertureTicksValue", "ShortOptionsLabel")
+			.closeLayout()
+			.addWidget("EnableEnhancements", "Checkbox")
+		.closeLayout()
+	.closeDialog();
+}
+
+void LoomEgaGameOptionsWidget::handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) {
+
+	switch (cmd) {
+	case kOvertureTicksChanged:
+		updateOvertureTicksValue();
+		break;
+	default:
+		GUI::OptionsContainerWidget::handleCommand(sender, cmd, data);
+		break;
+	}
+}
+
+void LoomEgaGameOptionsWidget::updateOvertureTicksValue() {
+	int ticks = DEFAULT_LOOM_OVERTURE_TRANSITION + _overtureTicksSlider->getValue();
+
+	_overtureTicksValue->setLabel(Common::String::format("%d:%02d.%d", ticks / 600, (ticks % 600) / 10, ticks % 10));
+}
+
 } // End of namespace Scumm

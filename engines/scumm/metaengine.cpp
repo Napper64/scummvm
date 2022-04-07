@@ -32,6 +32,7 @@
 #include "scumm/he/intern_he.h"
 #include "scumm/scumm_v0.h"
 #include "scumm/scumm_v8.h"
+#include "scumm/dialogs.h"
 #include "scumm/resource.h"
 
 // Files related for detection.
@@ -335,6 +336,12 @@ Common::Error ScummMetaEngine::createInstance(OSystem *syst, Engine **engine) {
 	// file transparently.
 	Common::updateGameGUIOptions(res.game.guioptions, getGameGUIOptionsDescriptionLanguage(res.language));
 
+	// If the game was added really long ago, it may be missing its "extra"
+	// field. When adding game-specific options, it may be our only way of
+	// telling certain versions apart, so make sure it's updated.
+	if (res.game.variant && res.game.variant[0] && !ConfMan.hasKey("extra"))
+		ConfMan.setAndFlush("extra", res.game.variant);
+
 	// Check for a user override of the platform. We allow the user to override
 	// the platform, to make it possible to add games which are not yet in
 	// our MD5 database but require a specific platform setting.
@@ -520,6 +527,25 @@ SaveStateDescriptor ScummMetaEngine::querySaveMetaInfos(const char *target, int 
 	}
 
 	return desc;
+}
+
+GUI::OptionsContainerWidget *ScummMetaEngine::buildEngineOptionsWidgetDynamic(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const {
+	if (ConfMan.get("gameid", target) != "loom")
+		return nullptr;
+
+	// These Loom settings are only relevant for the EGA version, since
+	// that is the only one that has an overture.
+
+	Common::Platform platform = Common::parsePlatform(ConfMan.get("platform", target));
+	if (platform != Common::kPlatformUnknown && platform != Common::kPlatformDOS)
+		return nullptr;
+
+	Common::String extra = ConfMan.get("extra", target);
+
+	if (extra == "Steam" || extra == "VGA")
+		return nullptr;
+
+	return new Scumm::LoomEgaGameOptionsWidget(boss, name, target);
 }
 
 #if PLUGIN_ENABLED_DYNAMIC(SCUMM)

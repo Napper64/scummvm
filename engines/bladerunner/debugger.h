@@ -22,6 +22,8 @@
 #ifndef BLADERUNNER_DEBUGGER_H
 #define BLADERUNNER_DEBUGGER_H
 
+#include "bladerunner/bladerunner.h" // For BLADERUNNER_ORIGINAL_BUGS symbol
+
 #include "bladerunner/vector.h"
 
 #include "gui/debugger.h"
@@ -85,6 +87,9 @@ public:
 	bool _showStatsVk;
 	bool _showMazeScore;
 	bool _showMouseClickInfo;
+	bool _useBetaCrosshairsCursor;
+	bool _useAdditiveDrawModeForMouseCursorMode0;
+	bool _useAdditiveDrawModeForMouseCursorMode1;
 
 	Debugger(BladeRunnerEngine *vm);
 	~Debugger() override;
@@ -112,7 +117,7 @@ public:
 	bool cmdObject(int argc, const char **argv);
 	bool cmdItem(int argc, const char **argv);
 	bool cmdRegion(int argc, const char **argv);
-	bool cmdClick(int argc, const char **argv);
+	bool cmdMouse(int argc, const char **argv);
 	bool cmdDifficulty(int argc, const char **argv);
 #if BLADERUNNER_ORIGINAL_BUGS
 #else

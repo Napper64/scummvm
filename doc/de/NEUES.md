@@ -6,6 +6,11 @@ Umfangreichere Informationen über die Änderungen des aktuellen Codes findest D
  Neue Spiele:
    - Unterstützung für Sanitarium hinzugefügt.
    - Unterstützung für Hades Challenge hinzugefügt.
+   - Unterstützung für Marvel Comics Spider-Man: The Sinister Six hinzugefügt.
+   - Unterstützung für The 11th Hour hinzugefügt.
+   - Unterstützung für Clandestiny hinzugefügt.
+   - Unterstützung für Tender Loving Care (CD-ROM-Versionen) hinzugefügt.
+   - Unterstützung für Uncle Henry's Playhouse hinzugefügt.
 
  Allgemein:
    - Die Lizenz des Projektes wurde auf GPLv3+ aktualisiert.
@@ -13,6 +18,14 @@ Umfangreichere Informationen über die Änderungen des aktuellen Codes findest D
    - Unterstützung für verbesserte Filter in der Such-Box hinzugefügt.
      Weitere Informationen findest Du in der Dokumentation unnter "Unterstanding the search box".
    - Icon-Ansicht zur Benutzeroberfläche hinzugefügt [GSoC-Aufgabe].
+   - Unterstützung für die RetroWave OPL3-Soundkarte hinzugefügt.
+
+ AGI:
+   - Unterstützung für die Macintosh-Versionen von Manhunter 1 und 2 hinzugefügt.
+
+ BBVS:
+   - Teilweise fehlerhafte Darstellung der Buttons im Hauptmenü korrigiert.
+   - Absturz am Ende des Hock-A-Loogie-Minispiels behoben.
 
  Buried:
    - Gleichzeitige Wiedergabe von Audio und Video kann nun übersprungen werden.
@@ -42,15 +55,31 @@ Umfangreichere Informationen über die Änderungen des aktuellen Codes findest D
 
  SCI:
    - Unterstützung für Sprachausgabe in den Diskettenversionen von SCI-Spielen zugefügt.
+   - In den folgenden Spielen kann das Spiel nun über das globale ScummVM-Menü gespeichert werden:
+     BRAIN1, BRAIN2, ECOQUEST1, ECOQUEST2, FAIRYTALES, PHARKAS, GK1, GK2, ICEMAN,
+     KQ1, KQ4, KQ5, KQ6, KQ7, LB1, LB2, LIGHTHOUSE, LONGBOW, LSL1, LSL2, LSL3,
+     LSL5, LSL6, LSL6HIRES, LSL7, PEPPER, PHANT2, PQ1, PQ2, PQ3, PQ4, PQSWAT,
+     QFG1, QFG1VGA, QFG2, QFG3, QFG4, SHIVERS, SQ1, SQ3, SQ4, SQ5, SQ6, TORIN.
 
  SCUMM:
    - Neue Digital iMUSE-Engine hinzugefügt.
    - Der Musik-Player der Amiga-Versionen von Indy3 und Loom wurde neu entworfen, um dem Original-Code genauer zu entsprechen.
+   - Fehlender Cursor nach dem Laden eines gespeicherten Spielstands in der 16-Farben-Version (Macintosh)
+     in Loom und Indiana Jones and the Last Crusade behoben.
+   - Es ist nun möglich, die Musik in den Disketten-Versionen von Loom durch eigene Audio-Tracks
+     zu ersetzen. Im ScummVM-Wiki findest Du eine Liste, welche Teile von Schwanensee im Spiel verwendet werden.
+   - Einige Verbesserungen, die ScummVM zu Spielen hinzufügt, können jetzt
+     in den Spiel-Einstellungen deaktiviert werden. Die Option zur Korrektur des Zeichen-
+     Abstands in den 16-Farben-Versionen für Macintosh von Indiana Jones and the Last Crusade
+     findest du jetzt dort.
 
  Sherlock:
    - Fehler in der Wiedergabegeschwindigkeit im Intro von Serrated Scalpel behoben, der auftritt,
      wenn die Spieldateien über eine minimale Installation bereitgestellt werden.
    - Fehler in der Darstellung der Benutzeroberfläche in Serrated Scalpel behoben.
+
+ Titanic:
+   - Das Haus im Sternenfeld-Puzzle wird nun korrekt dargestellt.
 
  TwinE:
    - Fehler in der Kollisionserkennung behoben, der dazu führt, dass das Spiel nicht beendet werden kann,
@@ -58,6 +87,7 @@ Umfangreichere Informationen über die Änderungen des aktuellen Codes findest D
    - Rendering-Artefakte aufgrund fehlerhafter Berechnung des Lichteinfalls in einigen Szenen korrigiert.
    - Fehler in der Polygon-Darstellung in einigen Szenen korrigiert.
    - Falsche Schussrichtung einiger Charaktere korrigiert.
+   - Tür-Bewegungen in einigen Situationen korrigiert.
 
  macOS-Port:
    - Unterstützung für die Anzeige von OSD-Nachrichten in der Touch Bar hinzugefügt.

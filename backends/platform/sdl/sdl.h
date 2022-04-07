@@ -95,6 +95,7 @@ public:
 
 #if defined(USE_OPENGL_GAME) || defined(USE_OPENGL_SHADERS)
 	Common::Array<uint> getSupportedAntiAliasingLevels() const override;
+	OpenGL::ContextOGLType getOpenGLType() const override { return _oglType; }
 #endif
 
 protected:
@@ -119,6 +120,12 @@ protected:
 	Common::String _logFilePath;
 
 	/**
+	 * A path specified by the user where screenshots are created.
+	 * This may be empty, in which case a OS-dependent default path is used.
+	 */
+	Common::String _userScreenshotPath;
+
+	/**
 	 * The event source we use for obtaining SDL events.
 	 */
 	SdlEventSource *_eventSource;
@@ -133,10 +140,12 @@ protected:
 
 #if defined(USE_OPENGL_GAME) || defined(USE_OPENGL_SHADERS)
 	// Graphics capabilities
-	void detectFramebufferSupport();
+	void detectOpenGLFeaturesSupport();
 	void detectAntiAliasingSupport();
 
+	OpenGL::ContextOGLType _oglType;
 	bool _supportsFrameBuffer;
+	bool _supportsShaders;
 	Common::Array<uint> _antiAliasLevels;
 #endif
 

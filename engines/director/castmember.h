@@ -99,6 +99,7 @@ public:
 	Common::Array<Resource> _children;
 
 	bool _hilite;
+	bool _erase;
 	int _purgePriority;
 	uint32 _size;
 	uint8 _flags1;
@@ -344,9 +345,10 @@ struct CastMemberInfo {
 };
 
 struct Label {
+	Common::String comment;
 	Common::String name;
 	uint16 number;
-	Label(Common::String name1, uint16 number1) { name = name1; number = number1; }
+	Label(Common::String name1, uint16 number1, Common::String comment1) { name = name1; number = number1; comment = comment1;}
 };
 
 class PaletteCastMember : public CastMember {

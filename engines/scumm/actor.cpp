@@ -650,11 +650,13 @@ int Actor_v3::actorWalkStep() {
 	}
 
 	if ((_walkdata.xfrac += _walkdata.xAdd) >= _stepThreshold) {
-		_pos.x += _walkdata.deltaXFactor;
+		if (_pos.x != _walkdata.next.x)
+			_pos.x += _walkdata.deltaXFactor;
 		_walkdata.xfrac -= _stepThreshold;
 	}
 	if ((_walkdata.yfrac += _walkdata.yAdd) >= _stepThreshold) {
-		_pos.y += _walkdata.deltaYFactor;
+		if (_pos.y != _walkdata.next.y)
+			_pos.y += _walkdata.deltaYFactor;
 		_walkdata.yfrac -= _stepThreshold;
 	}
 
@@ -1607,7 +1609,7 @@ void Actor::putActor(int dstX, int dstY, int newRoom) {
 	// WORKAROUND: The green transparency of the tank in the Hall of Oddities
 	// is positioned one pixel too far to the left. This appears to be a bug
 	// in the original game as well.
-	if (_vm->_game.id == GID_SAMNMAX && newRoom == 16 && _number == 5 && dstX == 235 && dstY == 236)
+	if (_vm->_game.id == GID_SAMNMAX && newRoom == 16 && _number == 5 && dstX == 235 && dstY == 236 && _vm->_enableEnhancements)
 		dstX++;
 
 	_pos.x = dstX;
@@ -2538,7 +2540,7 @@ void Actor::startAnimActor(int f) {
 			if (_vm->_game.version >= 3 && f == _initFrame) {
 				_cost.reset();
 				if (_vm->_game.heversion != 0) {
-				((ActorHE *)this)->_auxBlock.reset();
+					((ActorHE *)this)->_auxBlock.reset();
 				}
 			}
 			_vm->_costumeLoader->costumeDecodeData(this, f, (uint) - 1);

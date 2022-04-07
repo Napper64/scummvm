@@ -557,12 +557,12 @@ static const SAGAGameDescription gameDescriptions[] = {
 		ITEPatch_Files,
 	},
 
-	// Inherit the earth - Windows/Linux/DOS CD version
-	// FIXME Unclear which version(s) this matches - Windows and Linux versions have separate entries above.
+	// Inherit the earth - DOS CD version - 17-06-1994
+	// Reported by eriktorbjorn
 	{
 		{
 			"ite",
-			"Windows/Linux/DOS CD Version",
+			"DOS CD Version 1",
 			{
 				{"ite.rsc",		GAME_RESOURCEFILE,	"8f4315a9bb10ec839253108a032c8b54", 8928678},
 				{"scripts.rsc",	GAME_SCRIPTFILE,	"a891405405edefc69c9d6c420c868b84", -1},
@@ -632,12 +632,11 @@ static const SAGAGameDescription gameDescriptions[] = {
 		ITEPatch_Files,
 	},
 
-	// Inherit the earth - Italian Windows/Linux/DOS CD version (fan translation)
-	// FIXME Unclear which version(s) this matches - Windows and Linux versions have separate entries above.
+	// Inherit the earth - Italian DOS CD version (fan translation)
 	{
 		{
 			"ite",
-			"Windows/Linux/DOS CD Version",
+			"DOS CD Version",
 			{
 				{"ite.rsc",		GAME_RESOURCEFILE,	"8f4315a9bb10ec839253108a032c8b54", 8929956},
 				{"scripts.rsc",	GAME_SCRIPTFILE,	"a891405405edefc69c9d6c420c868b84", 350243},
@@ -707,12 +706,11 @@ static const SAGAGameDescription gameDescriptions[] = {
 		ITEPatch_Files,
 	},
 
-	// Inherit the earth - French Windows/Linux/DOS CD version (fan translation)
-	// FIXME Unclear which version(s) this matches - Windows and Linux versions have separate entries above.
+	// Inherit the earth - French DOS CD version (fan translation)
 	{
 		{
 			"ite",
-			"Windows/Linux/DOS CD Version",
+			"DOS CD Version",
 			{
 				{"ite.rsc",		GAME_RESOURCEFILE,	"8f4315a9bb10ec839253108a032c8b54", 8929384},
 				{"scripts.rsc",	GAME_SCRIPTFILE,	"a891405405edefc69c9d6c420c868b84", 355877},
@@ -732,11 +730,11 @@ static const SAGAGameDescription gameDescriptions[] = {
 		ITEPatch_Files,
 	},
 
-	// Inherit the earth - DOS CD version
+	// Inherit the earth - DOS CD version - 30-06-1994
 	{
 		{
 			"ite",
-			"CD Version",
+			"DOS CD Version 2",
 			{
 				{"ite.rsc",		GAME_RESOURCEFILE,	"8f4315a9bb10ec839253108a032c8b54", -1},
 				{"scripts.rsc",	GAME_SCRIPTFILE,	"50a0d2d7003c926a3832d503c8534e90", -1},
@@ -754,6 +752,30 @@ static const SAGAGameDescription gameDescriptions[] = {
 		ARRAYSIZE(ITE_GameFonts),
 		ITE_GameFonts,
 		ITEPatch_Files,
+	},
+
+	// Inherit the earth - Hebrew fan translation
+	{
+		{
+			"ite",
+			"CD Version",
+			{
+				{"ite.rsc",		GAME_RESOURCEFILE,	"b9354a4c2d138f680306e4baf8585e9d", -1},
+				{"scripts.rsc",	GAME_SCRIPTFILE,	"a891405405edefc69c9d6c420c868b84", -1},
+				AD_LISTEND
+			},
+			Common::HE_ISR,
+			Common::kPlatformUnknown,
+			ADGF_CD,
+			GUIO0()
+		},
+		GID_ITE,
+		0,
+		ITE_DEFAULT_SCENE,
+		&ITE_Resources,
+		ARRAYSIZE(ITE_GameFonts),
+		ITE_GameFonts,
+		NULL,
 	},
 
 	// Inherit the earth - DOS CD German version

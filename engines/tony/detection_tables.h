@@ -51,7 +51,7 @@ static const TonyGameDescription gameDescriptions[] = {
 				{ "voices.vdb",  0, "3384bdcb70d1e1ecedbde26e79683ede", 299019523 },
 				AD_LISTEND
 			},
-			Common::CZ_CZE,
+			Common::CS_CZE,
 			Common::kPlatformWindows,
 			ADGF_DROPPLATFORM,
 			GUIO1(GUIO_NOMIDI)
@@ -70,6 +70,24 @@ static const TonyGameDescription gameDescriptions[] = {
 				AD_LISTEND
 			},
 			Common::FR_FRA,
+			Common::kPlatformWindows,
+			ADGF_DROPPLATFORM,
+			GUIO1(GUIO_NOMIDI)
+		},
+	},
+
+	{
+		// Tony Tough Spanish provided by Pakolmo
+		{
+			"tony",
+			0,
+			{
+				{ "roasted.mpc", 0, "bcca7985db2fba9c1c4a0886618ec835", 515967 },
+				{ "roasted.mpr", 0, "06203dbbc85fdd1e6dc8fc211c1a6207", 135911071 },
+				{ "voices.vdb", 0, "aebc6eb607ee19cc94bfe9c11898bb8c", 243003502 },
+				AD_LISTEND
+			},
+			Common::ES_ESP,
 			Common::kPlatformWindows,
 			ADGF_DROPPLATFORM,
 			GUIO1(GUIO_NOMIDI)

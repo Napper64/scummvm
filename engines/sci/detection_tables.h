@@ -297,6 +297,22 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 		AD_LISTEND},
 		Common::EN_ANY, Common::kPlatformDOS, 0, GUIO_STD16_UNDITHER	},
 
+	// Codename: Iceman - English DOS (360kb disks)
+	// Executable scanning reports "0.000.685", Floppy label reports "1.033, 6.8.90", VERSION file reports "1.033"
+	// SCI interpreter version 0.000.685
+	{"iceman", "", {
+		{"resource.map", 0, "d4f2ab06146656619836587059ac1fc2", 6282},
+		{"resource.000", 0, "b1bccd827453d4cb834bfd5b45bef63c", 26989},
+		{"resource.001", 0, "32b351072fccf76fc82234d73d28c08b", 126775},
+		{"resource.002", 0, "36670a917550757d57df84c96cf9e6d9", 307014},
+		{"resource.003", 0, "1ae7752a54802ab196115f8d8d34d9d5", 318066},
+		{"resource.004", 0, "5fb36f15dd68a7c32e49fc57f9b1c9cf", 324243},
+		{"resource.005", 0, "d97a96f1ab91b41cf46a02cc89b0a04e", 333091},
+		{"resource.006", 0, "c0881236945b1f61d4e11b23014eee41", 232696},
+		{"resource.007", 0, "8613c45fc771d658e5a505b9a4a54f31", 267741},
+		AD_LISTEND},
+		Common::EN_ANY, Common::kPlatformDOS, 0, GUIO_STD16_UNDITHER	},
+
 	// Codename: Iceman - English DOS (from FRG)
 	// SCI interpreter version 0.000.668
 	{"iceman", "", {
@@ -1178,6 +1194,7 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 
 	// Hoyle 1 - English Macintosh (supplied by Omer Mor)
 	// Executable scanning reports "x.yyy.zzz"
+	// Resource fork reports "Sierra Interpreter 0.022"
 	{"hoyle1", "", {
 		{"resource.map", 0, "e96963c2e34b21e2680fdaafb5d00a40", 8706},
 		{"resource.001", 0, "37b23afcf940ddbccfbe0b44080d9bc2", 611892},
@@ -1274,6 +1291,7 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 
 	// Hoyle 3 - English DOS Floppy (from jvprat)
 	// Executable scanning reports "x.yyy.zzz", Floppy label reports "1.0, 11.2.91", VERSION file reports "1.000"
+	// Also found on SierraOriginals CD as Hoyle Classic Board Games (1996)
 	// SCI interpreter version 1.000.510 (just a guess)
 	{"hoyle3", "", {
 		{"resource.map", 0, "7216a2972f9c595c45ab314941628e43", 2247},
@@ -1319,6 +1337,7 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 
 	// Hoyle 4 (Hoyle Classic Card Games) - English DOS/Win
 	// Supplied by abevi in bug report #5131
+	// VERSION file reports "2.000"
 	// Although this is a floppy game, it does have speech. (bug #13007)
 	{"hoyle4", "", {
 		{"resource.map", 0, "2b577c975cc8d8d43f61b6a756129fe3", 4352},
@@ -1350,6 +1369,7 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 								   GAMEOPTION_ORIGINAL_SAVELOAD )
 
 	// Hoyle 5 (Hoyle Classic Games) - Windows demo
+	// Executable scanning reports "2.100.002"
 	{"hoyle5", "Demo", {
 		{"ressci.000", 0, "98a39ae535dd01714ac313f8ba925045", 7260363},
 		{"resmap.000", 0, "10267a1542a73d527e50f0340549088b", 4900},
@@ -2357,7 +2377,8 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 		AD_LISTEND},
 		Common::RU_RUS, Common::kPlatformWindows, ADGF_NO_FLAGS, GUIO_KQ7 },
 
-	// King's Quest 7 - English DOS Non-Interactive Demo
+	// King's Quest 7 - English DOS/Win Non-Interactive Demo
+	// Demo from original PQ4CD release has only the Windows interpreter
 	// SCI interpreter version 2.100.002
 	{"kq7", "Demo", {
 		{"resource.map", 0, "b44f774108d63faa1d021101221c5a54", 1690},
@@ -3404,6 +3425,18 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 		AD_LISTEND},
 		Common::EN_ANY, Common::kPlatformMacintosh, ADGF_MACRESFORK | ADGF_UNSTABLE, GUIO_LSL6HIRES_MAC },
 
+	// Larry 6 - English Macintosh CD - HIRES (provided by eriktorbjorn)
+	// This version has the same game resources as the previous entry.
+	// Data1 contains an additional six byte resource named DESCRIPT.ION
+	{"lsl6hires", "Hi-res", {
+		{"Data1", 0, "2c4e00a6910490831d4d84e9e6a49ec4", 3456235},
+		{"Data2", 0, "a7522b925dd5422c2db2b0a2337c76c3", 5856422},
+		{"Data3", 0, "9ebb490ec63721e5261111b918b5520e", 5577742},
+		{"Data4", 0, "d70687689ff3cf19a5e3c79dfced1c94", 3472064},
+		{"Data5", 0, "e91c3b681095a263fcb2f2c8d8fc74b6", 3273843},
+		AD_LISTEND},
+		Common::EN_ANY, Common::kPlatformMacintosh, ADGF_MACRESFORK | ADGF_UNSTABLE, GUIO_LSL6HIRES_MAC },
+
 #undef GUIO_LSL6HIRES
 #undef GUIO_LSL6HIRES_MAC
 
@@ -4226,7 +4259,7 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 							  GAMEOPTION_ORIGINAL_SAVELOAD)
 #define GUIO_PQ4_MAC    GUIO1(GUIO_LINKSPEECHTOSFX)
 
-	// Police Quest 4 - English DOS CD (from the Police Quest Collection)
+	// Police Quest 4 - English DOS CD
 	// Executable scanning reports "2.100.002", VERSION file reports "1.100.000"
 	{"pq4", "CD", {
 		{"resource.map", 0, "379dfe80ed6bd16c47e4b950c4722eac", 11374},
@@ -4317,6 +4350,20 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 	{"pqswat", "", {
 		{"resmap.000", 0, "1c2563fee189885e29d9348f37306d94", 12175},
 		{"ressci.000", 0, "b2e1826ca81ce2e7e764587f5a14eee9", 127149181},
+		AD_LISTEND},
+		Common::EN_ANY, Common::kPlatformDOS, ADGF_NO_FLAGS, GUIO_PQSWAT },
+
+	// Police Quest: SWAT - English DOS/Windows
+	// Executable scanning reports "2.100.002", VERSION.TXT file reports "1.100"
+	{"pqswat", "", {
+		{"resmap.001", 0, "c2571ca6fc43f9a0b2d44c14aa2a39a3", 6955},
+		{"ressci.001", 0, "4550b56b6ea65c10c507b571abb43b97", 29312320},
+		{"resmap.002", 0, "808de8c5357f519ace8836a5e52d9e44", 6439},
+		{"ressci.002", 0, "672665bbe12be2aee44722495daca84e", 31599543},
+		{"resmap.003", 0, "3a8e446d7355789cdf0fe2cdf5e478db", 6841},
+		{"ressci.003", 0, "621621778cf754986e7f9f3f245b898b", 46510796},
+		{"resmap.004", 0, "98cd83681994e922a2f65031cf13fd49", 7069},
+		{"ressci.004", 0, "d28ad458276f42748f47ac27d0a0cc76", 50759885},
 		AD_LISTEND},
 		Common::EN_ANY, Common::kPlatformDOS, ADGF_NO_FLAGS, GUIO_PQSWAT },
 
@@ -4912,6 +4959,22 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 #undef GUIO_RAMA_DEMO
 #undef GUIO_RAMA
 
+	// The Realm - English Windows demo from the Space Quest Collection
+	// Executable scanning reports "2.100.002", VERSION file reports "2.184"
+	{"realm", "Demo", {
+		{"resmap.000", 0, "70ba2ff04a2b7fb2c52420ba7fbd47c2", 8338},
+		{"ressci.000", 0, "2a68edd064e5e4937b5e9c74b38f2082", 70611091},
+		AD_LISTEND},
+		Common::EN_ANY, Common::kPlatformWindows, ADGF_DEMO | ADGF_UNSTABLE, GUIO1(GUIO_NONE) },
+
+	// The Realm - English Windows demo from SWAT 2 CD
+	// Executable scanning reports "2.100.002", version file reports "3.38"
+	{"realm", "Demo", {
+		{"resmap.000", 0, "cff25ac9b1a24b38b964c67d5c5dbcac", 2344},
+		{"ressci.000", 0, "93f0c4caa2461f383a656c6e81656efc", 431707},
+		AD_LISTEND},
+		Common::EN_ANY, Common::kPlatformWindows, ADGF_DEMO | ADGF_UNSTABLE, GUIO1(GUIO_NONE) },
+
 #define GUIO_SHIVERS_DEMO GUIO6(GUIO_NOSUBTITLES, \
 								GUIO_NOMIDI, \
 								GUIO_NOLAUNCHLOAD, \
@@ -5286,15 +5349,6 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 		AD_LISTEND},
 		Common::EN_ANY, Common::kPlatformDOS, 0, GUIO_STD16_PALETTEMODS	},
 
-	// Space Quest 3 - English Mac (from Fingolfin)
-	{"sq3", "", {
-		{"resource.map", 0, "5c931675c6e01c4b418faca85d76c92c", 5844},
-		{"resource.001", 0, "0d8dfe42683b46f3131823233a91ce6a", 771917},
-		{"resource.002", 0, "0d8dfe42683b46f3131823233a91ce6a", 794072},
-		{"resource.003", 0, "0d8dfe42683b46f3131823233a91ce6a", 776536},
-		AD_LISTEND},
-		Common::EN_ANY, Common::kPlatformMacintosh, ADGF_UNSTABLE, GUIO_STD16_MAC_PALETTEMODS },
-
 	// Space Quest 3 - German DOS (from Tobis87, also includes english language)
 	// SCI interpreter version 0.000.453 (?)
 	{"sq3", "", {
@@ -5307,7 +5361,7 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 		{"resource.006", 0, "9107c2aa5398e28b5c5406df13491f85", 320643},
 		{"resource.007", 0, "9107c2aa5398e28b5c5406df13491f85", 344287},
 		AD_LISTEND},
-		Common::DE_DEU, Common::kPlatformDOS, ADGF_ADDENGLISH, GUIO_STD16_MAC_PALETTEMODS },
+		Common::DE_DEU, Common::kPlatformDOS, ADGF_ADDENGLISH, GUIO_STD16_PALETTEMODS },
 
 	// Space Quest 3 v1.052 - German DOS (supplied by markcoolio in bug report #4281, also includes english language)
 	// Executable scanning reports "S.old.114"
@@ -5319,6 +5373,15 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 		AD_LISTEND},
 		Common::DE_DEU, Common::kPlatformDOS, ADGF_ADDENGLISH, GUIO_STD16_PALETTEMODS	},
 
+	// Space Quest 3 - English Mac (from Fingolfin)
+	{"sq3", "", {
+		{"resource.map", 0, "5c931675c6e01c4b418faca85d76c92c", 5844},
+		{"resource.001", 0, "0d8dfe42683b46f3131823233a91ce6a", 771917},
+		{"resource.002", 0, "0d8dfe42683b46f3131823233a91ce6a", 794072},
+		{"resource.003", 0, "0d8dfe42683b46f3131823233a91ce6a", 776536},
+		AD_LISTEND},
+		Common::EN_ANY, Common::kPlatformMacintosh, ADGF_UNSTABLE, GUIO_STD16_MAC_PALETTEMODS },
+
 	// Space Quest 3 v1.1 (game says 0.016) - English Mac (supplied by misterhands in bug report #6484)
 	// Executable scanning reports "0.024"
 	{"sq3", "", {
@@ -5328,7 +5391,7 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 		{"resource.003", 0, "0d8dfe42683b46f3131823233a91ce6a", 776554},
 		{"resource.004", 0, "0d8dfe42683b46f3131823233a91ce6a", 787066},
 		AD_LISTEND},
-		Common::EN_ANY, Common::kPlatformMacintosh, ADGF_UNSTABLE, GUIO_STD16_PALETTEMODS	},
+		Common::EN_ANY, Common::kPlatformMacintosh, ADGF_UNSTABLE, GUIO_STD16_MAC_PALETTEMODS	},
 
 #define GUIO_SQ4_CD GUIO5(GAMEOPTION_SQ4_SILVER_CURSORS,	\
 						  GAMEOPTION_PREFER_DIGITAL_SFX,	\
@@ -5529,6 +5592,14 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 		{"resource.000", 0, "231fd8421e1f211e1bcf9d7b8b6408e7", 9526423},
 		AD_LISTEND},
 		Common::EN_ANY, Common::kPlatformDOS, ADGF_CD, GUIO_SQ4_CD	},
+
+	// Space Quest 4 - French DOS CD (fan translation and patch-set)
+	{"sq4", "CD", {
+		{"resource.map", 0, "ed90a8e3ccc53af6633ff6ab58392bae", 7054},
+		{"resource.000", 0, "63247e3901ab8963d4eece73747832e0", 5157378},
+		{"0.fon",        0, "ff0d61807398a6928222ebbfc233adde", 2431},
+		AD_LISTEND},
+		Common::FR_FRA, Common::kPlatformDOS, ADGF_CD, GUIO_SQ4_CD	},
 
 	// Space Quest 4 - Spanish DOS Floppy version distributed on a CD (from jvprat, also includes english language)
 	// Executable scanning reports "1.SQ4.057", VERSION file reports "1.000"
@@ -5808,7 +5879,15 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 							  GAMEOPTION_HQ_VIDEO)
 #define GUIO_TORIN_MAC  GUIO_TORIN
 
-	// Torin's Passage - English Windows Interactive Demo
+	// Torin's Passage - English DOS/Windows Early Demo
+	// SCI interpreter version 2.100.002
+	{"torin", "Demo", {
+		{"resmap.000", 0, "2f466e0dca27d2e6a85e422492a92915", 3403},
+		{"ressci.000", 0, "db3e290481c35c3224e9602e71e4a1f1", 5004165},
+		AD_LISTEND},
+		Common::EN_ANY, Common::kPlatformWindows, ADGF_DEMO | ADGF_DROPPLATFORM, GUIO_TORIN_DEMO },
+
+	// Torin's Passage - English DOS/Windows Interactive Demo
 	// SCI interpreter version 2.100.002
 	{"torin", "Demo", {
 		{"resmap.000", 0, "9a3e172cde9963d0a969f26469318cec", 3403},

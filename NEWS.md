@@ -6,6 +6,11 @@ For a more comprehensive changelog of the latest experimental code, see:
  New games:
    - Added support for Sanitarium.
    - Added support for Hades Challenge.
+   - Added support for Marvel Comics Spider-Man: The Sinister Six.
+   - Added support for The 11th Hour.
+   - Added support for Clandestiny.
+   - Added support for Tender Loving Care (CD-ROM Editions).
+   - Added support for Uncle Henry's Playhouse.
 
  General:
    - The project license has been upgraded to GPLv3+.
@@ -13,6 +18,14 @@ For a more comprehensive changelog of the latest experimental code, see:
    - Implemented enhanced filtering in the Search box. See "Understanding
      the search box" in the documentation for details.
    - Implemented Icon view in GUI (GSoC task).
+   - Added support for the RetroWave OPL3 sound card.
+
+ AGI:
+   - Added support for Macintosh versions of Manhunter 1-2.
+
+ BBVS:
+   - Fixed the size of the main menu buttons being incorrect in some cases.
+   - Fixed crash at the end of the Hock-A-Loogie mini game.
 
  Buried:
    - Added support for skipping synchronous audio and video.
@@ -57,11 +70,23 @@ For a more comprehensive changelog of the latest experimental code, see:
    - New Digital iMUSE engine.
    - Rewrote music player for Amiga versions of Indy3 and Loom in accordance
      to the original code.
+   - Fix missing cursor in the 16-color Macintosh versions of Loom and Indiana
+     Jones and the Last Crusade after loading a savegame.
+   - It is now possible to replace the music in the floppy versions of Loom
+     with audio tracks. The ScummVM Wiki has a list of which parts of the Swan
+     Lake ballet the game uses.
+   - Some enhancements that ScummVM makes to games can now be disabled in the
+     game's settings. The old option to use correct character spacing in the
+     16-color Mac version of Indiana Jones and the Last Crusade is now included
+     in this setting instead.
 
  Sherlock:
    - Fixed slowdown in Serrated Scalpel intro when playing the game from a small
      installation.
    - Fixed UI glitches in Serrated Scalpel.
+
+ Titanic:
+   - Fixed not being able to see House in Starfield puzzle.
 
  TwinE:
    - Fixed a bug in the collision code that made the game unfinishable due to the
@@ -70,6 +95,7 @@ For a more comprehensive changelog of the latest experimental code, see:
      scenes.
    - Fixed polygon rendering method for the boat windows.
    - Fixed wrong shooting direction for some actors.
+   - Fixed door movement in some situations.
 
  macOS port:
    - Added support for displaying OSD messages on the Touch Bar.

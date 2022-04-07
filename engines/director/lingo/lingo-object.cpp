@@ -44,10 +44,12 @@
 #include "director/lingo/xlibs/orthoplayxobj.h"
 #include "director/lingo/xlibs/palxobj.h"
 #include "director/lingo/xlibs/popupmenuxobj.h"
+#include "director/lingo/xlibs/registercomponent.h"
 #include "director/lingo/xlibs/serialportxobj.h"
 #include "director/lingo/xlibs/soundjam.h"
 #include "director/lingo/xlibs/videodiscxobj.h"
 #include "director/lingo/xlibs/winxobj.h"
+#include "director/lingo/xlibs/xplayanim.h"
 
 namespace Director {
 
@@ -125,12 +127,15 @@ static struct XLibProto {
 	{ LabelDrvXObj::fileNames,		LabelDrvXObj::open,		LabelDrvXObj::close,		kXObj,					400 }, 	// D4
 	{ OrthoPlayXObj::fileNames,		OrthoPlayXObj::open,	OrthoPlayXObj::close,		kXObj,					400 }, 	// D4
 	{ PalXObj::fileNames,			PalXObj::open,			PalXObj::close,				kXObj,					400 }, 	// D4
+	{ MemoryXObj::fileNames,		MemoryXObj::open,		MemoryXObj::close,			kXObj,					400 }, 	// D4
 	{ PopUpMenuXObj::fileNames,		PopUpMenuXObj::open,	PopUpMenuXObj::close,		kXObj,					200 }, 	// D2
 	{ SerialPortXObj::fileNames,	SerialPortXObj::open,	SerialPortXObj::close,		kXObj,					200 },	// D2
 	{ SoundJam::fileNames,			SoundJam::open,			SoundJam::close,			kXObj,					400 },	// D4
+	{ RegisterComponent::fileNames,	RegisterComponent::open,RegisterComponent::close,	kXObj,					400 },	// D4
 	{ VideodiscXObj::fileNames,		VideodiscXObj::open,	VideodiscXObj::close,		kXObj,					200 }, 	// D2
 	{ RearWindowXObj::fileNames,	RearWindowXObj::open,	RearWindowXObj::close,		kXObj,					400 },	// D4
 	{ MoveMouseXObj::fileNames,		MoveMouseXObj::open,	MoveMouseXObj::close,		kXObj,					400 },	// D4
+	{ XPlayAnim::fileNames,			XPlayAnim::open,		XPlayAnim::close, 			kXObj,					300 },	// D3
 	{ nullptr, nullptr, nullptr, 0, 0 }
 
 };
@@ -475,6 +480,7 @@ bool Window::hasField(int field) {
 	case kTheDrawRect:
 	case kTheFileName:
 	case kTheModal:
+	case kTheRect:
 	case kTheSourceRect:
 	case kTheTitle:
 	case kTheTitleVisible:
@@ -497,6 +503,9 @@ Datum Window::getField(int field) {
 		return isVisible();
 	case kTheWindowType:
 		return getWindowType();
+	case kTheRect:
+		return getStageRect();
+
 	default:
 		warning("Window::getField: unhandled field '%s'", g_lingo->field2str(field));
 		return Datum();
@@ -638,7 +647,7 @@ Datum CastMember::getField(int field) {
 		break;
 	case kTheFileName:
 		if (castInfo)
-			d = Datum(castInfo->fileName);
+			d = Datum(castInfo->directory + g_director->_dirSeparator + castInfo->fileName);
 		break;
 	case kTheForeColor:
 		d = (int)getForeColor();

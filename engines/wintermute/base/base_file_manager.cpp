@@ -182,7 +182,7 @@ bool BaseFileManager::registerPackages(const Common::FSList &fslist) {
 	for (Common::FSList::const_iterator it = fslist.begin(); it != fslist.end(); ++it) {
 		debugC(kWintermuteDebugFileAccess, "Adding %s", it->getName().c_str());
 		if (it->getName().contains(".dcp")) {
-			if (registerPackage(*it)) {
+			if (registerPackage(*it, it->getName())) {
 				addPath(PATH_PACKAGE, *it);
 			}
 		}
@@ -257,7 +257,7 @@ bool BaseFileManager::registerPackages() {
 					}
 				// Czech
 				} else if (fileName == "czech.dcp" || fileName == "xlanguage_cz.dcp" || fileName == "czech_language_pack.dcp") {
-					if (_language != Common::CZ_CZE) {
+					if (_language != Common::CS_CZE) {
 						continue;
 					}
 				// French
