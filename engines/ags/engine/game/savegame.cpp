@@ -57,7 +57,7 @@
 #include "ags/plugins/ags_plugin.h"
 #include "ags/plugins/plugin_engine.h"
 #include "ags/engine/script/script.h"
-#include "ags/shared/script/cc_error.h"
+#include "ags/shared/script/cc_common.h"
 #include "ags/shared/util/aligned_stream.h"
 #include "ags/shared/util/file.h"
 #include "ags/shared/util/stream.h"
@@ -72,7 +72,7 @@ using namespace Shared;
 using namespace Engine;
 
 // function is currently implemented in savegame_v321.cpp
-HSaveError restore_game_data(Stream *in, SavegameVersion svg_version, const PreservedParams &pp, RestoredData &r_data);
+HSaveError restore_save_data_v321(Stream *in, const PreservedParams &pp, RestoredData &r_data);
 
 namespace AGS {
 namespace Engine {
@@ -157,9 +157,8 @@ String GetSavegameErrorText(SavegameErrorType err) {
 	case kSvgErr_GameObjectInitFailed:
 		return "Game object initialization failed after save restoration.";
 	default:
-		break;
+		return "Unknown error.";
 	}
-	return "Unknown error.";
 }
 
 Bitmap *RestoreSaveImage(Stream *in) {
@@ -355,10 +354,11 @@ void DoBeforeRestore(PreservedParams &pp) {
 	_G(gameinstFork) = nullptr;
 	_G(gameinst) = nullptr;
 	pp.ScMdDataSize.resize(_G(numScriptModules));
-	for (int i = 0; i < _G(numScriptModules); ++i) {
+	for (size_t i = 0; i < _G(numScriptModules); ++i) {
 		pp.ScMdDataSize[i] = _GP(moduleInst)[i]->globaldatasize;
 		delete _GP(moduleInstFork)[i];
 		delete _GP(moduleInst)[i];
+		_GP(moduleInstFork)[i] = nullptr;
 		_GP(moduleInst)[i] = nullptr;
 	}
 
@@ -447,7 +447,7 @@ HSaveError DoAfterRestore(const PreservedParams &pp, const RestoredData &r_data)
 	RemapLegacySoundNums(_GP(game), _GP(views), _G(loaded_game_file_version));
 
 	// restore these to the ones retrieved from the save game
-	const size_t dynsurf_num = Math::Min((uint)MAX_DYNAMIC_SURFACES, r_data.DynamicSurfaces.size());
+	const size_t dynsurf_num = MIN((uint)MAX_DYNAMIC_SURFACES, r_data.DynamicSurfaces.size());
 	for (size_t i = 0; i < dynsurf_num; ++i) {
 		_G(dynamicallyCreatedSurfaces)[i] = r_data.DynamicSurfaces[i];
 	}
@@ -458,19 +458,19 @@ HSaveError DoAfterRestore(const PreservedParams &pp, const RestoredData &r_data)
 
 	if (create_global_script()) {
 		return new SavegameError(kSvgErr_GameObjectInitFailed,
-		                         String::FromFormat("Unable to recreate global script: %s", _G(ccErrorString).GetCStr()));
+		                         String::FromFormat("Unable to recreate global script: %s", cc_get_error().ErrorString.GetCStr()));
 	}
 
 	// read the global data into the newly created script
 	if (r_data.GlobalScript.Data.get())
 		memcpy(_G(gameinst)->globaldata, r_data.GlobalScript.Data.get(),
-		       Math::Min((size_t)_G(gameinst)->globaldatasize, r_data.GlobalScript.Len));
+		       MIN((size_t)_G(gameinst)->globaldatasize, r_data.GlobalScript.Len));
 
 	// restore the script module data
-	for (int i = 0; i < _G(numScriptModules); ++i) {
+	for (size_t i = 0; i < _G(numScriptModules); ++i) {
 		if (r_data.ScriptModules[i].Data.get())
 			memcpy(_GP(moduleInst)[i]->globaldata, r_data.ScriptModules[i].Data.get(),
-			       Math::Min((size_t)_GP(moduleInst)[i]->globaldatasize, r_data.ScriptModules[i].Len));
+			       MIN((size_t)_GP(moduleInst)[i]->globaldatasize, r_data.ScriptModules[i].Len));
 	}
 
 	setup_player_character(_GP(game).playercharacter);
@@ -513,6 +513,10 @@ HSaveError DoAfterRestore(const PreservedParams &pp, const RestoredData &r_data)
 	update_polled_stuff_if_runtime();
 
 	if (_G(displayed_room) >= 0) {
+		// Fixup the frame index, in case the restored room does not have enough background frames
+		if (_GP(play).bg_frame < 0 || static_cast<size_t>(_GP(play).bg_frame) >= _GP(thisroom).BgFrameCount)
+			_GP(play).bg_frame = 0;
+
 		for (int i = 0; i < MAX_ROOM_BGFRAMES; ++i) {
 			if (r_data.RoomBkgScene[i]) {
 				_GP(thisroom).BgFrames[i].Graphic = r_data.RoomBkgScene[i];
@@ -535,7 +539,7 @@ HSaveError DoAfterRestore(const PreservedParams &pp, const RestoredData &r_data)
 		on_background_frame_change();
 	}
 
-	_G(gui_disabled_style) = convert_gui_disabled_style(_GP(game).options[OPT_DISABLEOFF]);
+	GUI::Options.DisabledStyle = static_cast<GuiDisableStyle>(_GP(game).options[OPT_DISABLEOFF]);
 
 	// restore the queue now that the music is playing
 	_GP(play).music_queue_size = queuedMusicSize;
@@ -594,7 +598,7 @@ HSaveError DoAfterRestore(const PreservedParams &pp, const RestoredData &r_data)
 	}
 	update_directional_sound_vol();
 
-	adjust_fonts_for_render_mode(_GP(game).options[OPT_ANTIALIASFONTS]);
+	adjust_fonts_for_render_mode(_GP(game).options[OPT_ANTIALIASFONTS] != 0);
 
 	recreate_overlay_ddbs();
 
@@ -610,7 +614,6 @@ HSaveError DoAfterRestore(const PreservedParams &pp, const RestoredData &r_data)
 	if (_G(displayed_room) < 0) {
 		// the restart point, no room was loaded
 		load_new_room(_G(playerchar)->room, _G(playerchar));
-		_G(playerchar)->prevroom = -1;
 
 		first_room_initialization();
 	}
@@ -640,7 +643,7 @@ HSaveError RestoreGameState(Stream *in, SavegameVersion svg_version) {
 	if (svg_version >= kSvgVersion_Components)
 		err = SavegameComponents::ReadAll(in, svg_version, pp, r_data);
 	else
-		err = restore_game_data(in, svg_version, pp, r_data);
+		err = restore_save_data_v321(in, pp, r_data);
 	if (!err)
 		return err;
 	return DoAfterRestore(pp, r_data);

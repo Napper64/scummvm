@@ -33,15 +33,11 @@
 //
 //=============================================================================
 
-#include "ags/engine/script/script_runtime.h"
-#include "ags/shared/script/script_common.h"
-#include "ags/shared/script/cc_error.h"
-#include "ags/shared/script/cc_options.h"
 #include "ags/engine/ac/dynobj/cc_dynamic_array.h"
-#include "ags/engine/script/system_imports.h"
 #include "ags/engine/ac/statobj/static_object.h"
-#include "ags/plugins/ags_plugin.h"
-#include "ags/plugins/plugin_base.h"
+#include "ags/shared/script/cc_common.h"
+#include "ags/engine/script/system_imports.h"
+#include "ags/engine/script/script_runtime.h"
 #include "ags/globals.h"
 
 namespace AGS3 {
@@ -49,31 +45,31 @@ namespace AGS3 {
 // static const char ccRunnerCopyright[] = "ScriptExecuter32 v" SCOM_VERSIONSTR " (c) 2001 Chris Jones";
 
 bool ccAddExternalStaticFunction(const String &name, ScriptAPIFunction *pfn) {
-	return _GP(simp).add(name, RuntimeScriptValue().SetStaticFunction(pfn), nullptr) == 0;
+	return _GP(simp).add(name, RuntimeScriptValue().SetStaticFunction(pfn), nullptr) != UINT32_MAX;
 }
 
 bool ccAddExternalPluginFunction(const String &name, Plugins::ScriptContainer *instance) {
-	return _GP(simp).add(name, RuntimeScriptValue().SetPluginMethod(instance, name), nullptr) == 0;
+	return _GP(simp).add(name, RuntimeScriptValue().SetPluginMethod(instance, name), nullptr) != UINT32_MAX;
 }
 
 bool ccAddExternalStaticObject(const String &name, void *ptr, ICCStaticObject *manager) {
-	return _GP(simp).add(name, RuntimeScriptValue().SetStaticObject(ptr, manager), nullptr) == 0;
+	return _GP(simp).add(name, RuntimeScriptValue().SetStaticObject(ptr, manager), nullptr) != UINT32_MAX;
 }
 
 bool ccAddExternalStaticArray(const String &name, void *ptr, StaticArray *array_mgr) {
-	return _GP(simp).add(name, RuntimeScriptValue().SetStaticArray(ptr, array_mgr), nullptr) == 0;
+	return _GP(simp).add(name, RuntimeScriptValue().SetStaticArray(ptr, array_mgr), nullptr) != UINT32_MAX;
 }
 
 bool ccAddExternalDynamicObject(const String &name, void *ptr, ICCDynamicObject *manager) {
-	return _GP(simp).add(name, RuntimeScriptValue().SetDynamicObject(ptr, manager), nullptr) == 0;
+	return _GP(simp).add(name, RuntimeScriptValue().SetDynamicObject(ptr, manager), nullptr) != UINT32_MAX;
 }
 
 bool ccAddExternalObjectFunction(const String &name, ScriptAPIObjectFunction *pfn) {
-	return _GP(simp).add(name, RuntimeScriptValue().SetObjectFunction(pfn), nullptr) == 0;
+	return _GP(simp).add(name, RuntimeScriptValue().SetObjectFunction(pfn), nullptr) != UINT32_MAX;
 }
 
 bool ccAddExternalScriptSymbol(const String &name, const RuntimeScriptValue &prval, ccInstance *inst) {
-	return _GP(simp).add(name, prval, inst) == 0;
+	return _GP(simp).add(name, prval, inst) != UINT32_MAX;
 }
 
 void ccRemoveExternalSymbol(const String &name) {
@@ -124,8 +120,9 @@ void ccSetScriptAliveTimer(int numloop) {
 }
 
 void ccNotifyScriptStillAlive() {
-	if (_G(current_instance) != nullptr)
-		_G(current_instance)->flags |= INSTF_RUNNING;
+	ccInstance *cur_inst = ccInstance::GetCurrentInstance();
+	if (cur_inst)
+		cur_inst->flags |= INSTF_RUNNING;
 }
 
 void ccSetDebugHook(new_line_hook_type jibble) {

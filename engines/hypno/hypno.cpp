@@ -53,12 +53,11 @@ HypnoEngine::HypnoEngine(OSystem *syst, const ADGameDescription *gd)
 	  _levelId(0), _skipLevel(false), _health(0), _maxHealth(0),
 	  _playerFrameIdx(0), _playerFrameSep(0), _refreshConversation(false),
 	  _countdown(0), _timerStarted(false), _score(0), _lives(0),
-	  _defaultCursor(""), _checkpoint(""),
-	  _currentPlayerPosition(kPlayerLeft), _lastPlayerPosition(kPlayerLeft),
-	  _background(nullptr),
-	  _masks(nullptr),
-	  _screenW(0), _screenH(0) { // Every games initializes its own resolution
+	  _defaultCursor(""), _defaultCursorIdx(0),  _skipDefeatVideo(false),
+	  _background(nullptr), _masks(nullptr), _ammo(0), _maxAmmo(0),
+	  _doNotStopSounds(false), _screenW(0), _screenH(0) { // Every games initializes its own resolution
 	_rnd = new Common::RandomSource("hypno");
+	_checkpoint = "";
 
 	if (gd->extra)
 		_variant = gd->extra;
@@ -69,6 +68,12 @@ HypnoEngine::HypnoEngine(OSystem *syst, const ADGameDescription *gd)
 	_language = Common::parseLanguage(ConfMan.get("language"));
 	_platform = Common::parsePlatform(ConfMan.get("platform"));
 	if (!Common::parseBool(ConfMan.get("cheats"), _cheatsEnabled))
+		error("Failed to parse bool from cheats options");
+
+	if (!Common::parseBool(ConfMan.get("infiniteHealth"), _infiniteHealthCheat))
+		error("Failed to parse bool from cheats options");
+
+	if (!Common::parseBool(ConfMan.get("infiniteAmmo"), _infiniteAmmoCheat))
 		error("Failed to parse bool from cheats options");
 
 	if (!Common::parseBool(ConfMan.get("restored"), _restoredContentEnabled))
@@ -152,7 +157,8 @@ Common::Error HypnoEngine::run() {
 			_nextLevel = "";
 			_arcadeMode = "";
 			runLevel(_currentLevel);
-		}
+		} else
+			g_system->delayMillis(300);
 	}
 	return Common::kNoError;
 }
@@ -167,11 +173,19 @@ void HypnoEngine::runLevel(Common::String &name) {
 
 	// Play intros
 	disableCursor();
+
+	if (_levels[name]->playMusicDuringIntro && !_levels[name]->music.empty()) {
+		playSound(_levels[name]->music, 0, _levels[name]->musicRate);
+		_doNotStopSounds = true;
+	}
+
 	debug("Number of videos to play: %d", _levels[name]->intros.size());
 	for (Filenames::iterator it = _levels[name]->intros.begin(); it != _levels[name]->intros.end(); ++it) {
 		MVideo v(*it, Common::Point(0, 0), false, true, false);
 		runIntro(v);
 	}
+
+	_doNotStopSounds = false;
 
 	if (_levels[name]->type == TransitionLevel) {
 		debugC(1, kHypnoDebugScene, "Executing transition level %s", name.c_str());
@@ -199,8 +213,11 @@ void HypnoEngine::runLevel(Common::String &name) {
 void HypnoEngine::runIntros(Videos &videos) {
 	debugC(1, kHypnoDebugScene, "Starting run intros with %d videos!", videos.size());
 	Common::Event event;
-	stopSound();
-	// defaultCursor();
+	if (!_doNotStopSounds)
+		stopSound();
+	bool skip = false;
+	int clicked[3] = {-1, -1, -1};
+	int clicks = 0;
 
 	for (Videos::iterator it = videos.begin(); it != videos.end(); ++it) {
 		playVideo(*it);
@@ -211,12 +228,17 @@ void HypnoEngine::runIntros(Videos &videos) {
 			// Events
 			switch (event.type) {
 			case Common::EVENT_KEYDOWN:
-				if (event.kbd.keycode == Common::KEYCODE_ESCAPE) {
-					for (Videos::iterator it = videos.begin(); it != videos.end(); ++it) {
-						if (it->decoder)
-							skipVideo(*it);
-					}
-					videos.clear();
+				if (event.kbd.keycode == Common::KEYCODE_ESCAPE)
+					skip = true;
+				break;
+			case Common::EVENT_LBUTTONDOWN:
+				if (videos.size() == 1) {
+					int first = (clicks - 2) % 3;
+					int last = clicks % 3;
+					clicked[last] = videos[0].decoder->getCurFrame();
+					if (clicks >= 2 && clicked[last] - clicked[first] <= 10)
+						skip = true;
+					clicks++;
 				}
 				break;
 
@@ -224,6 +246,14 @@ void HypnoEngine::runIntros(Videos &videos) {
 				break;
 			}
 		}
+		if (skip) {
+			for (Videos::iterator it = videos.begin(); it != videos.end(); ++it) {
+				if (it->decoder)
+					skipVideo(*it);
+			}
+			videos.clear();
+		}
+
 		bool playing = false;
 		for (Videos::iterator it = videos.begin(); it != videos.end(); ++it) {
 			assert(!it->loop);
@@ -431,6 +461,13 @@ void HypnoEngine::loadPalette(const Common::String &fname) {
 void HypnoEngine::loadPalette(const byte *palette, uint32 offset, uint32 size) {
 	debugC(1, kHypnoDebugMedia, "Loading palette from byte array with offset %d and size %d", offset, size);
 	g_system->getPaletteManager()->setPalette(palette, offset, size);
+}
+
+
+byte *HypnoEngine::getPalette(uint32 idx) {
+	byte *videoPalette = (byte *)malloc(3);
+	g_system->getPaletteManager()->grabPalette(videoPalette, idx, 1);
+	return videoPalette;
 }
 
 void HypnoEngine::updateVideo(MVideo &video) {

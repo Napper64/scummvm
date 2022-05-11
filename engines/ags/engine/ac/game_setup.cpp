@@ -25,7 +25,7 @@ namespace AGS3 {
 
 GameSetup::GameSetup() {
 	local_user_conf = false;
-	audio_backend = 1;
+	audio_enabled = true;
 	no_speech_pack = false;
 	textheight = 0;
 	enable_antialiasing = false;
@@ -40,6 +40,10 @@ GameSetup::GameSetup() {
 	mouse_speed_def = kMouseSpeed_CurrentDisplay;
 	RenderAtScreenRes = false;
 	Supersampling = 1;
+	clear_cache_on_room_change = false;
+	load_latest_save = false;
+	rotation = kScreenRotation_Unlocked;
+	show_fps = false;
 
 	Screen.Params.RefreshRate = 0;
 	Screen.Params.VSync = false;

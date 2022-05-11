@@ -29,6 +29,9 @@
 #include "common/serializer.h"
 #include "tinsel/tinsel.h"
 #include "tinsel/token.h"
+#include "tinsel/sysvar.h"
+
+#include "tinsel/background.h"
 
 #include "common/textconsole.h"
 #include "common/util.h"
@@ -185,6 +188,10 @@ public:
 	int32 playfield;	// Noir field
 	int32 sceneId;		// Noir field
 
+	int32 vx[4]; // Noir field, only for scale polygon
+	int32 vy[4]; // Noir field, only for scale polygon
+	int32 vz[4]; // Noir field, only for scale polygon
+
 protected:
 	int32 nodecount;		///<The number of nodes in this polygon
 	int32 pnodelistx, pnodelisty;	///<offset in chunk to this array if present
@@ -192,10 +199,6 @@ protected:
 
 	const int32 *nlistx;
 	const int32 *nlisty;
-
-	int32 vx[4]; // Noir field, only for scale polygon
-	int32 vy[4]; // Noir field, only for scale polygon
-	int32 vz[4]; // Noir field, only for scale polygon
 
 public:
 	SCNHANDLE hScript;	///< handle of code segment for polygon events
@@ -235,9 +238,9 @@ void Poly::nextPoly() {
 	const byte *pRecord = _pData;
 
 	int typeVal = nextLong(_pData);
-	if ((FROM_32(typeVal) == 6) && TinselV3)
+	if ((FROM_32(typeVal) == 6) && (TinselVersion == 3))
 		typeVal = TO_32(7);
-	if ((FROM_32(typeVal) == 5) && TinselV2)
+	if ((FROM_32(typeVal) == 5) && TinselVersion >= 2)
 		typeVal = TO_32(6);
 	type = (POLY_TYPE)typeVal;
 
@@ -246,18 +249,18 @@ void Poly::nextPoly() {
 	for (int i = 0; i < 4; ++i)
 		y[i] = nextLong(_pData);
 
-	if (TinselV2) {
+	if (TinselVersion >= 2) {
 		xoff = nextLong(_pData);
 		yoff = nextLong(_pData);
 		id = nextLong(_pData);
-		if (TinselV3) {
+		if (TinselVersion == 3) {
 			sceneId = nextLong(_pData);
 			playfield = nextLong(_pData);
 		}
 	}
 
 	// Noir is for scale polygons using union with some alignment
-	if (TinselV3 && type == POLY_SCALE) {
+	if ((TinselVersion == 3) && type == POLY_SCALE) {
 		vx[0] = nextLong(_pData);
 		vx[1] = nextLong(_pData);
 		vx[2] = nextLong(_pData);
@@ -273,7 +276,7 @@ void Poly::nextPoly() {
 		vz[2] = nextLong(_pData);
 		vz[3] = nextLong(_pData);
 	} else {
-		if (TinselV2) {
+		if (TinselVersion >= 2) {
 			reftype = nextLong(_pData);
 		}
 		tagx = nextLong(_pData);
@@ -283,7 +286,7 @@ void Poly::nextPoly() {
 		nodey = nextLong(_pData);
 		hFilm = nextLong(_pData);
 
-		if (!TinselV2) {
+		if (TinselVersion <= 1) {
 			reftype = nextLong(_pData);
 			id = nextLong(_pData);
 		}
@@ -291,14 +294,14 @@ void Poly::nextPoly() {
 		scale1 = nextLong(_pData);
 		scale2 = nextLong(_pData);
 
-		if (TinselV2) {
+		if (TinselVersion >= 2) {
 			level1 = nextLong(_pData);
 			level2 = nextLong(_pData);
 			bright1 = nextLong(_pData);
 		}
 	}
 
-	if (TinselV2) {
+	if (TinselVersion >= 2) {
 		bright2 = nextLong(_pData);
 	}
 
@@ -312,7 +315,7 @@ void Poly::nextPoly() {
 	nlistx = (const int32 *)(_pStart + (int)FROM_32(pnodelistx));
 	nlisty = (const int32 *)(_pStart + (int)FROM_32(pnodelisty));
 
-	if (TinselV0)
+	if (TinselVersion == 0)
 		// Skip to the last 4 bytes of the record for the hScript value
 		_pData = pRecord + 0x62C;
 
@@ -411,7 +414,7 @@ bool IsInPolygon(int xt, int yt, HPOLYGON hp) {
 	assert(pp != NULL); // Testing whether in a NULL polygon
 
 	// Shift cursor for relative polygons
-	if (TinselV2) {
+	if (TinselVersion >= 2) {
 		xt -= volatileStuff[hp].xoff;
 		yt -= volatileStuff[hp].yoff;
 	}
@@ -734,7 +737,7 @@ void FindBestPoint(HPOLYGON hp, int *x, int *y, int *pline) {
 }
 
 /**
- * Returns TRUE if two paths are asdjacent.
+ * Returns TRUE if two paths are adjacent.
  */
 bool IsAdjacentPath(HPOLYGON hPath1, HPOLYGON hPath2) {
 	const POLYGON *pp1, *pp2;
@@ -818,7 +821,7 @@ static HPOLYGON PathOnTheWay(HPOLYGON from, HPOLYGON to) {
 
 	const POLYGON *p = TryPath(Polys[from], Polys[to], Polys[from]);
 
-	if (TinselV2 && !p)
+	if ((TinselVersion >= 2) && !p)
 		return NOPOLY;
 
 	assert(p != NULL); // Trying to find route between unconnected paths
@@ -1123,8 +1126,8 @@ void GetTagTag(HPOLYGON hp, SCNHANDLE *hTagText, int *tagx, int *tagy) {
 
 	Poly ptp(_vm->_handle->LockMem(pHandle), Polys[hp]->pIndex);
 
-	*tagx = (int)FROM_32(ptp.tagx) + (TinselV2 ? volatileStuff[hp].xoff : 0);
-	*tagy = (int)FROM_32(ptp.tagy) + (TinselV2 ? volatileStuff[hp].yoff : 0);
+	*tagx = (int)FROM_32(ptp.tagx) + ((TinselVersion >= 2) ? volatileStuff[hp].xoff : 0);
+	*tagy = (int)FROM_32(ptp.tagy) + ((TinselVersion >= 2) ? volatileStuff[hp].yoff : 0);
 	*hTagText = FROM_32(ptp.hTagtext);
 }
 
@@ -1266,22 +1269,22 @@ void syncPolyInfo(Common::Serializer &s) {
  */
 
 void SaveDeadPolys(bool *sdp) {
-	assert(!TinselV2);
+	assert(TinselVersion <= 1);
 	memcpy(sdp, deadPolys, MAX_POLY*sizeof(bool));
 }
 
 void RestoreDeadPolys(bool *sdp) {
-	assert(!TinselV2);
+	assert(TinselVersion <= 1);
 	memcpy(deadPolys, sdp, MAX_POLY*sizeof(bool));
 }
 
 void SavePolygonStuff(POLY_VOLATILE *sps) {
-	assert(TinselV2);
+	assert(TinselVersion >= 2);
 	memcpy(sps, volatileStuff, MAX_POLY*sizeof(POLY_VOLATILE));
 }
 
 void RestorePolygonStuff(POLY_VOLATILE *sps) {
-	assert(TinselV2);
+	assert(TinselVersion >= 2);
 	memcpy(volatileStuff, sps, MAX_POLY*sizeof(POLY_VOLATILE));
 }
 
@@ -1397,7 +1400,7 @@ static void SetPathAdjacencies() {
 				continue;
 
 			// Must be on the same level
-			if (TinselV2 && !MatchingLevels(p1, p2))
+			if ((TinselVersion >= 2) && !MatchingLevels(p1, p2))
 				continue;
 
 			int j = DistinctCorners(i1, i2);
@@ -1863,7 +1866,7 @@ void InitPolygons(SCNHANDLE ph, int numPoly, bool bRestart) {
 	memset(RoutePaths, 0, sizeof(RoutePaths));
 
 	if (!bRestart) {
-		if (TinselV2)
+		if (TinselVersion >= 2)
 			memset(volatileStuff, 0, sizeof(volatileStuff));
 		else
 			memset(deadPolys, 0, sizeof(deadPolys));
@@ -1912,7 +1915,7 @@ void InitPolygons(SCNHANDLE ph, int numPoly, bool bRestart) {
 		}
 	}
 
-	if (!TinselV2) {
+	if (TinselVersion <= 1) {
 		SetPathAdjacencies();		// Paths need to know the facts
 #ifdef DEBUG
 		CheckNPathIntegrity();
@@ -1930,7 +1933,7 @@ void InitPolygons(SCNHANDLE ph, int numPoly, bool bRestart) {
 		} else {
 			for (int i = numPoly - 1; i >= 0; i--) {
 				if (Polys[i]->polyType == TAG){
-					if (TinselV3) {
+					if (TinselVersion == 3) {
 						Poly ptp(_vm->_handle->LockMem(pHandle), Polys[i]->pIndex);
 						if (ptp.sceneId != -1) {
 							continue;
@@ -2049,7 +2052,7 @@ void GetPolyNode(HPOLYGON hp, int *pNodeX, int *pNodeY) {
 	Poly ptp(_vm->_handle->LockMem(pHandle), Polys[hp]->pIndex);
 
 	// WORKAROUND: Invalid node adjustment for DW2 Cartwheel scene refer polygon
-	if (TinselV2 && (pHandle == 0x74191900) && (hp == 8)) {
+	if ((TinselVersion >= 2) && (pHandle == 0x74191900) && (hp == 8)) {
 		*pNodeX = 480;
 		*pNodeY = 408;
 	} else {
@@ -2057,7 +2060,7 @@ void GetPolyNode(HPOLYGON hp, int *pNodeX, int *pNodeY) {
 		*pNodeY = FROM_32(ptp.nodey);
 	}
 
-	if (TinselV2) {
+	if (TinselVersion >= 2) {
 		*pNodeX += volatileStuff[hp].xoff;
 		*pNodeY += volatileStuff[hp].yoff;
 	}
@@ -2075,7 +2078,7 @@ void SetPolyPointedTo(HPOLYGON hp, bool bPointedTo) {
 bool PolyIsPointedTo(HPOLYGON hp) {
 	CHECK_HP(hp, "Out of range polygon handle (31)");
 
-	if (TinselV2)
+	if (TinselVersion >= 2)
 		return (Polys[hp]->tagFlags & POINTING);
 
 	return PolyPointState(hp) == PS_POINTING;
@@ -2262,14 +2265,14 @@ void EnableTag(CORO_PARAM, int tag) {
 		Polys[_ctx->i]->polyType = TAG;
 		volatileStuff[_ctx->i].bDead = false;
 
-		if (TinselV2)
+		if (TinselVersion >= 2)
 			CORO_INVOKE_ARGS(PolygonEvent, (CORO_SUBCTX, _ctx->i, SHOWEVENT, 0, true, 0));
 	} else if ((_ctx->i = FindPolygon(TAG, tag)) != NOPOLY) {
-		if (TinselV2)
+		if (TinselVersion >= 2)
 			CORO_INVOKE_ARGS(PolygonEvent, (CORO_SUBCTX, _ctx->i, SHOWEVENT, 0, true, 0));
 	}
 
-	if (!TinselV2) {
+	if (TinselVersion <= 1) {
 		TAGSTATE *pts = &TagStates[SceneTags[currentTScene].offset];
 		for (int j = 0; j < SceneTags[currentTScene].nooftags; j++, pts++) {
 			if (pts->tid == tag) {
@@ -2385,14 +2388,14 @@ void DisableTag(CORO_PARAM, int tag) {
 
 		volatileStuff[_ctx->i].bDead = true;
 
-		if (TinselV2)
+		if (TinselVersion >= 2)
 			CORO_INVOKE_ARGS(PolygonEvent, (CORO_SUBCTX, _ctx->i, HIDEEVENT, 0, true, 0));
 	} else if ((_ctx->i = FindPolygon(EX_TAG, tag)) != NOPOLY) {
-		if (TinselV2)
+		if (TinselVersion >= 2)
 			CORO_INVOKE_ARGS(PolygonEvent, (CORO_SUBCTX, _ctx->i, HIDEEVENT, 0, true, 0));
 	}
 
-	if (!TinselV2) {
+	if (TinselVersion <= 1) {
 		TAGSTATE *pts = &TagStates[SceneTags[currentTScene].offset];
 		for (int j = 0; j < SceneTags[currentTScene].nooftags; j++, pts++) {
 			if (pts->tid == tag) {
@@ -2426,6 +2429,65 @@ void DisableExit(int exitno) {
 			break;
 		}
 	}
+}
+
+#if 0
+void drawpolys() {
+	int Loffset, Toffset;
+
+	_vm->_bg->PlayfieldGetPos(FIELD_WORLD, &Loffset, &Toffset);
+	for (int i = 0; i < noofPolys; ++i) {
+		POLYGON* p = Polys[i];
+		if (volatileStuff[i].bDead) continue;
+		if (p->polyType != PATH) continue;
+		int xoff = volatileStuff[i].xoff - Loffset;
+		int yoff = volatileStuff[i].yoff - Toffset;
+		// if (p->polyType == TAG) {
+
+		uint color = 0xFFFF;
+		_vm->screen().drawLine(xoff + p->cx[0], yoff + p->cy[0], xoff + p->cx[1], yoff + p->cy[1], 0xFFFF);
+		_vm->screen().drawLine(xoff + p->cx[2], yoff + p->cy[2], xoff + p->cx[1], yoff + p->cy[1], 0xFFFF);
+		_vm->screen().drawLine(xoff + p->cx[2], yoff + p->cy[2], xoff + p->cx[3], yoff + p->cy[3], 0xFFFF);
+		_vm->screen().drawLine(xoff + p->cx[0], yoff + p->cy[0], xoff + p->cx[3], yoff + p->cy[3], 0xFFFF);
+	}
+}
+#endif
+
+void UpdateGroundPlane() {
+	int i;
+	for (i = 0; i < noofPolys; ++i) {
+		if (Polys[i]->polyType == SCALE && Polys[i]->polyID == SysVar(SV_SPRITER_SCENE_ID)) {
+			break;
+		}
+	}
+	if (i >= noofPolys)
+		return;
+	// assert(i < noofPolys);// No scale polygon
+
+	POLYGON *pp = Polys[i];
+	Poly ptp(_vm->_handle->LockMem(pHandle), pp->pIndex);
+
+	// Vertex2c v[4];
+
+	// float scale = SysVar(SV_SPRITER_SCALE);
+	// TransformXYZ(ptp.vx[0] * scale, -ptp.vy[0] * scale, -ptp.vz[0] * scale, v[0]);
+	// TransformXYZ(ptp.vx[1] * scale, -ptp.vy[1] * scale, -ptp.vz[1] * scale, v[1]);
+	// TransformXYZ(ptp.vx[2] * scale, -ptp.vy[2] * scale, -ptp.vz[2] * scale, v[2]);
+	// TransformXYZ(ptp.vx[3] * scale, -ptp.vy[3] * scale, -ptp.vz[3] * scale, v[3]);
+	//...
+}
+
+// Notebook (Tinsel)
+void NotebookPolyEntry(Common::Point c0, Common::Point c1, Common::Point c2, Common::Point c3) {
+	warning("TODO: Finish implementation of NotebookPolyEntry(%d, %d, %d, %d, %d, %d, %d, %d)", c0.x, c0.y, c1.x, c1.y, c2.x, c2.y, c3.x, c3.y);
+}
+
+void NotebookPolyNextPage(Common::Point c0, Common::Point c1, Common::Point c2, Common::Point c3) {
+	warning("TODO: Finish implementation of NotebookPolyNextPage(%d, %d, %d, %d, %d, %d, %d, %d)", c0.x, c0.y, c1.x, c1.y, c2.x, c2.y, c3.x, c3.y);
+}
+
+void NotebookPolyPrevPage(Common::Point c0, Common::Point c1, Common::Point c2, Common::Point c3) {
+	warning("TODO: Finish implementation of NotebookPolyPrevPage(%d, %d, %d, %d, %d, %d, %d, %d)", c0.x, c0.y, c1.x, c1.y, c2.x, c2.y, c3.x, c3.y);
 }
 
 } // End of namespace Tinsel

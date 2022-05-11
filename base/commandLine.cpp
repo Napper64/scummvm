@@ -212,15 +212,15 @@ static const char HELP_STRING[] =
 	"  --md5                    Shows MD5 hash of the file given by --md5-path=PATH\n"
 	"                           If --md5-length=NUM is passed then it shows the MD5 hash of\n"
 	"                           the first NUM bytes of the file given by PATH\n"
-    "                           If --md5-engine=ENGINE_ID is passed, it fetches the MD5 length\n"
-    "                           automatically, overriding --md5-length\n"
+	"                           If --md5-engine=ENGINE_ID is passed, it fetches the MD5 length\n"
+	"                           automatically, overriding --md5-length\n"
 	"  --md5-path=PATH          Used with --md5 to specify path of file to calculate MD5 hash of\n"
 	"  --md5-length=NUM         Used with --md5 to specify the number of bytes to be hashed.\n"
 	"                           Use negative number for calculating tail md5.\n"
-    "                           Is overriden when used with --md5-engine\n"
-    "  --md5-engine=ENGINE_ID   Used with --md5 to specify the engine for which number of bytes\n"
-    "                           to be hashed must be calculated. This option overrides --md5-length\n"
-    "                           if used along with it. Use --list-engines to find all engineIds\n"
+	"                           Is overriden when used with --md5-engine\n"
+	"  --md5-engine=ENGINE_ID   Used with --md5 to specify the engine for which number of bytes\n"
+	"                           to be hashed must be calculated. This option overrides --md5-length\n"
+	"                           if used along with it. Use --list-engines to find all engineIds\n"
 	"\n"
 	"The meaning of boolean long options can be inverted by prefixing them with\n"
 	"\"no-\", e.g. \"--no-aspect-ratio\".\n"
@@ -1388,8 +1388,9 @@ static void calcMD5(Common::FSNode &path, int32 length) {
 		}
 
 		Common::String md5 = Common::computeStreamMD5AsString(*stream, length);
-		printf("(hash) : %s, (filename) : %s, (bytes) : %d%s\n", md5.c_str(), path.getName().c_str(), length && length <= stream->size() ? (int32)length : (int32)stream->size(), tail ? ", tail" : "");
-
+		if (length != 0 && length < stream->size())
+			md5 += Common::String::format(" (%s %d bytes)", tail ? "last" : "first", length);
+		printf("%s: %s, %llu bytes\n", path.getName().c_str(), md5.c_str(), (unsigned long long)stream->size());
 		delete stream;
 	} else {
 		printf("Usage : --md5 --md5-path=<PATH> [--md5-length=NUM]\n");

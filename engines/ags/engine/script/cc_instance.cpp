@@ -24,11 +24,10 @@
 #include "ags/engine/ac/dynobj/cc_dynamic_array.h"
 #include "ags/engine/ac/dynobj/managed_object_pool.h"
 #include "ags/shared/gui/gui_defines.h"
-#include "ags/shared/script/cc_error.h"
+#include "ags/shared/script/cc_common.h"
 #include "ags/engine/script/cc_instance.h"
 #include "ags/engine/debugging/debug_log.h"
 #include "ags/shared/debugging/out.h"
-#include "ags/shared/script/cc_options.h"
 #include "ags/engine/script/script.h"
 #include "ags/engine/script/script_runtime.h"
 #include "ags/engine/script/system_imports.h"
@@ -158,6 +157,18 @@ const char *regnames[] = { "null", "sp", "mar", "ax", "bx", "cx", "op", "dx" };
 
 const char *fixupnames[] = { "null", "fix_gldata", "fix_func", "fix_string", "fix_import", "fix_datadata", "fix_stack" };
 
+String cc_get_callstack(int max_lines) {
+	String callstack;
+	for (auto sci = _GP(InstThreads).crbegin(); sci != _GP(InstThreads).crend(); ++sci) {
+		if (callstack.IsEmpty())
+			callstack.Append("in the active script:\n");
+		else
+			callstack.Append("in the waiting script:\n");
+		callstack.Append((*sci)->GetCallStack(max_lines));
+	}
+	return callstack;
+}
+
 // Function call stack is used to temporarily store
 // values before passing them to script function
 #define MAX_FUNC_PARAMS 20
@@ -182,7 +193,7 @@ struct FunctionCallStack {
 
 
 ccInstance *ccInstance::GetCurrentInstance() {
-	return _G(current_instance);
+	return _GP(InstThreads).size() > 0 ? _GP(InstThreads).back() : nullptr;
 }
 
 ccInstance *ccInstance::CreateFromScript(PScript scri) {
@@ -263,7 +274,7 @@ void ccInstance::AbortAndDestroy() {
 	}
 
 int ccInstance::CallScriptFunction(const char *funcname, int32_t numargs, const RuntimeScriptValue *params) {
-	_G(ccError) = 0;
+	cc_clear_error();
 	_G(currentline) = 0;
 
 	if (numargs > 0 && !params) {
@@ -284,22 +295,25 @@ int ccInstance::CallScriptFunction(const char *funcname, int32_t numargs, const 
 	int32_t startat = -1;
 	int k;
 	char mangledName[200];
-	sprintf(mangledName, "%s$", funcname);
+	size_t mangled_len = snprintf(mangledName, sizeof(mangledName), "%s$", funcname);
+	int32_t export_args = 0;
 
 	for (k = 0; k < instanceof->numexports; k++) {
 		char *thisExportName = instanceof->exports[k];
 		int match = 0;
 
 		// check for a mangled name match
-		if (strncmp(thisExportName, mangledName, strlen(mangledName)) == 0) {
+		if (strncmp(thisExportName, mangledName, mangled_len) == 0) {
 			// found, compare the number of parameters
-			char *numParams = thisExportName + strlen(mangledName);
-			if (atoi(numParams) != numargs) {
-				cc_error("wrong number of parameters to exported function '%s' (expected %d, supplied %d)", funcname, atoi(numParams), numargs);
+			export_args = atoi(thisExportName + mangled_len);
+			if (export_args > numargs) {
+				cc_error("wrong number of parameters to exported function '%s' (expected %d, supplied %d)",
+					funcname, export_args, numargs);
 				return -1;
 			}
 			match = 1;
 		}
+
 		// check for an exact match (if the script was compiled with
 		// an older version)
 		if ((match == 1) || (strcmp(thisExportName, funcname) == 0)) {
@@ -318,46 +332,41 @@ int ccInstance::CallScriptFunction(const char *funcname, int32_t numargs, const 
 		return -2;
 	}
 
-	//numargs++;                    // account for return address
+	// Prepare instance for run
 	flags &= ~INSTF_ABORTED;
-
+	// Allow to pass less parameters if script callback has less declared args
+	numargs = MIN(numargs, export_args);
 	// object pointer needs to start zeroed
 	registers[SREG_OP].SetDynamicObject(nullptr, nullptr);
-
-	ccInstance *currentInstanceWas = _G(current_instance);
 	registers[SREG_SP].SetStackPtr(&stack[0]);
 	stackdata_ptr = stackdata;
 	// NOTE: Pushing parameters to stack in reverse order
 	ASSERT_STACK_SPACE_AVAILABLE(numargs + 1 /* return address */)
-	for (int i = numargs - 1; i >= 0; --i) {
-		PushValueToStack(params[i]);
-	}
+		for (int i = numargs - 1; i >= 0; --i) {
+			PushValueToStack(params[i]);
+		}
 	PushValueToStack(RuntimeScriptValue().SetInt32(0)); // return address on stack
-	if (_G(ccError)) {
-		return -1;
-	}
-	runningInst = this;
 
+	_GP(InstThreads).push_back(this); // push instance thread
+	runningInst = this;
 	int reterr = Run(startat);
+	// Cleanup before returning, even if error
 	ASSERT_STACK_SIZE(numargs);
 	PopValuesFromStack(numargs);
 	pc = 0;
-	_G(current_instance) = currentInstanceWas;
-
-	if (_G(abort_engine))
-		return -1;
+	_G(currentline) = 0;
+	_GP(InstThreads).pop_back(); // pop instance thread
+	if (reterr != 0)
+		return reterr;
 
 	// NOTE that if proper multithreading is added this will need
-	// to be reconsidered, since the GC could be run in the middle
-	// of a RET from a function or something where there is an
+	// to be reconsidered, since the GC could be run in the middle 
+	// of a RET from a function or something where there is an 
 	// object with ref count 0 that is in use
 	_GP(pool).RunGarbageCollectionIfAppropriate();
 
 	if (_G(new_line_hook))
 		_G(new_line_hook)(nullptr, 0);
-
-	if (reterr)
-		return -6;
 
 	if (flags & INSTF_ABORTED) {
 		flags &= ~INSTF_ABORTED;
@@ -371,7 +380,7 @@ int ccInstance::CallScriptFunction(const char *funcname, int32_t numargs, const 
 		cc_error("stack pointer was not zero at completion of script");
 		return -5;
 	}
-	return _G(ccError);
+	return cc_has_error();
 }
 
 // Macros to maintain the call stack
@@ -413,7 +422,6 @@ int ccInstance::Run(int32_t curpc) {
 	int loopIterationCheckDisabled = 0;
 	thisbase[0] = 0;
 	funcstart[0] = pc;
-	_G(current_instance) = this;
 	ccInstance *codeInst = runningInst;
 	bool write_debug_dump = ccGetOption(SCOPT_DEBUGRUN) ||
 		(gDebugLevel > 0 && DebugMan.isDebugChannelEnabled(::AGS::kDebugScript));
@@ -477,7 +485,7 @@ int ccInstance::Run(int32_t curpc) {
 					codeOp.Args[i].SetStringLiteral(&codeInst->strings[0] + codeInst->code[pc_at]);
 					break;
 				case FIXUP_IMPORT: {
-					const ScriptImport *import = _GP(simp).getByIndex((int32_t)codeInst->code[pc_at]);
+					const ScriptImport *import = _GP(simp).getByIndex(static_cast<uint32_t>(codeInst->code[pc_at]));
 					if (import) {
 						codeOp.Args[i] = import->Value;
 					} else {
@@ -537,7 +545,7 @@ int ccInstance::Run(int32_t curpc) {
 					registers[SREG_SP].RValue++;
 				} else {
 					PushDataToStack(arg2.IValue);
-					if (_G(ccError)) {
+					if (cc_has_error()) {
 						return -1;
 					}
 				}
@@ -558,7 +566,7 @@ int ccInstance::Run(int32_t curpc) {
 					// This is practically LOADSPOFFS
 					reg1 = GetStackPtrOffsetRw(arg2.IValue);
 				}
-				if (_G(ccError)) {
+				if (cc_has_error()) {
 					return -1;
 				}
 			} else {
@@ -603,7 +611,6 @@ int ccInstance::Run(int32_t curpc) {
 				returnValue = registers[SREG_AX].IValue;
 				return 0;
 			}
-			_G(current_instance) = this;
 			POP_CALL_STACK;
 			continue; // continue so that the PC doesn't get overwritten
 		}
@@ -620,7 +627,7 @@ int ccInstance::Run(int32_t curpc) {
 			break;
 		case SCMD_LOADSPOFFS:
 			registers[SREG_MAR] = GetStackPtrOffsetRw(arg1.IValue);
-			if (_G(ccError)) {
+			if (cc_has_error()) {
 				return -1;
 			}
 			break;
@@ -688,7 +695,7 @@ int ccInstance::Run(int32_t curpc) {
 			reg1 = !(reg1);
 			break;
 		case SCMD_CALL:
-			// CallScriptFunction another function within same script, just save PC
+			// Call another function within same script, just save PC
 			// and continue from there
 			if (curnest >= MAXNEST - 1) {
 				cc_error("!call stack overflow, recursive call problem?");
@@ -699,9 +706,6 @@ int ccInstance::Run(int32_t curpc) {
 
 			ASSERT_STACK_SPACE_AVAILABLE(1);
 			PushValueToStack(RuntimeScriptValue().SetInt32(pc + codeOp.ArgCount + 1));
-			if (_G(ccError)) {
-				return -1;
-			}
 
 			if (thisbase[curnest] == 0)
 				pc = reg1.IValue;
@@ -747,9 +751,6 @@ int ccInstance::Run(int32_t curpc) {
 			// Push reg[arg1] value to the stack
 			ASSERT_STACK_SPACE_AVAILABLE(1);
 			PushValueToStack(reg1);
-			if (_G(ccError)) {
-				return -1;
-			}
 			break;
 		case SCMD_POPREG:
 			ASSERT_STACK_SIZE(1);
@@ -802,7 +803,7 @@ int ccInstance::Run(int32_t curpc) {
 		// 64 bit: Handles are always 32 bit values. They are not C pointer.
 
 		case SCMD_MEMREADPTR: {
-			_G(ccError) = 0;
+			cc_clear_error();
 
 			int32_t handle = registers[SREG_MAR].ReadInt32();
 			void *object;
@@ -815,7 +816,7 @@ int ccInstance::Run(int32_t curpc) {
 			}
 
 			// if error occurred, cc_error will have been set
-			if (_G(ccError))
+			if (cc_has_error())
 				return -1;
 			break;
 		}
@@ -914,7 +915,7 @@ int ccInstance::Run(int32_t curpc) {
 		case SCMD_CALLAS: {
 			PUSH_CALL_STACK;
 
-			// CallScriptFunction to a function in another script
+			// Call to a function in another script
 
 			// If there are nested CALLAS calls, the stack might
 			// contain 2 calls worth of parameters, so only
@@ -931,7 +932,7 @@ int ccInstance::Run(int32_t curpc) {
 			// 0, so that the cc_run_code returns
 			RuntimeScriptValue oldstack = registers[SREG_SP];
 			PushValueToStack(RuntimeScriptValue().SetInt32(0));
-			if (_G(ccError)) {
+			if (cc_has_error()) {
 				return -1;
 			}
 
@@ -971,7 +972,7 @@ int ccInstance::Run(int32_t curpc) {
 			break;
 		}
 		case SCMD_CALLEXT: {
-			// CallScriptFunction to a real 'C' code function
+			// Call to a real 'C' code function
 			was_just_callas = -1;
 			if (num_args_to_func < 0) {
 				num_args_to_func = func_callstack.Count;
@@ -1027,12 +1028,11 @@ int ccInstance::Run(int32_t curpc) {
 				cc_error("invalid pointer type for function call: %d", reg1.Type);
 			}
 
-			if (_G(ccError) || _G(abort_engine)) {
+			if (cc_has_error() || _G(abort_engine)) {
 				return -1;
 			}
 
 			registers[SREG_AX] = return_value;
-			_G(current_instance) = this;
 			next_call_needs_object = 0;
 			num_args_to_func = -1;
 			break;
@@ -1211,7 +1211,7 @@ int ccInstance::Run(int32_t curpc) {
 	}
 }
 
-String ccInstance::GetCallStack(int maxLines) {
+String ccInstance::GetCallStack(int maxLines) const {
 	String buffer = String::FromFormat("in \"%s\", line %d\n", runningInst->instanceof->GetSectionName(pc), line_number);
 
 	int linesDone = 0;
@@ -1225,16 +1225,16 @@ String ccInstance::GetCallStack(int maxLines) {
 	return buffer;
 }
 
-void ccInstance::GetScriptPosition(ScriptPosition &script_pos) {
+void ccInstance::GetScriptPosition(ScriptPosition &script_pos) const {
 	script_pos.Section = runningInst->instanceof->GetSectionName(pc);
 	script_pos.Line    = line_number;
 }
 
 // get a pointer to a variable or function exported by the script
-RuntimeScriptValue ccInstance::GetSymbolAddress(const char *symname) {
+RuntimeScriptValue ccInstance::GetSymbolAddress(const char *symname) const {
 	int k;
 	char altName[200];
-	sprintf(altName, "%s$", symname);
+	snprintf(altName, sizeof(altName), "%s$", symname);
 	RuntimeScriptValue rval_null;
 
 	for (k = 0; k < instanceof->numexports; k++) {
@@ -1247,7 +1247,7 @@ RuntimeScriptValue ccInstance::GetSymbolAddress(const char *symname) {
 	return rval_null;
 }
 
-void ccInstance::DumpInstruction(const ScriptOperation &op) {
+void ccInstance::DumpInstruction(const ScriptOperation &op) const {
 	// line_num local var should be shared between all the instances
 	static int line_num = 0;
 
@@ -1494,16 +1494,16 @@ bool ccInstance::ResolveScriptImports(const ccScript *scri) {
 		return true;
 	}
 
-	resolved_imports = new int[numimports];
-	int errors = 0, last_err_idx;
+	resolved_imports = new uint32_t[numimports];
+	size_t errors = 0, last_err_idx = 0;
 	for (int import_idx = 0; import_idx < scri->numimports; ++import_idx) {
 		if (scri->imports[import_idx] == nullptr) {
-			resolved_imports[import_idx] = -1;
+			resolved_imports[import_idx] = UINT32_MAX;
 			continue;
 		}
 
 		resolved_imports[import_idx] = _GP(simp).get_index_of(scri->imports[import_idx]);
-		if (resolved_imports[import_idx] < 0) {
+		if (resolved_imports[import_idx] == UINT32_MAX) {
 			Debug::Printf(kDbgMsg_Error, "unresolved import '%s' in '%s'", scri->imports[import_idx], scri->numSections > 0 ? scri->sectionNames[0] : "<unknown>");
 			errors++;
 			last_err_idx = import_idx;
@@ -1620,7 +1620,7 @@ static void cc_error_fixups(const ccScript *scri, size_t pc, const char *fmt, ..
 	String displbuf = String::FromFormatV(fmt, ap);
 	va_end(ap);
 	const char *scname = scri->numSections > 0 ? scri->sectionNames[0] : "?";
-	if (pc == (size_t) -1) {
+	if (pc == SIZE_MAX) {
 		cc_error("in script %s: %s", scname, displbuf.GetCStr());
 	} else {
 		int line = DetermineScriptLine(scri->code, scri->codesize, pc);
@@ -1654,7 +1654,7 @@ bool ccInstance::CreateRuntimeCodeFixups(const ccScript *scri) {
 		case FIXUP_IMPORT:
 			break; // do nothing yet
 		default:
-			cc_error_fixups(scri, (size_t)-1, "unknown fixup type: %d (fixup num %d)", scri->fixuptypes[i], i);
+			cc_error_fixups(scri, UINT32_MAX, "unknown fixup type: %d (fixup num %d)", scri->fixuptypes[i], i);
 			return false;
 		}
 	}
@@ -1667,8 +1667,8 @@ bool ccInstance::ResolveImportFixups(const ccScript *scri) {
 		if (scri->fixuptypes[fixup_idx] != FIXUP_IMPORT)
 			continue;
 
-		int32_t const fixup = scri->fixups[fixup_idx];
-		int const import_index = resolved_imports[code[fixup]];
+		uint32_t const fixup = scri->fixups[fixup_idx];
+		uint32_t const import_index = resolved_imports[code[fixup]];
 		ScriptImport const *import = _GP(simp).getByIndex(import_index);
 		if (!import) {
 			cc_error_fixups(scri, fixup, "cannot resolve import (bytecode pos %d, key %d)", fixup, import_index);

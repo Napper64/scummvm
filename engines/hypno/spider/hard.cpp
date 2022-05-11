@@ -92,13 +92,17 @@ void SpiderEngine::runMatrix(Code *code) {
 	delete v;
 	Graphics::Surface *menu;
 	Common::Rect menuArea(0, 0, 0, 0);
-	if (isDemo()) // No hints in demo
+	bool transparent;
+	if (isDemo()) { // No hints in demo
 		menu = decodeFrame("int_main/resume.smk", 0);
-	else
+		transparent = true;
+	} else {
 		menu = decodeFrame("int_main/hint1.smk", 0);
+		transparent = false;
+	}
 
 	menuArea = Common::Rect(0, 0, menu->w, menu->h);
-	drawImage(*menu, 0, 0, false);
+	drawImage(*menu, 0, 0, transparent);
 
 	while (!shouldQuit() && _nextLevel.empty()) {
 
@@ -571,13 +575,17 @@ void SpiderEngine::runFusePanel(Code *code) {
 					runIntro(v);
 					_isFuseRust = false;
 					_isFuseUnreadable = true;
+					_defaultCursorIdx = 0;
 					loadImage("int_alof/fuseclea.smk", 0, 0, false, true);
+					defaultCursor();
 				} else if (_isFuseUnreadable && _sceneState["GS_SWITCH9"]) {
 					MVideo v("cine/spv032s.smk", Common::Point(0, 0), false, false, false);
 					runIntro(v);
 					_isFuseRust = false;
 					_isFuseUnreadable = false;
+					_defaultCursorIdx = 0;
 					loadImage("int_alof/fuseread.smk", 0, 0, false, true);
+					defaultCursor();
 				}
 
 				if (_isFuseRust || _isFuseUnreadable)
@@ -1084,31 +1092,22 @@ void SpiderEngine::runGiveUp() {
 }
 
 void SpiderEngine::showScore(const Common::String prefix) {
-	Common::String message = Common::String::format("%s\n\
-	You finished the game with a score of %d points", prefix.c_str(), _score);
+	Common::String fmessage = "%s\nYou finished the ";
+	fmessage = fmessage + (isDemo() ? "demo" : "game") + " with a score of %d points";
+	Common::String message = Common::String::format(fmessage.c_str(), prefix.c_str(), _score);
 	GUI::MessageDialog dialog(message);
 	dialog.runModal();
 }
 
 void SpiderEngine::showCredits() {
-	if (_cheatsEnabled && !_arcadeMode.empty()) {
-		_skipLevel = true;
-		return;
+	changeScreenMode("640x480");
+	MVideo video("cine/credits.smk", Common::Point(0, 0), false, true, false);
+	runIntro(video);
+	if (_restoredContentEnabled) {
+		showScore("Spider-Man saved the day!");
 	}
-
-	if (!_arcadeMode.empty())
-		return; // No credits during arcade sequence
-
-	if (!isDemo()) { // No credits in demo
-		changeScreenMode("640x480");
-		MVideo video("cine/credits.smk", Common::Point(0, 0), false, true, false);
-		runIntro(video);
-		if (_restoredContentEnabled) {
-			showScore("Spider-Man saved the day!");
-		}
-		_score = 0;
-		_nextLevel = "mainmenu.mi_";
-	}
+	_score = 0;
+	_nextLevel = "mainmenu.mi_";
 }
 
 } // End of namespace Hypno

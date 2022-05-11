@@ -26,7 +26,6 @@
 #include "ags/plugins/core/core.h"
 #include "ags/shared/ac/common.h"
 #include "ags/shared/ac/view.h"
-#include "ags/engine/ac/character_cache.h"
 #include "ags/engine/ac/display.h"
 #include "ags/engine/ac/draw.h"
 #include "ags/engine/ac/dynamic_sprite.h"
@@ -39,11 +38,11 @@
 #include "ags/shared/ac/keycode.h"
 #include "ags/engine/ac/mouse.h"
 #include "ags/engine/ac/move_list.h"
-#include "ags/engine/ac/object_cache.h"
 #include "ags/engine/ac/parser.h"
 #include "ags/engine/ac/path_helper.h"
 #include "ags/engine/ac/room_status.h"
 #include "ags/engine/ac/string.h"
+#include "ags/engine/ac/sys_events.h"
 #include "ags/shared/ac/sprite_cache.h"
 #include "ags/engine/ac/dynobj/cc_dynamic_object_addr_and_manager.h"
 #include "ags/engine/ac/dynobj/script_string.h"
@@ -340,10 +339,8 @@ void IAGSEngine::BlitSpriteRotated(int32 x, int32 y, BITMAP *bmp, int32 angle) {
 	rotate_sprite(ds->GetAllegroBitmap(), bmp, x, y, itofix(angle));
 }
 
-extern void domouse(int);
-
 void IAGSEngine::PollSystem() {
-	domouse(DOMOUSE_NOCURSOR);
+	ags_domouse();
 	update_polled_stuff_if_runtime();
 	int mbut, mwheelz;
 	if (run_service_mb_controls(mbut, mwheelz) && mbut >= 0 && !_GP(play).IsIgnoringInput())
@@ -484,7 +481,7 @@ void IAGSEngine::GetTextExtent(int32 font, const char *text, int32 *width, int32
 	if (width != nullptr)
 		width[0] = get_text_width_outlined(text, font);
 	if (height != nullptr)
-		height[0] = get_font_height(font);
+		height[0] = get_font_height_outlined(font);
 }
 void IAGSEngine::PrintDebugConsole(const char *text) {
 	debug_script_log("[PLUGIN] %s", text);
@@ -599,7 +596,6 @@ int IAGSEngine::IsSpriteAlphaBlended(int32 slot) {
 // disable AGS's sound engine
 void IAGSEngine::DisableSound() {
 	shutdown_sound();
-	_GP(usetup).audio_backend = 0;
 }
 int IAGSEngine::CanRunScriptFunctionNow() {
 	if (_G(inside_script))
@@ -612,11 +608,12 @@ int IAGSEngine::CallGameScriptFunction(const char *name, int32 globalScript, int
 
 	ccInstance *toRun = GetScriptInstanceByType(globalScript ? kScInstGame : kScInstRoom);
 
-	RuntimeScriptValue params[3];
-	params[0].SetPluginArgument(arg1);
-	params[1].SetPluginArgument(arg2);
-	params[2].SetPluginArgument(arg3);
-	int toret = RunScriptFunctionIfExists(toRun, name, numArgs, params);
+	RuntimeScriptValue params[]{
+		   RuntimeScriptValue().SetPluginArgument(arg1),
+		   RuntimeScriptValue().SetPluginArgument(arg2),
+		   RuntimeScriptValue().SetPluginArgument(arg3),
+	};
+	int toret = RunScriptFunction(toRun, name, numArgs, params);
 	return toret;
 }
 
@@ -641,8 +638,9 @@ void IAGSEngine::QueueGameScriptFunction(const char *name, int32 globalScript, i
 	if (numArgs < 0 || numArgs > 2)
 		quit("IAGSEngine::QueueGameScriptFunction: invalid number of arguments");
 
-	_G(curscript)->run_another(name, globalScript ? kScInstGame : kScInstRoom, numArgs,
-	                           RuntimeScriptValue().SetPluginArgument(arg1), RuntimeScriptValue().SetPluginArgument(arg2));
+	RuntimeScriptValue params[]{ RuntimeScriptValue().SetPluginArgument(arg1),
+		RuntimeScriptValue().SetPluginArgument(arg2) };
+	_G(curscript)->run_another(name, globalScript ? kScInstGame : kScInstRoom, numArgs, params);
 }
 
 int IAGSEngine::RegisterManagedObject(const void *object, IAGSScriptManagedObject *callback) {
@@ -713,21 +711,21 @@ void IAGSEngine::SimulateMouseClick(int32 button) {
 }
 
 int IAGSEngine::GetMovementPathWaypointCount(int32 pathId) {
-	return _G(mls)[pathId % TURNING_AROUND].numstage;
+	return _GP(mls)[pathId % TURNING_AROUND].numstage;
 }
 
 int IAGSEngine::GetMovementPathLastWaypoint(int32 pathId) {
-	return _G(mls)[pathId % TURNING_AROUND].onstage;
+	return _GP(mls)[pathId % TURNING_AROUND].onstage;
 }
 
 void IAGSEngine::GetMovementPathWaypointLocation(int32 pathId, int32 waypoint, int32 *x, int32 *y) {
-	*x = (_G(mls)[pathId % TURNING_AROUND].pos[waypoint] >> 16) & 0x0000ffff;
-	*y = (_G(mls)[pathId % TURNING_AROUND].pos[waypoint] & 0x0000ffff);
+	*x = (_GP(mls)[pathId % TURNING_AROUND].pos[waypoint] >> 16) & 0x0000ffff;
+	*y = (_GP(mls)[pathId % TURNING_AROUND].pos[waypoint] & 0x0000ffff);
 }
 
 void IAGSEngine::GetMovementPathWaypointSpeed(int32 pathId, int32 waypoint, int32 *xSpeed, int32 *ySpeed) {
-	*xSpeed = _G(mls)[pathId % TURNING_AROUND].xpermove[waypoint];
-	*ySpeed = _G(mls)[pathId % TURNING_AROUND].ypermove[waypoint];
+	*xSpeed = _GP(mls)[pathId % TURNING_AROUND].xpermove[waypoint];
+	*ySpeed = _GP(mls)[pathId % TURNING_AROUND].ypermove[waypoint];
 }
 
 int IAGSEngine::IsRunningUnderDebugger() {

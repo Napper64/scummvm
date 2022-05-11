@@ -37,19 +37,26 @@ void BoyzEngine::runBeforeArcade(ArcadeShooting *arc) {
 	Common::Rect portraitBox(0, 40, 57, 94);
 
 	for (int i = 0; i < int(_playerFrames.size()); i++) {
-		_healthBar[i] = _playerFrames[i]->getSubArea(healthBarBox);
-		_ammoBar[i] = _playerFrames[i]->getSubArea(ammoBarBox);
-		_portrait[i] = _playerFrames[i]->getSubArea(portraitBox);
+		_healthBar[i+1] = _playerFrames[i]->getSubArea(healthBarBox);
+		_ammoBar[i+1] = _playerFrames[i]->getSubArea(ammoBarBox);
+		_portrait[i+1] = _playerFrames[i]->getSubArea(portraitBox);
 	}
 
 	_playerFrameSep = _playerFrames.size();
 	_playerFrameIdx = -1;
 
+	if (!arc->beforeVideo.empty()) {
+		MVideo video(arc->beforeVideo, Common::Point(0, 0), false, true, false);
+		runIntro(video);
+	}
+
 	_currentScript = arc->script;
-	ScriptInfo si = *_currentScript.begin();
-	_currentActor = si.actor - 1;
-	_currentMode = si.mode;
-	_currentScript.pop_front();
+	// Reload all weapons
+	for (Script::iterator it = _currentScript.begin(); it != _currentScript.end(); ++it) {
+		_ammoTeam[it->actor] = _weaponMaxAmmo[it->cursor];
+	}
+
+	updateFromScript();
 }
 
 void BoyzEngine::runAfterArcade(ArcadeShooting *arc) {
@@ -63,25 +70,30 @@ void BoyzEngine::updateFromScript() {
 	if (_currentScript.size() > 0) {
 		ScriptInfo si = *_currentScript.begin();
 		//debug("%d %d %d", si.time, _background->decoder->getCurFrame(), si.actor);
-		if (int(si.time) <= _background->decoder->getCurFrame()) {
-			_currentActor = si.actor - 1;
+		if (!_background || int(si.time) <= _background->decoder->getCurFrame()) {
+			_currentActor = si.actor;
 			_currentMode = si.mode;
+			_currentWeapon = si.cursor;
 			_currentScript.pop_front();
+
+			if (_currentMode == NonInteractive)
+				changeCursor(_crosshairsInactive[_currentWeapon], _crosshairsPalette, true);
+			else
+				changeCursor(_crosshairsActive[_currentWeapon], _crosshairsPalette, true);
 		}
 	}
 }
 
 void BoyzEngine::drawCursorArcade(const Common::Point &mousePos) {
 	if (_currentMode == NonInteractive) {
-		changeCursor(_crosshairsInactive[0], _crosshairsPalette, true);
 		return;
 	}
 
 	int i = detectTarget(mousePos);
 	if (i >= 0)
-		changeCursor(_crosshairsTarget[0], _crosshairsPalette, true);
+		changeCursor(_crosshairsTarget[_currentWeapon], _crosshairsPalette, true);
 	else
-		changeCursor(_crosshairsActive[0], _crosshairsPalette, true);
+		changeCursor(_crosshairsActive[_currentWeapon], _crosshairsPalette, true);
 }
 
 void BoyzEngine::drawPlayer() {
@@ -91,13 +103,43 @@ void BoyzEngine::drawPlayer() {
 
 void BoyzEngine::drawHealth() {
 	updateFromScript();
+
+	float w = float(_healthTeam[_currentActor]) / float(_maxHealth);
+	Common::Rect healthBarBox(0, 0, int((_healthBar[_currentActor].w - 3) * w), _healthBar[_currentActor].h / 2);
+
+	uint32 c = kHypnoColorWhiteOrBlue; // white
+	_compositeSurface->fillRect(healthBarBox, c);
+
+	for (int i = 0; i < _maxHealth; i = i + 10) {
+		int x = (_healthBar[_currentActor].w - 3) * float(i) / float(_maxHealth);
+		_compositeSurface->drawLine(x, 2, x, 6, 0);
+	}
+
 	drawImage(_healthBar[_currentActor], 0, 0, true);
-	drawImage(_ammoBar[_currentActor], 320 - _ammoBar[_currentActor].w, 0, true);
 }
+
+void BoyzEngine::drawAmmo() {
+	updateFromScript();
+
+	float w = float(_ammoBar[_currentWeapon].w) / float(_weaponMaxAmmo[_currentWeapon]);
+
+	Common::Rect ammoBarBox(320 - int(_ammoTeam[_currentActor] * w), 0, 320, _ammoBar[_currentActor].h / 2);
+	uint32 c = kHypnoColorGreen; // green
+	_compositeSurface->fillRect(ammoBarBox, c);
+
+	drawImage(_ammoBar[_currentActor], 320 - _ammoBar[_currentWeapon].w, 0, true);
+	for (int i = 1; i < _weaponMaxAmmo[_currentWeapon]; i++) {
+		int x = 320 - _ammoBar[_currentWeapon].w + int (i * w);
+		_compositeSurface->drawLine(x, 2, x, 6, 0);
+	}
+}
+
 void BoyzEngine::hitPlayer() {
-	uint32 c = 250; // red
+	uint32 c = kHypnoColorRed; // red
 	_compositeSurface->fillRect(Common::Rect(0, 0, _screenW, _screenH), c);
 	drawScreen();
+	if (!_infiniteHealthCheat)
+		_healthTeam[_currentActor] = _healthTeam[_currentActor] - 10;
 	if (!_hitSound.empty())
 		playSound(_soundPath + _hitSound, 1, 11025);
 }
@@ -120,6 +162,39 @@ void BoyzEngine::findNextSegment(ArcadeShooting *arc) {
 	_segmentIdx = _segmentIdx + 1;
 }
 
+bool BoyzEngine::checkTransition(ArcadeTransitions &transitions, ArcadeShooting *arc) {
+	ArcadeTransition at = *transitions.begin();
+	int ttime = at.time;
+	if (_background->decoder->getCurFrame() > ttime) {
+		if (!at.video.empty()) {
+			_background->decoder->pauseVideo(true);
+			debugC(1, kHypnoDebugArcade, "Playing transition %s", at.video.c_str());
+			MVideo video(at.video, Common::Point(0, 0), false, true, false);
+			disableCursor();
+			runIntro(video);
+
+			if (!at.palette.empty())
+				_currentPalette = at.palette;
+
+			loadPalette(_currentPalette);
+			_background->decoder->pauseVideo(false);
+			drawPlayer();
+			updateScreen(*_background);
+			drawScreen();
+			drawCursorArcade(g_system->getEventManager()->getMousePos());
+		} else if (!at.sound.empty()) {
+			playSound(at.sound, 1);
+		} else
+			error ("Invalid transition at %d", ttime);
+
+		transitions.pop_front();
+		if (!_music.empty())
+			playSound(_music, 0, arc->musicRate); // restore music
+		return true;
+	}
+	return false;
+}
+
 int BoyzEngine::detectTarget(const Common::Point &mousePos) {
 	Common::Point target = computeTargetPosition(mousePos);
 	assert(_shoots.size() <= 1);
@@ -130,12 +205,20 @@ int BoyzEngine::detectTarget(const Common::Point &mousePos) {
 	return -1;
 }
 
-void BoyzEngine::shoot(const Common::Point &mousePos, ArcadeShooting *arc, MVideo &background) {
-	playSound(_soundPath + _weaponShootSound[0], 1);
+void BoyzEngine::shoot(const Common::Point &mousePos, ArcadeShooting *arc) {
+	if (_currentMode == NonInteractive) {
+		return;
+	}
+
+	if (_ammoTeam[_currentActor] == 0)
+		return; // TODO: out of ammo sound is missing
+	if (!_infiniteAmmoCheat)
+		_ammoTeam[_currentActor]--;
+	playSound(_soundPath + _weaponShootSound[_currentWeapon], 1);
 	incShotsFired();
 	int i = detectTarget(mousePos);
 	if (i < 0) {
-		missNoTarget(arc, background);
+		missNoTarget(arc);
 	} else {
 		if (!_shoots[i].hitSound.empty())
 			playSound(_soundPath + _shoots[i].hitSound, 1);
@@ -148,26 +231,26 @@ void BoyzEngine::shoot(const Common::Point &mousePos, ArcadeShooting *arc, MVide
 		incScore(_shoots[i].pointsToShoot);
 		incBonus(_shoots[i].pointsToShoot);
 		_shoots[i].destroyed = true;
-		background.decoder->forceSeekToFrame(_shoots[i].explosionFrames[0].start - 3);
+		_background->decoder->forceSeekToFrame(_shoots[i].explosionFrames[0].start - 3);
 		_masks->decoder->forceSeekToFrame(_shoots[i].explosionFrames[0].start - 3);
 		_shoots.clear();
-		changeCursor(_crosshairsActive[0], _crosshairsPalette, true);
+		changeCursor(_crosshairsActive[_currentWeapon], _crosshairsPalette, true);
 	}
 }
 
-void BoyzEngine::missedTarget(Shoot *s, ArcadeShooting *arc, MVideo &background) {
+void BoyzEngine::missedTarget(Shoot *s, ArcadeShooting *arc) {
 	hitPlayer();
 	if (s->missedAnimation == 0)
 		return;
 	else if (s->missedAnimation == uint32(-1)) {
-		uint32 last = background.decoder->getFrameCount()-1;
-		background.decoder->forceSeekToFrame(last);
+		uint32 last = _background->decoder->getFrameCount()-1;
+		_background->decoder->forceSeekToFrame(last);
 		_masks->decoder->forceSeekToFrame(last);
 		return;
 	}
 
 	s->missedAnimation = s->missedAnimation + 3;
-	background.decoder->forceSeekToFrame(s->missedAnimation);
+	_background->decoder->forceSeekToFrame(s->missedAnimation);
 	_masks->decoder->forceSeekToFrame(s->missedAnimation);
 }
 

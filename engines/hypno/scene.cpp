@@ -80,6 +80,17 @@ void HypnoEngine::loadSceneLevel(const Common::String &current, const Common::St
 	free(buf);
 }
 
+void HypnoEngine::loadSceneLevel(const char *buf, const Common::String &name, const Common::String &next, const Common::String &prefix) {
+	debugC(1, kHypnoDebugParser, "Parsing %s", name.c_str());
+	debugC(1, kHypnoDebugParser, "%s", buf);
+	parse_mis(buf);
+	Scene *level = new Scene();
+	level->prefix = prefix;
+	level->levelIfWin = next;
+	level->hots = *g_parsedHots;
+	_levels[name] = level;
+}
+
 void HypnoEngine::resetSceneState() {
 	uint32 i = 0;
 	while (sceneVariables[i]) {
@@ -119,9 +130,10 @@ void HypnoEngine::clickedHotspot(Common::Point mousePos) {
 		}
 	}
 	if (selected.type == MakeMenu) {
-		if (isDemo())
+		if (isDemo()) {
 			_nextLevel = "sixdemo/mis/demo.mis";
-		else // TODO: remove when proper escape to main menu is implemented
+			resetSceneState();
+		} else // TODO: remove when proper escape to main menu is implemented
 			openMainMenuDialog();
 		return;
 	}
@@ -195,6 +207,10 @@ void HypnoEngine::clickedHotspot(Common::Point mousePos) {
 			runPalette((Palette *)action);
 			break;
 
+		case SwapPointerAction:
+			runSwapPointer((SwapPointer *)action);
+			break;
+
 		default:
 			break;
 		}
@@ -241,6 +257,8 @@ Common::String HypnoEngine::findNextLevel(const Transition *trans) { error("Func
 void HypnoEngine::runTransition(Transition *trans) {
 	Common::String nextLevel = findNextLevel(trans);
 	if (!trans->frameImage.empty()) {
+		// This is only used in Wetlands, and therefore, resolution should be 320x200
+		changeScreenMode("320x200");
 		debugC(1, kHypnoDebugScene, "Rendering %s frame in transaction", trans->frameImage.c_str());
 		loadImage(trans->frameImage, 0, 0, false, true, trans->frameNumber);
 		drawScreen();
@@ -254,7 +272,6 @@ void HypnoEngine::runTransition(Transition *trans) {
 void HypnoEngine::runScene(Scene *scene) {
 	_refreshConversation = false;
 	_timerStarted = false;
-	_conversation.clear();
 	Common::Event event;
 	Common::Point mousePos;
 	Common::List<uint32> videosToRemove;
@@ -365,6 +382,7 @@ void HypnoEngine::runScene(Scene *scene) {
 			_nextParallelVideoToPlay.empty() &&
 			_videosPlaying.empty()) {
 			showConversation();
+			runMenu(stack.back(), true);
 			drawScreen();
 			_refreshConversation = false;
 		}
@@ -465,6 +483,7 @@ void HypnoEngine::runScene(Scene *scene) {
 					debugC(1, kHypnoDebugScene, "Resetting level variables");
 					resetSceneState();
 					_checkpoint = _nextLevel;
+					_defaultCursorIdx = 0;
 				}
 				_sceneState["GS_LEVELCOMPLETE"] = 0;
 
@@ -530,11 +549,13 @@ void HypnoEngine::runScene(Scene *scene) {
 	_nextParallelVideoToPlay.clear();
 	_nextSequentialVideoToPlay.clear();
 	_escapeSequentialVideoToPlay.clear();
+	_conversation.clear();
 
 	removeTimers();
 }
 
 void HypnoEngine::showConversation() { error("Function \"%s\" not implemented", __FUNCTION__); }
+void HypnoEngine::endConversation() { error("Function \"%s\" not implemented", __FUNCTION__); }
 void HypnoEngine::rightClickedConversation(const Common::Point &mousePos) { error("Function \"%s\" not implemented", __FUNCTION__); }
 void HypnoEngine::leftClickedConversation(const Common::Point &mousePos) { error("Function \"%s\" not implemented", __FUNCTION__); }
 bool HypnoEngine::hoverConversation(const Common::Point &mousePos) { error("Function \"%s\" not implemented", __FUNCTION__); }
