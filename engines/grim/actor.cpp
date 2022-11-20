@@ -35,7 +35,6 @@
 #include "engines/grim/set.h"
 #include "engines/grim/gfx_base.h"
 #include "engines/grim/model.h"
-
 #include "engines/grim/emi/emi.h"
 #include "engines/grim/emi/costumeemi.h"
 #include "engines/grim/emi/skeleton.h"
@@ -822,7 +821,7 @@ void Actor::walkForward() {
 
 	if (!_followBoxes) {
 		Math::Vector3d forwardVec(-_moveYaw.getSine() * _pitch.getCosine(),
-								  _moveYaw.getCosine() * _pitch.getCosine(), _pitch.getSine());
+		                           _moveYaw.getCosine() * _pitch.getCosine(), _pitch.getSine());
 
 		// EMI: Y is up-down, actors use an X-Z plane for movement
 		if (g_grim->getGameType() == GType_MONKEY4) {
@@ -851,7 +850,7 @@ void Actor::walkForward() {
 		g_grim->getCurrSet()->findClosestSector(_pos, &currSector, &_pos);
 		if (!currSector) { // Shouldn't happen...
 			Math::Vector3d forwardVec(-_moveYaw.getSine() * _pitch.getCosine(),
-									  _moveYaw.getCosine() * _pitch.getCosine(), _pitch.getSine());
+			                           _moveYaw.getCosine() * _pitch.getCosine(), _pitch.getSine());
 
 			// EMI: Y is up-down, actors use an X-Z plane for movement
 			if (g_grim->getGameType() == GType_MONKEY4) {
@@ -882,7 +881,7 @@ void Actor::walkForward() {
 				float z1 = -_moveYaw.getCosine() * (ay - _pitch).getCosine();
 				float z2 = _moveYaw.getSine() * (ax - _pitch).getCosine();
 				forwardVec = Math::Vector3d(-_moveYaw.getSine() * ax.getSine() * _pitch.getCosine(),
-											_moveYaw.getCosine() * ay.getSine() * _pitch.getCosine(), z1 + z2);
+				                             _moveYaw.getCosine() * ay.getSine() * _pitch.getCosine(), z1 + z2);
 			} else {
 				Math::Angle ax = Math::Vector2d(normal.x(), normal.y()).getAngle();
 				Math::Angle az = Math::Vector2d(normal.z(), normal.y()).getAngle();
@@ -890,7 +889,7 @@ void Actor::walkForward() {
 				float y1 = _moveYaw.getCosine() * (az - _pitch).getCosine();
 				float y2 = _moveYaw.getSine() * (ax - _pitch).getCosine();
 				forwardVec = Math::Vector3d(-_moveYaw.getSine() * ax.getSine() * _pitch.getCosine(), y1 + y2,
-											-_moveYaw.getCosine() * az.getSine() * _pitch.getCosine());
+				                            -_moveYaw.getCosine() * az.getSine() * _pitch.getCosine());
 			}
 
 			if (backwards)
@@ -1519,8 +1518,8 @@ void Actor::updateWalk() {
 		if (_path.empty()) {
 			_walking = false;
 			_pos = destPos;
-// It seems that we need to allow an already active turning motion to
-// continue or else turning actors away from barriers won't work right
+			// It seems that we need to allow an already active turning motion to
+			// continue or else turning actors away from barriers won't work right
 			_turning = false;
 			return;
 		}
@@ -1843,7 +1842,10 @@ bool Actor::shouldDrawShadow(int shadowId) {
 		return false;
 
 	// Don't draw a shadow if the shadow caster and the actor are on different sides
-	// of the the shadow plane.
+	// of the shadow plane.
+
+	if (shadow->planeList.size() == 0)
+		return false;
 	Sector *sector = shadow->planeList.front().sector;
 	Math::Vector3d n = sector->getNormal();
 	Math::Vector3d p = sector->getVertices()[0];
@@ -2025,7 +2027,7 @@ Math::Vector3d Actor::getTangentPos(const Math::Vector3d &pos, const Math::Vecto
 	Math::Segment2d segment(p1, p2);
 
 	// TODO: collision with Box
-//  if (_collisionMode == CollisionSphere) {
+//	if (_collisionMode == CollisionSphere) {
 	Math::Vector2d center(p.x(), p.y());
 
 	Math::Vector2d inter;
@@ -2039,9 +2041,8 @@ Math::Vector3d Actor::getTangentPos(const Math::Vector3d &pos, const Math::Vecto
 
 		return Math::Vector3d(v.getX(), v.getY(), dest.z());
 	}
-//  } else {
-
-//  }
+//	} else {
+//	}
 
 	return dest;
 }
@@ -2131,8 +2132,7 @@ bool Actor::handleCollisionWith(Actor *actor, CollisionMode mode, Math::Vector3d
 	// because it seems the original does so.
 	// if you change this code test this places: the rocks in lb and bv (both when booting directly in the
 	// set and when coming in from another one) and the poles in xb.
-	if (!this->getSphereInfo(true, size1, p1) ||
-	    !actor->getSphereInfo(false, size2, p2)) {
+	if (!this->getSphereInfo(true, size1, p1) || !actor->getSphereInfo(false, size2, p2)) {
 		return false;
 	}
 
@@ -2575,13 +2575,11 @@ unsigned const int Actor::ActionChore::talkFadeTime = 50;
 Actor::ActionChore::ActionChore() :
 	_costume(nullptr),
 	_chore(-1) {
-
 }
 
 Actor::ActionChore::ActionChore(Costume *cost, int chore) :
 	_costume(cost),
 	_chore(chore) {
-
 }
 
 void Actor::ActionChore::play(bool fade, unsigned int time) {

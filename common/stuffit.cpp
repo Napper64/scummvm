@@ -19,7 +19,7 @@
  *
  */
 
-// StuffIt parsing based on http://code.google.com/p/theunarchiver/wiki/StuffItFormat
+// StuffIt parsing based on https://github.com/mietek/theunarchiver/wiki/StuffItFormat
 // Compression 14 based on libxad (http://sourceforge.net/projects/libxad/)
 
 #include "common/stuffit.h"
@@ -29,6 +29,7 @@
 #include "common/debug.h"
 #include "common/hash-str.h"
 #include "common/hashmap.h"
+#include "common/macresman.h"
 #include "common/memstream.h"
 #include "common/substream.h"
 
@@ -64,6 +65,9 @@ private:
 
 	typedef Common::HashMap<Common::String, FileEntry, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> FileMap;
 	FileMap _map;
+
+	typedef Common::HashMap<Common::String, Common::MacFinderInfoData, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> MetadataMap;
+	MetadataMap _metadataMap;
 
 	// Decompression Functions
 	Common::SeekableReadStream *decompress14(Common::SeekableReadStream *src, uint32 uncompressedSize) const;
@@ -145,9 +149,11 @@ bool StuffItArchive::open(Common::SeekableReadStream *stream) {
 		// Skip remaining bytes
 		_stream->skip(63 - fileNameLength);
 
-		/* uint32 fileType = */ _stream->readUint32BE();
-		/* uint32 fileCreator = */ _stream->readUint32BE();
-		/* uint16 finderFlags = */ _stream->readUint16BE();
+		MacFinderInfo finfo;
+
+		_stream->read(finfo.type, 4);
+		_stream->read(finfo.creator, 4);
+		finfo.flags = _stream->readUint16BE();
 		/* uint32 creationDate = */ _stream->readUint32BE();
 		/* uint32 modificationDate = */ _stream->readUint32BE();
 		uint32 resForkUncompressedSize = _stream->readUint32BE();
@@ -162,6 +168,8 @@ bool StuffItArchive::open(Common::SeekableReadStream *stream) {
 		// Ignore directories for now
 		if (dataForkCompression == 32 || dataForkCompression == 33)
 			continue;
+
+		_metadataMap[name + ".finf"] = finfo.toData();
 
 		if (dataForkUncompressedSize != 0) {
 			// We have a data fork
@@ -224,8 +232,14 @@ const Common::ArchiveMemberPtr StuffItArchive::getMember(const Common::Path &pat
 
 Common::SeekableReadStream *StuffItArchive::createReadStreamForMember(const Common::Path &path) const {
 	Common::String name = path.toString();
-	if (!_stream || !_map.contains(name))
+
+	if (!_stream || !_map.contains(name)) {
+		if (_metadataMap.contains(name)) {
+			const Common::MacFinderInfoData &metadata = _metadataMap[name];
+			return new Common::MemoryReadStream(reinterpret_cast<const byte *>(&metadata), sizeof(Common::MacFinderInfoData), DisposeAfterUse::NO);
+		}
 		return nullptr;
+	}
 
 	const FileEntry &entry = _map[name];
 
@@ -313,13 +327,13 @@ struct SIT14Data {
 void StuffItArchive::readTree14(Common::BitStream8LSB *bits, SIT14Data *dat, uint16 codesize, uint16 *result) const {
 	uint32 i, l, n;
 	uint32 k = bits->getBit();
-	uint32 j = bits->getBits(2) + 2;
-	uint32 o = bits->getBits(3) + 1;
+	uint32 j = bits->getBits<2>() + 2;
+	uint32 o = bits->getBits<3>() + 1;
 	uint32 size = 1 << j;
 	uint32 m = size - 1;
 	k = k ? (m - 1) : 0xFFFFFFFF;
 
-	if (bits->getBits(2) & 1) { // skip 1 bit!
+	if (bits->getBits<2>() & 1) { // skip 1 bit!
 		// requirements for this call: dat->buff[32], dat->code[32], dat->freq[32*2]
 		readTree14(bits, dat, size, dat->freq);
 
@@ -471,14 +485,14 @@ Common::SeekableReadStream *StuffItArchive::decompress14(Common::SeekableReadStr
 			for (j = 0; j < m; ++j)
 				dat->var6[i++] = l;
 
-	m = bits->getBits(16); // number of blocks
+	m = bits->getBits<16>(); // number of blocks
 	j = 0; // window position
 
 	while (m-- && !bits->eos()) {
-		bits->getBits(16); // skip crunched block size
-		bits->getBits(16);
-		n = bits->getBits(16); // number of uncrunched bytes
-		n |= bits->getBits(16) << 16;
+		bits->getBits<16>(); // skip crunched block size
+		bits->getBits<16>();
+		n = bits->getBits<16>(); // number of uncrunched bytes
+		n |= bits->getBits<16>() << 16;
 		readTree14(bits, dat, 308, dat->var7);
 		readTree14(bits, dat, 75, dat->var3);
 

@@ -629,7 +629,7 @@ void Insane::startVideo(const char *filename, int num, int argC, int frameRate,
 		smush_setupSanFromStart(filename, 0, -1, -1, 0);
 	}
 
-	_player->play(filename, _speed, offset, startFrame);
+	_player->play(filename, frameRate, offset, startFrame);
 }
 
 void Insane::smush_warpMouse(int x, int y, int buttons) {
@@ -879,7 +879,7 @@ void Insane::smush_rewindCurrentSan(int arg_0, int arg_4, int arg_8) {
 	debugC(DEBUG_INSANE, "smush_rewindCurrentSan(%d, %d, %d)", arg_0, arg_4, arg_8);
 	_smush_setupsan2 = arg_0;
 
-	smush_setupSanFile(0, 0, 0);
+	smush_setupSanFile(nullptr, 0, 0);
 	_smush_isSanFileSetup = 1;
 	smush_setFrameSteps(arg_4, arg_8);
 
@@ -1474,7 +1474,7 @@ void Insane::smush_setFrameSteps(int32 step1, int32 step2) {
 }
 
 void Insane::smush_setupSanFile(const char *filename, int32 offset, int32 contFrame) {
-	debugC(DEBUG_INSANE, "Insane::smush_setupSanFile(%s, %x, %d)", filename, offset, contFrame);
+	debugC(DEBUG_INSANE, "Insane::smush_setupSanFile(%s, %x, %d)", (filename ? filename : "(null)"), offset, contFrame);
 
 	_player->seekSan(filename, offset, contFrame);
 }

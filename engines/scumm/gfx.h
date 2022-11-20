@@ -270,6 +270,9 @@ public:
 	Gdi(ScummEngine *vm);
 	virtual ~Gdi();
 
+	virtual void setRenderModeColorMap(const byte *map) {}
+	virtual byte remapColorToRenderMode(byte col) const { return col; }
+
 	virtual void init();
 	virtual void roomChanged(byte *roomptr);
 	virtual void loadTiles(byte *roomptr);
@@ -404,6 +407,8 @@ protected:
 		byte maskMap[4096], maskChar[4096];
 	} _V1;
 
+	const byte *_colorMap = 0;
+
 protected:
 	void decodeV1Gfx(const byte *src, byte *dst, int size) const;
 
@@ -425,6 +430,9 @@ protected:
 
 public:
 	GdiV1(ScummEngine *vm);
+
+	void setRenderModeColorMap(const byte *map) override;
+	byte remapColorToRenderMode(byte col) const override;
 
 	void roomChanged(byte *roomptr) override;
 };
@@ -482,35 +490,39 @@ public:
 	void fillLayerRect(int layer, int x, int y, int w, int h, int col);
 	void addDirtyRect(int x, int y, int w, int h);
 	void toggleLayers(int flags);
-	void scrollLayers(int flags, int offset, bool fast);
+	void scrollLayer(int layer, int offset, int top, int bottom, bool fast);
 	void update();
-	bool isScrolling(int direction, int threshold = 0) const { return (direction == 0) ? _scrollRemainder != threshold : (direction == 1 ? _scrollRemainder > threshold : _scrollRemainder < threshold); }
+	bool isScrolling(int layer, int direction, int threshold = 0) const {
+		return (layer & ~1) ? false :
+			(direction == 0 ? (_layers[layer].scrollRemainder != threshold) :
+				(direction == 1 ? (_layers[layer].scrollRemainder > threshold) : (_layers[layer].scrollRemainder < threshold)));
+	}
 
 	uint8 *getLayerPixels(int layer, int x, int y) const;
-	int getLayerPitch(int layer) const { return (layer >= 0 && layer < 2) ? _layers[layer].pitch : 0; }
-	int getLayerWidth(int layer) const { return (layer >= 0 && layer < 2) ? _layers[layer].width : 0; }
-	int getLayerHeight(int layer) const { return (layer >= 0 && layer < 2) ? _layers[layer].height : 0; }
-	int getLayerBpp(int layer) const { return (layer >= 0 && layer < 2) ? _layers[layer].bpp : 0; }
-	int getLayerScaleW(int layer) const { return (layer >= 0 && layer < 2) ? _layers[layer].scaleW : 0; }
-	int getLayerScaleH(int layer) const { return (layer >= 0 && layer < 2) ? _layers[layer].scaleH : 0; }
+	int getLayerPitch(int layer) const { assert (layer >= 0 && layer < 2); return _layers[layer].pitch; }
+	int getLayerWidth(int layer) const { assert (layer >= 0 && layer < 2); return _layers[layer].width; }
+	int getLayerHeight(int layer) const { assert (layer >= 0 && layer < 2); return _layers[layer].height; }
+	int getLayerBpp(int layer) const { assert (layer >= 0 && layer < 2); return _layers[layer].bpp; }
+	int getLayerScaleW(int layer) const { assert (layer >= 0 && layer < 2); return _layers[layer].scaleW; }
+	int getLayerScaleH(int layer) const { assert (layer >= 0 && layer < 2); return _layers[layer].scaleH; }
 
 private:
 	struct TownsScreenLayer {
-		uint8 *pixels;
-		uint8 *palette;
-		int pitch;
-		int width;
-		int height;
-		int bpp;
-		int numCol;
-		int hScroll;
-		uint8 scaleW;
-		uint8 scaleH;
-		bool onBottom;
-		bool enabled;
-		bool ready;
-
-		uint16 *bltTmpPal;
+		uint8 *pixels = nullptr;
+		uint8 *palette = nullptr;
+		int pitch = 0;
+		int width = 0;
+		int height = 0;
+		int bpp = 0;
+		int numCol = 0;
+		uint16 hScroll = 0;
+		uint8 scaleW = 0;
+		uint8 scaleH = 0;
+		int scrollRemainder = 0;
+		bool onBottom = false;
+		bool enabled = false;
+		bool ready = false;
+		uint16 *bltTmpPal= nullptr;
 	} _layers[2];
 
 	template<typename dstPixelType, typename srcPixelType, int scaleW, int scaleH, bool col4bit> void transferRect(uint8 *dst, TownsScreenLayer *l, int x, int y, int w, int h);
@@ -524,8 +536,6 @@ private:
 	int _height;
 	int _width;
 	int _pitch;
-	uint16 _scrollOffset;
-	int _scrollRemainder;
 	bool _semiSmoothScroll;
 	Graphics::PixelFormat _pixelFormat;
 
@@ -534,6 +544,26 @@ private:
 	OSystem *_system;
 };
 #endif // DISABLE_TOWNS_DUAL_LAYER_MODE
+
+class MajMinCodec {
+public:
+
+	struct {
+		bool repeatMode;
+		int repeatCount;
+		byte color;
+		byte shift;
+		uint16 bits;
+		byte numBits;
+		const byte *dataPtr;
+		byte buffer[336];
+	} _majMinData;
+
+	void setupBitReader(byte shift, const byte *src);
+	void skipData(int32 numSkip);
+	void decodeLine(byte *buf, int32 numBytes, int32 dir);
+	inline byte readBits(byte n);
+};
 
 } // End of namespace Scumm
 

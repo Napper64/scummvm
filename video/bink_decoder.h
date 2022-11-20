@@ -47,7 +47,9 @@ namespace Common {
 class SeekableReadStream;
 template <class BITSTREAM>
 class Huffman;
+}
 
+namespace Math {
 class RDFT;
 class DCT;
 }
@@ -123,8 +125,8 @@ private:
 
 		float *coeffsPtr[kAudioChannelsMax];
 
-		Common::RDFT *rdft;
-		Common::DCT  *dct;
+		Math::RDFT *rdft;
+		Math::DCT  *dct;
 
 		AudioInfo();
 		~AudioInfo();
@@ -320,7 +322,8 @@ private:
 		void readBlockTypes  (VideoFrame &video, Bundle &bundle);
 		void readPatterns    (VideoFrame &video, Bundle &bundle);
 		void readColors      (VideoFrame &video, Bundle &bundle);
-		void readDCS         (VideoFrame &video, Bundle &bundle, int startBits, bool hasSign);
+		template<int startBits, bool hasSign>
+		void readDCS         (VideoFrame &video, Bundle &bundle);
 		void readDCTCoeffs   (VideoFrame &video, int32 *block, bool isIntra);
 		void readResidue     (VideoFrame &video, int16 *block, int masksCount);
 

@@ -357,8 +357,8 @@ bool Music::playDigital(uint32 resourceId, MusicFlags flags) {
 
 	// Try to open standalone digital track
 	char trackName[2][16];
-	sprintf(trackName[0], "track%d", realTrackNumber);
-	sprintf(trackName[1], "track%02d", realTrackNumber);
+	Common::sprintf_s(trackName[0], "track%d", realTrackNumber);
+	Common::sprintf_s(trackName[1], "track%02d", realTrackNumber);
 	Audio::SeekableAudioStream *stream = nullptr;
 	for (int i = 0; i < 2; ++i) {
 		stream = Audio::SeekableAudioStream::openStreamFile(trackName[i]);
@@ -466,6 +466,8 @@ void Music::playQuickTime(uint32 resourceId, MusicFlags flags) {
 }
 
 void Music::playMidi(uint32 resourceId, MusicFlags flags) {
+	if (_vm->isITEAmiga()) // Not supported yet
+		return;
 	if (_currentMusicBuffer == &_musicBuffer[1]) {
 		_currentMusicBuffer = &_musicBuffer[0];
 	} else {

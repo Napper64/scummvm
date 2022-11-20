@@ -30,7 +30,7 @@
 namespace Ultima {
 namespace Ultima8 {
 
-typedef Std::map<istring, Std::string, Common::IgnoreCase_Hash> KeyMap;
+typedef Common::HashMap<istring, Std::string, Common::IgnoreCase_Hash> KeyMap;
 
 class ConfigFileManager {
 public:
@@ -50,7 +50,7 @@ public:
 	//! \param fname The file to read
 	//! \param root The name of the root node in the file
 	//! \param readonly If true, don't write to this file's tree (or the file)
-	//! \return true if succesful
+	//! \return true if successful
 	bool readConfigFile(Std::string fname, const istring &category);
 
 	//! clear everything

@@ -374,10 +374,16 @@ void ScummEngine_v4::o4_saveLoadGame() {
 		// 1 Load
 		// 2 Save
 		slot = 1;
-		if (a == 1)
+		switch (a) {
+		case 1:
 			_opcode = 0x40;
-		else if ((a == 2) || (_game.platform == Common::kPlatformNES))
+			break;
+		case 2:
 			_opcode = 0x80;
+			break;
+		default:
+			error("o4_saveLoadGame: unknown param %d", a);
+		}
 	} else {
 		slot = a & 0x1F;
 		// Slot numbers in older games start with 0, in newer games with 1
@@ -412,7 +418,7 @@ void ScummEngine_v4::o4_saveLoadGame() {
 			char name[32];
 			if (_game.version <= 2) {
 				// use generic name
-				sprintf(name, "Game %c", 'A'+slot-1);
+				Common::sprintf_s(name, "Game %c", 'A'+slot-1);
 			} else {
 				// use name entered by the user
 				char* ptr;

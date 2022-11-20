@@ -81,6 +81,8 @@ MainMenuDialog::MainMenuDialog(Engine *engine)
 	// To enable "Help", an engine needs to use a subclass of MainMenuDialog
 	// (at least for now, we might change how this works in the future).
 	_helpButton = new GUI::ButtonWidget(this, "GlobalMenu.Help", _("~H~elp"), Common::U32String(), kHelpCmd);
+	_helpButton->setVisible(_engine->hasFeature(Engine::kSupportsHelp));
+	_helpButton->setEnabled(_engine->hasFeature(Engine::kSupportsHelp));
 
 	new GUI::ButtonWidget(this, "GlobalMenu.About", _("~A~bout"), Common::U32String(), kAboutCmd);
 
@@ -263,7 +265,6 @@ ConfigDialog::ConfigDialog() :
 
 	const Common::String &gameDomain = ConfMan.getActiveDomainName();
 	const MetaEngine *metaEngine = g_engine->getMetaEngine();
-	const MetaEngineDetection &metaEngineDetection = g_engine->getMetaEngineDetection();
 
 	// GUI:  Add tab widget
 	GUI::TabWidget *tab = new GUI::TabWidget(this, "GlobalConfig.TabWidget");
@@ -272,12 +273,10 @@ ConfigDialog::ConfigDialog() :
 	// The game specific options tab
 	//
 
-	int tabId = tab->addTab(_("Game"), "GlobalConfig_Engine", false);
+	int tabId = tab->addTab(_("Game"), "GlobalConfig_Engine");
 
 	if (g_engine->hasFeature(Engine::kSupportsChangingOptionsDuringRuntime)) {
-		_engineOptions = metaEngine->buildEngineOptionsWidgetDynamic(tab, "GlobalConfig_Engine.Container", gameDomain);
-		if (!_engineOptions)
-			_engineOptions = metaEngineDetection.buildEngineOptionsWidgetStatic(tab, "GlobalConfig_Engine.Container", gameDomain);
+		_engineOptions = metaEngine->buildEngineOptionsWidget(tab, "GlobalConfig_Engine.Container", gameDomain);
 	}
 
 	if (_engineOptions) {
@@ -428,7 +427,7 @@ Common::String ExtraGuiOptionsWidget::dialogLayout(const Common::String &domain)
 	if (ConfMan.getActiveDomainName().equals(domain)) {
 		return "GlobalConfig_Engine_Container";
 	} else {
-		return "GameOptions_Engine_Container";
+		return "GameOptions_Game_Container";
 	}
 }
 

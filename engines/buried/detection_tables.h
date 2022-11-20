@@ -21,10 +21,6 @@
 
 namespace Buried {
 
-#define GAMEOPTION_ALLOW_SKIP	GUIO_GAMEOPTIONS1
-#define GUIO_FULL_GAME			GUIO1(GAMEOPTION_ALLOW_SKIP)
-#define GUIO_GAME_DEMO			GUIO1(GUIO_NOLAUNCHLOAD)
-
 // NOTE: If variants with new languages are added, the Mayan death god
 // box puzzle will need to be updated. Check environ/mayan.cpp,
 // DeathGodPuzzleBox::isPuzzleSolved()
@@ -387,7 +383,7 @@ static const ADGameDescription gameDescriptions[] = {
 		AD_ENTRY1s("BIT816.EXE", "30bbd89d7df8cb319e654a441efce877", 1259072),
 		Common::EN_ANY,
 		Common::kPlatformWindows,
-		ADGF_DEMO | GF_TRUECOLOR | ADGF_TESTING,
+		ADGF_DEMO | GF_TRUECOLOR,
 		GUIO_GAME_DEMO
 	},
 
@@ -398,7 +394,7 @@ static const ADGameDescription gameDescriptions[] = {
 		AD_ENTRY1s("BIT2416.EXE", "69ba6611561c3eb5f7d8853ef913aa09", 2816256),
 		Common::EN_ANY,
 		Common::kPlatformWindows,
-		ADGF_DEMO | GF_TRUECOLOR | ADGF_TESTING,
+		ADGF_DEMO | GF_TRUECOLOR,
 		GUIO_GAME_DEMO
 	},
 

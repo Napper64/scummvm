@@ -25,7 +25,6 @@
 
 #include "common/gui_options.h"
 #include "common/file.h"
-#include "common/translation.h"
 
 #include "queen/detection.h"
 #include "queen/resource.h"
@@ -33,24 +32,6 @@
 static const PlainGameDescriptor queenGames[] = {
 	{"queen", "Flight of the Amazon Queen"},
 	{nullptr, nullptr}
-};
-
-#define GAMEOPTION_ALT_INTRO  GUIO_GAMEOPTIONS1
-
-static const ADExtraGuiOptionsMap optionsList[] = {
-	{
-		GAMEOPTION_ALT_INTRO,
-		{
-			_s("Alternative intro"),
-			_s("Use an alternative game intro (CD version only)"),
-			"alt_intro",
-			false,
-			0,
-			0
-		}
-	},
-
-	AD_EXTRA_GUI_OPTIONS_TERMINATOR
 };
 
 namespace Queen {
@@ -273,7 +254,7 @@ static const QueenGameDescription gameDescriptions[] = {
 			Common::HE_ISR,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO1(GAMEOPTION_ALT_INTRO)
+			GUIO2(GAMEOPTION_ALT_INTRO, GAMEOPTION_ALT_FONT)
 		},
 	},
 
@@ -377,7 +358,7 @@ static const QueenGameDescription gameDescriptions[] = {
 			Common::HE_ISR,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO1(GAMEOPTION_ALT_INTRO)
+			GUIO2(GAMEOPTION_ALT_INTRO, GAMEOPTION_ALT_FONT)
 		},
 	},
 
@@ -482,14 +463,14 @@ static const QueenGameDescription gameDescriptions[] = {
 
 class QueenMetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
-	QueenMetaEngineDetection() : AdvancedMetaEngineDetection(Queen::gameDescriptions, sizeof(Queen::QueenGameDescription), queenGames, optionsList) {
-	}
-
-	const char *getEngineId() const override {
-		return "queen";
+	QueenMetaEngineDetection() : AdvancedMetaEngineDetection(Queen::gameDescriptions, sizeof(Queen::QueenGameDescription), queenGames) {
 	}
 
 	const char *getName() const override {
+		return "queen";
+	}
+
+	const char *getEngineName() const override {
 		return "Flight of the Amazon Queen";
 	}
 

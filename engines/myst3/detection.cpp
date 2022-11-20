@@ -203,37 +203,19 @@ static const Myst3GameDescription gameDescriptions[] = {
 	{ AD_TABLE_END_MARKER, 0 }
 };
 
-#define GAMEOPTION_WIDESCREEN_MOD GUIO_GAMEOPTIONS1
-
-static const ADExtraGuiOptionsMap optionsList[] = {
-	{
-		GAMEOPTION_WIDESCREEN_MOD,
-		{
-			_s("Widescreen mod"),
-			_s("Enable widescreen rendering in fullscreen mode."),
-			"widescreen_mod",
-			false,
-			0,
-			0
-		}
-	},
-
-	AD_EXTRA_GUI_OPTIONS_TERMINATOR
-};
-
 class Myst3MetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
-	Myst3MetaEngineDetection() : AdvancedMetaEngineDetection(gameDescriptions, sizeof(Myst3GameDescription), myst3Games, optionsList) {
+	Myst3MetaEngineDetection() : AdvancedMetaEngineDetection(gameDescriptions, sizeof(Myst3GameDescription), myst3Games) {
 		_guiOptions = GUIO5(GUIO_NOMIDI, GUIO_NOSFX, GUIO_NOSPEECH, GUIO_NOSUBTITLES, GAMEOPTION_WIDESCREEN_MOD);
 		_maxScanDepth = 3;
 		_directoryGlobs = directoryGlobs;
 	}
 
-	const char *getName() const override {
+	const char *getEngineName() const override {
 		return "Myst III";
 	}
 
-	const char *getEngineId() const override {
+	const char *getName() const override {
 		return "myst3";
 	}
 

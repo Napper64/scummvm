@@ -316,8 +316,8 @@ void process_interface_click(int ifce, int btn, int mbut) {
 	int rtype = kGUIAction_None, rdata = 0;
 	if (btype == kGUIButton) {
 		GUIButton *gbuto = (GUIButton *)_GP(guis)[ifce].GetControl(btn);
-		rtype = gbuto->ClickAction[kMouseLeft];
-		rdata = gbuto->ClickData[kMouseLeft];
+		rtype = gbuto->ClickAction[kGUIClickLeft];
+		rdata = gbuto->ClickData[kGUIClickLeft];
 	} else if ((btype == kGUISlider) || (btype == kGUITextBox) || (btype == kGUIListBox))
 		rtype = kGUIAction_RunScript;
 	else quit("unknown GUI object triggered process_interface");
@@ -378,13 +378,13 @@ void replace_macro_tokens(const char *text, String &fixed_text) {
 			macroname[idd] = 0;
 			tempo[0] = 0;
 			if (ags_stricmp(macroname, "score") == 0)
-				sprintf(tempo, "%d", _GP(play).score);
+				snprintf(tempo, sizeof(tempo), "%d", _GP(play).score);
 			else if (ags_stricmp(macroname, "totalscore") == 0)
-				sprintf(tempo, "%d", MAXSCORE);
+				snprintf(tempo, sizeof(tempo), "%d", MAXSCORE);
 			else if (ags_stricmp(macroname, "scoretext") == 0)
-				sprintf(tempo, "%d of %d", _GP(play).score, MAXSCORE);
+				snprintf(tempo, sizeof(tempo), "%d of %d", _GP(play).score, MAXSCORE);
 			else if (ags_stricmp(macroname, "gamename") == 0)
-				strcpy(tempo, _GP(play).game_name);
+				snprintf(tempo, sizeof(tempo), "%s", _GP(play).game_name);
 			else if (ags_stricmp(macroname, "overhotspot") == 0) {
 				// While game is in Wait mode, no overhotspot text
 				if (!IsInterfaceEnabled())
@@ -393,7 +393,7 @@ void replace_macro_tokens(const char *text, String &fixed_text) {
 					GetLocationName(game_to_data_coord(_G(mousex)), game_to_data_coord(_G(mousey)), tempo);
 			} else { // not a macro, there's just a @ in the message
 				curptr = curptrWasAt + 1;
-				strcpy(tempo, "@");
+				snprintf(tempo, sizeof(tempo), "%s", "@");
 			}
 
 			fixed_text.Append(tempo);

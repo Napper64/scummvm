@@ -107,7 +107,7 @@ const char *BaseScriptable::scToString() {
 
 //////////////////////////////////////////////////////////////////////////
 void *BaseScriptable::scToMemBuffer() {
-	return (void *)NULL;
+	return (void *)nullptr;
 }
 
 
@@ -173,7 +173,7 @@ int BaseScriptable::scCompare(BaseScriptable *val) {
 
 //////////////////////////////////////////////////////////////////////////
 void BaseScriptable::scDebuggerDesc(char *buf, int bufSize) {
-	strcpy(buf, scToString());
+	Common::strcpy_s(buf, bufSize, scToString());
 }
 
 //////////////////////////////////////////////////////////////////////////

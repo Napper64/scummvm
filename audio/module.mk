@@ -5,6 +5,7 @@ MODULE_OBJS := \
 	adlib_ms.o \
 	audiostream.o \
 	casio.o \
+	cms.o \
 	fmopl.o \
 	mididrv.o \
 	mididrv_ms.o \
@@ -26,6 +27,7 @@ MODULE_OBJS := \
 	decoders/aac.o \
 	decoders/adpcm.o \
 	decoders/aiff.o \
+	decoders/apc.o \
 	decoders/asf.o \
 	decoders/flac.o \
 	decoders/g711.o \

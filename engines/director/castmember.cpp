@@ -48,6 +48,25 @@ CastMember::CastMember(Cast *cast, uint16 castId, Common::SeekableReadStreamEndi
 	_flags1 = 0;
 
 	_modified = true;
+	_isChanged = false;
+
+	_objType = kCastMemberObj;
+
+	_widget = nullptr;
+	_erase = false;
+}
+
+CastMember::CastMember(Cast *cast, uint16 castId) : Object<CastMember>("CastMember") {
+	_type = kCastTypeNull;
+	_cast = cast;
+	_castId = castId;
+	_hilite = false;
+	_purgePriority = 3;
+	_size = 0;
+	_flags1 = 0;
+
+	_modified = true;
+	_isChanged = false;
 
 	_objType = kCastMemberObj;
 
@@ -59,6 +78,12 @@ CastMemberInfo *CastMember::getInfo() {
 	return _cast->getCastMemberInfo(_castId);
 }
 
+void CastMember::setModified(bool modified) {
+	_modified = modified;
+	if (modified)
+		_isChanged = true;
+}
+
 
 /////////////////////////////////////
 // Bitmap
@@ -68,6 +93,7 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableRe
 		: CastMember(cast, castId, stream) {
 	_type = kCastBitmap;
 	_img = nullptr;
+	_ditheredImg = nullptr;
 	_matte = nullptr;
 	_noMatte = false;
 	_bytes = 0;
@@ -170,9 +196,31 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableRe
 	_tag = castTag;
 }
 
+BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Image::ImageDecoder *img, uint8 flags1)
+	: CastMember(cast, castId) {
+	_type = kCastBitmap;
+	_matte = nullptr;
+	_noMatte = false;
+	_bytes = 0;
+	_img = img;
+	_ditheredImg = nullptr;
+	_clut = -1;
+	_initialRect = Common::Rect(0, 0, img->getSurface()->w, img->getSurface()->h);
+	_pitch = img->getSurface()->pitch;
+	_bitsPerPixel = img->getSurface()->format.bytesPerPixel * 8;
+	_regY = img->getSurface()->h / 2;
+	_regX = img->getSurface()->w / 2;
+	_flags1 = flags1;
+	_flags2 = 0;
+	_tag = 0;
+}
+
 BitmapCastMember::~BitmapCastMember() {
 	if (_img)
 		delete _img;
+
+	if (_ditheredImg)
+		delete _ditheredImg;
 
 	if (_matte)
 		delete _matte;
@@ -188,15 +236,44 @@ Graphics::MacWidget *BitmapCastMember::createWidget(Common::Rect &bbox, Channel 
 	if (!bbox.width() || !bbox.height())
 		return nullptr;
 
+	// Check if we need to dither the image
+	int dstBpp = g_director->_wm->_pixelformat.bytesPerPixel;
+	int srcBpp = _img->getSurface()->format.bytesPerPixel;
+
+	const byte *pal = _img->getPalette();
+
+	if (dstBpp == 1) {
+		if (srcBpp > 1
+		// At least early directors were not remapping 8bpp images. But in case it is
+		// needed, here is the code
+#if 0
+		|| (srcBpp == 1 &&
+			memcmp(g_director->_wm->getPalette(), _img->getPalette(), _img->getPaletteColorCount() * 3))
+#endif
+			) {
+
+			_ditheredImg = _img->getSurface()->convertTo(g_director->_wm->_pixelformat, _img->getPalette(), _img->getPaletteColorCount(), g_director->_wm->getPalette(), g_director->_wm->getPaletteSize());
+
+			pal = g_director->_wm->getPalette();
+		}
+	}
+
 	Graphics::MacWidget *widget = new Graphics::MacWidget(g_director->getCurrentWindow(), bbox.left, bbox.top, bbox.width(), bbox.height(), g_director->_wm, false);
 
 	// scale for drawing a different size sprite
-	copyStretchImg(widget->getSurface()->surfacePtr(), bbox);
+	copyStretchImg(widget->getSurface()->surfacePtr(), bbox, pal);
 
 	return widget;
 }
 
-void BitmapCastMember::copyStretchImg(Graphics::Surface *surface, const Common::Rect &bbox) {
+void BitmapCastMember::copyStretchImg(Graphics::Surface *surface, const Common::Rect &bbox, const byte *pal) {
+	const Graphics::Surface *srcSurf;
+
+	if (_ditheredImg)
+		srcSurf = _ditheredImg;
+	else
+		srcSurf = _img->getSurface();
+
 	if (bbox.width() != _initialRect.width() || bbox.height() != _initialRect.height()) {
 
 		int scaleX = SCALE_THRESHOLD * _initialRect.width() / bbox.width();
@@ -205,18 +282,34 @@ void BitmapCastMember::copyStretchImg(Graphics::Surface *surface, const Common::
 		for (int y = 0, scaleYCtr = 0; y < bbox.height(); y++, scaleYCtr += scaleY) {
 			if (g_director->_wm->_pixelformat.bytesPerPixel == 1) {
 				for (int x = 0, scaleXCtr = 0; x < bbox.width(); x++, scaleXCtr += scaleX) {
-					const byte *src = (const byte *)_img->getSurface()->getBasePtr(scaleXCtr / SCALE_THRESHOLD, scaleYCtr / SCALE_THRESHOLD);
+					const byte *src = (const byte *)srcSurf->getBasePtr(scaleXCtr / SCALE_THRESHOLD, scaleYCtr / SCALE_THRESHOLD);
 					*(byte *)surface->getBasePtr(x, y) = *src;
 				}
 			} else {
 				for (int x = 0, scaleXCtr = 0; x < bbox.width(); x++, scaleXCtr += scaleX) {
-					const int *src = (const int *)_img->getSurface()->getBasePtr(scaleXCtr / SCALE_THRESHOLD, scaleYCtr / SCALE_THRESHOLD);
-					*(int *)surface->getBasePtr(x, y) = *src;
+					const void *ptr = srcSurf->getBasePtr(scaleXCtr / SCALE_THRESHOLD, scaleYCtr / SCALE_THRESHOLD);
+					int32 color;
+
+					switch (srcSurf->format.bytesPerPixel) {
+					case 1:
+						{
+							color = *(const byte *)ptr * 3;
+							color = surface->format.RGBToColor(pal[color], pal[color + 1], pal[color + 2]);
+						}
+						break;
+					case 4:
+						color = *(const int32 *)ptr;
+						break;
+					default:
+						error("Unimplemented src bpp: %d", srcSurf->format.bytesPerPixel);
+					}
+
+					*(int32 *)surface->getBasePtr(x, y) = color;
 				}
 			}
 		}
 	} else {
-		surface->copyFrom(*_img->getSurface());
+		surface->copyFrom(*srcSurf);
 	}
 }
 
@@ -292,6 +385,17 @@ Graphics::Surface *BitmapCastMember::getMatte(Common::Rect &bbox) {
 	return _matte ? _matte->getMask() : nullptr;
 }
 
+Common::String BitmapCastMember::formatInfo() {
+	return Common::String::format(
+		"initialRect: %dx%d@%d,%d, boundingRect: %dx%d@%d,%d, foreColor: %d, backColor: %d, regX: %d, regY: %d, pitch: %d, bitsPerPixel: %d",
+		_initialRect.width(), _initialRect.height(),
+		_initialRect.left, _initialRect.top,
+		_boundingRect.width(), _boundingRect.height(),
+		_boundingRect.left, _boundingRect.top,
+		getForeColor(), getBackColor(),
+		_regX, _regY, _pitch, _bitsPerPixel
+	);
+}
 
 /////////////////////////////////////
 // DigitalVideo
@@ -365,8 +469,14 @@ bool DigitalVideoCastMember::loadVideo(Common::String path) {
 	debugC(2, kDebugLoading | kDebugImages, "Loading video %s -> %s", path.c_str(), path1.c_str());
 	bool result = _video->loadFile(Common::Path(path1, g_director->_dirSeparator));
 	if (!result) {
+		delete _video;
 		_video = new Video::AVIDecoder();
 		result = _video->loadFile(Common::Path(path1, g_director->_dirSeparator));
+		if (!result) {
+		    warning("DigitalVideoCastMember::loadVideo(): format not supported, skipping");
+		    delete _video;
+		    _video = nullptr;
+		}
 	}
 
 	if (result && g_director->_pixelformat.bytesPerPixel == 1) {
@@ -421,7 +531,7 @@ void DigitalVideoCastMember::startVideo(Channel *channel) {
 	_duration = getMovieTotalTime();
 }
 
-void DigitalVideoCastMember::stopVideo(Channel *channel) {
+void DigitalVideoCastMember::stopVideo() {
 	if (!_video || !_video->isVideoLoaded()) {
 		warning("DigitalVideoCastMember::stopVideo: No video decoder");
 		return;
@@ -430,6 +540,17 @@ void DigitalVideoCastMember::stopVideo(Channel *channel) {
 	_video->stop();
 
 	debugC(2, kDebugImages, "STOPPING VIDEO %s", _filename.c_str());
+}
+
+void DigitalVideoCastMember::rewindVideo() {
+	if (!_video || !_video->isVideoLoaded()) {
+		warning("DigitalVideoCastMember::rewindVideo: No video decoder");
+		return;
+	}
+
+	_video->rewind();
+
+	debugC(2, kDebugImages, "REWINDING VIDEO %s", _filename.c_str());
 }
 
 Graphics::MacWidget *DigitalVideoCastMember::createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) {
@@ -451,10 +572,9 @@ Graphics::MacWidget *DigitalVideoCastMember::createWidget(Common::Rect &bbox, Ch
 		return widget;
 	}
 
-	debugC(1, kDebugImages, "Video time: %d  rate: %f", _channel->_movieTime, _channel->_movieRate);
 	const Graphics::Surface *frame = _video->decodeNextFrame();
 
-	_channel->_movieTime = getMovieCurrentTime();
+	debugC(1, kDebugImages, "Video time: %d  rate: %f", _channel->_movieTime, _channel->_movieRate);
 
 	if (frame) {
 		if (_lastFrame) {
@@ -556,6 +676,57 @@ void DigitalVideoCastMember::setFrameRate(int rate) {
 	warning("STUB: DigitalVideoCastMember::setFrameRate(%d)", rate);
 }
 
+Common::String DigitalVideoCastMember::formatInfo() {
+	return Common::String::format(
+		"initialRect: %dx%d@%d,%d, boundingRect: %dx%d@%d,%d, filename: \"%s\", duration: %d, enableVideo: %d, enableSound: %d, looping: %d, crop: %d, center: %d, showControls: %d",
+		_initialRect.width(), _initialRect.height(),
+		_initialRect.left, _initialRect.top,
+		_boundingRect.width(), _boundingRect.height(),
+		_boundingRect.left, _boundingRect.top,
+		_filename.c_str(), _duration,
+		_enableVideo, _enableSound,
+		_looping, _crop, _center, _showControls
+	);
+}
+
+
+/////////////////////////////////////
+// MovieCasts
+/////////////////////////////////////
+
+MovieCastMember::MovieCastMember(Cast *cast, uint16 castId, Common::SeekableReadStreamEndian &stream, uint16 version)
+		: CastMember(cast, castId, stream) {
+	_type = kCastMovie;
+
+	_initialRect = Movie::readRect(stream);
+	_flags = stream.readUint32();
+
+	_looping = !(_flags & 0x20);
+	_enableScripts = _flags & 0x10;
+	_enableSound = _flags & 0x08;
+	_crop = !(_flags & 0x02);
+	_center = _flags & 0x01;
+
+	if (debugChannelSet(2, kDebugLoading))
+		_initialRect.debugPrint(2, "MovieCastMember(): rect:");
+	debugC(2, kDebugLoading, "MovieCastMember(): flags: (%d 0x%04x)", _flags, _flags);
+	debugC(2, kDebugLoading, "_looping: %d, _enableScripts %d, _enableSound: %d, _crop %d, _center: %d",
+			_looping, _enableScripts, _enableSound, _crop, _center);
+
+}
+
+Common::String MovieCastMember::formatInfo() {
+	return Common::String::format(
+		"initialRect: %dx%d@%d,%d, boundingRect: %dx%d@%d,%d, enableScripts: %d, enableSound: %d, looping: %d, crop: %d, center: %d",
+		_initialRect.width(), _initialRect.height(),
+		_initialRect.left, _initialRect.top,
+		_boundingRect.width(), _boundingRect.height(),
+		_boundingRect.left, _boundingRect.top,
+		_enableScripts, _enableSound, _looping,
+		_crop, _center
+	);
+}
+
 /////////////////////////////////////
 // Film loops
 /////////////////////////////////////
@@ -619,8 +790,16 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, C
 		chan._height = height;
 
 		_subchannels.push_back(chan);
-		_subchannels[_subchannels.size() - 1].replaceWidget();
+
 	}
+	// Initialise the widgets on all of the subchannels.
+	// This has to be done once the list has been constructed, otherwise
+	// the list grow operation will erase the widgets as they aren't
+	// part of the Channel assignment constructor.
+	for (auto &iter : _subchannels) {
+		iter.replaceWidget();
+	}
+
 	return &_subchannels;
 }
 
@@ -764,6 +943,17 @@ void FilmLoopCastMember::loadFilmLoopData(Common::SeekableReadStreamEndian &stre
 
 }
 
+Common::String FilmLoopCastMember::formatInfo() {
+	return Common::String::format(
+		"initialRect: %dx%d@%d,%d, boundingRect: %dx%d@%d,%d, frameCount: %d, subchannelCount: %d, enableSound: %d, looping: %d, crop: %d, center: %d",
+		_initialRect.width(), _initialRect.height(),
+		_initialRect.left, _initialRect.top,
+		_boundingRect.width(), _boundingRect.height(),
+		_boundingRect.left, _boundingRect.top,
+		_frames.size(), _subchannels.size(), _enableSound, _looping,
+		_crop, _center
+	);
+}
 
 /////////////////////////////////////
 // Sound
@@ -781,6 +971,11 @@ SoundCastMember::~SoundCastMember() {
 		delete _audio;
 }
 
+Common::String SoundCastMember::formatInfo() {
+	return Common::String::format(
+		"looping: %d", _looping
+	);
+}
 
 /////////////////////////////////////
 // Text
@@ -958,6 +1153,16 @@ Graphics::TextAlign TextCastMember::getAlignment() {
 	}
 }
 
+void TextCastMember::setBackColor(uint32 bgCol) {
+	_bgcolor = bgCol;
+	_modified = true;
+}
+
+void TextCastMember::setForeColor(uint32 fgCol) {
+	_fgcolor = fgCol;
+	_modified = true;
+}
+
 void TextCastMember::importStxt(const Stxt *stxt) {
 	_fontId = stxt->_style.fontId;
 	_textSlant = stxt->_style.textSlant;
@@ -967,6 +1172,11 @@ void TextCastMember::importStxt(const Stxt *stxt) {
 	_fgpalinfo3 = stxt->_style.b;
 	_ftext = stxt->_ftext;
 	_ptext = stxt->_ptext;
+
+	// Rectifying _fontId in case of a fallback font
+	Graphics::MacFont macFont(_fontId, _fontSize, _textSlant);
+	g_director->_wm->_fontMan->getFont(&macFont);
+	_fontId = macFont.getId();
 }
 
 Graphics::MacWidget *TextCastMember::createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) {
@@ -1011,7 +1221,7 @@ Graphics::MacWidget *TextCastMember::createWidget(Common::Rect &bbox, Channel *c
 	case kCastButton:
 		// note that we use _initialRect for the dimensions of the button;
 		// the values provided in the sprite bounding box are ignored
-		widget = new Graphics::MacButton(Graphics::MacButtonType(buttonType), getAlignment(), g_director->getCurrentWindow(), bbox.left, bbox.top, _initialRect.width(), _initialRect.height(), g_director->_wm, _ftext, macFont, getForeColor(), 0xff);
+		widget = new Graphics::MacButton(Graphics::MacButtonType(buttonType), getAlignment(), g_director->getCurrentWindow(), bbox.left, bbox.top, _initialRect.width(), _initialRect.height(), g_director->_wm, _ftext, macFont, getForeColor(), g_director->_wm->_colorWhite);
 		widget->_focusable = true;
 
 		((Graphics::MacButton *)widget)->setHilite(_hilite);
@@ -1085,6 +1295,19 @@ void TextCastMember::updateFromWidget(Graphics::MacWidget *widget) {
 	}
 }
 
+Common::String TextCastMember::formatInfo() {
+	return Common::String::format(
+		"initialRect: %dx%d@%d,%d, boundingRect: %dx%d@%d,%d, foreColor: %d, backColor: %d, editable: %d, text: \"%s\"",
+		_initialRect.width(), _initialRect.height(),
+		_initialRect.left, _initialRect.top,
+		_boundingRect.width(), _boundingRect.height(),
+		_boundingRect.left, _boundingRect.top,
+		getForeColor(), getBackColor(),
+		_editable, _ptext.encode().c_str()
+	);
+
+}
+
 
 /////////////////////////////////////
 // Shape
@@ -1144,6 +1367,28 @@ ShapeCastMember::ShapeCastMember(Cast *cast, uint16 castId, Common::SeekableRead
 		_initialRect.debugPrint(0, "ShapeCastMember: rect:");
 }
 
+void ShapeCastMember::setBackColor(uint32 bgCol) {
+	_bgCol = bgCol;
+	_modified = true;
+}
+
+void ShapeCastMember::setForeColor(uint32 fgCol) {
+	_fgCol = fgCol;
+	_modified = true;
+}
+
+Common::String ShapeCastMember::formatInfo() {
+	return Common::String::format(
+		"initialRect: %dx%d@%d,%d, boundingRect: %dx%d@%d,%d, foreColor: %d, backColor: %d, shapeType: %d, pattern: %d, fillType: %d, lineThickness: %d, lineDirection: %d, ink: %d",
+		_initialRect.width(), _initialRect.height(),
+		_initialRect.left, _initialRect.top,
+		_boundingRect.width(), _boundingRect.height(),
+		_boundingRect.left, _boundingRect.top,
+		getForeColor(), getBackColor(),
+		_shapeType, _pattern, _fillType,
+		_lineThickness, _lineDirection, _ink
+	);
+}
 
 /////////////////////////////////////
 // Script

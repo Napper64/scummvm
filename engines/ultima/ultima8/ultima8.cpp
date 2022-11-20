@@ -19,6 +19,7 @@
  *
  */
 
+#include "common/rational.h"
 #include "common/translation.h"
 #include "gui/saveload.h"
 #include "image/png.h"
@@ -131,7 +132,7 @@ Ultima8Engine::Ultima8Engine(OSystem *syst, const Ultima::UltimaGameDescription 
 		_avatarInStasis(false), _cruStasis(false), _paintEditorItems(false), _inversion(0),
 		_showTouching(false), _timeOffset(0), _hasCheated(false), _cheatsEnabled(false),
 		_fontOverride(false), _fontAntialiasing(false), _audioMixer(0), _inverterGump(nullptr),
-	    _lerpFactor(256), _inBetweenFrame(false), _unkCrusaderFlag(false), _moveKeyFrame(0),
+	    _lerpFactor(256), _inBetweenFrame(false), _crusaderTeleporting(false), _moveKeyFrame(0),
 		_highRes(false) {
 	_instance = this;
 }
@@ -671,7 +672,7 @@ void Ultima8Engine::GraphicSysInit() {
 		_screen->GetSurfaceDims(old_dims);
 		if (width == old_dims.width() && height == old_dims.height())
 			return;
-		bpp = RenderSurface::_format.bpp();
+		bpp = RenderSurface::_format->bpp();
 
 		delete _screen;
 	}
@@ -1484,7 +1485,7 @@ void Ultima8Engine::save(Common::WriteStream *ws) {
 	ws->writeByte(s);
 
 	if (GAME_IS_CRUSADER) {
-		uint8 f = (_unkCrusaderFlag ? 1 : 0);
+		uint8 f = (_crusaderTeleporting ? 1 : 0);
 		ws->writeByte(f);
 	}
 
@@ -1508,7 +1509,7 @@ bool Ultima8Engine::load(Common::ReadStream *rs, uint32 version) {
 	_avatarInStasis = (rs->readByte() != 0);
 
 	if (GAME_IS_CRUSADER) {
-		_unkCrusaderFlag  = (rs->readByte() != 0);
+		_crusaderTeleporting = (rs->readByte() != 0);
 		_cruStasis = false;
 	}
 
@@ -1603,20 +1604,20 @@ uint32 Ultima8Engine::I_getTimeInGameHours(const uint8 * /*args*/,
 	return get_instance()->getGameTimeInSeconds() / 900;
 }
 
-uint32 Ultima8Engine::I_getUnkCrusaderFlag(const uint8 * /*args*/,
+uint32 Ultima8Engine::I_getCrusaderTeleporting(const uint8 * /*args*/,
 	unsigned int /*argsize*/) {
-	return get_instance()->isUnkCrusaderFlag() ? 1 : 0;
+	return get_instance()->isCrusaderTeleporting() ? 1 : 0;
 }
 
-uint32 Ultima8Engine::I_setUnkCrusaderFlag(const uint8 * /*args*/,
+uint32 Ultima8Engine::I_setCrusaderTeleporting(const uint8 * /*args*/,
 	unsigned int /*argsize*/) {
-	get_instance()->setUnkCrusaderFlag(true);
+	get_instance()->setCrusaderTeleporting(true);
 	return 0;
 }
 
-uint32 Ultima8Engine::I_clrUnkCrusaderFlag(const uint8 * /*args*/,
+uint32 Ultima8Engine::I_clrCrusaderTeleporting(const uint8 * /*args*/,
 	unsigned int /*argsize*/) {
-	get_instance()->setUnkCrusaderFlag(false);
+	get_instance()->setCrusaderTeleporting(false);
 	return 0;
 }
 
@@ -1681,8 +1682,24 @@ void Ultima8Engine::showSplashScreen() {
 	Graphics::Screen *scr = Ultima8Engine::get_instance()->getScreen();
 	const Graphics::Surface *srcSurface = png.getSurface();
 
-	scr->transBlitFrom(*srcSurface, Common::Rect(0, 0, srcSurface->w, srcSurface->h),
-		Common::Rect(0, 0, scr->w, scr->h));
+	Common::Rect dest(0, 0, scr->w, scr->h);
+
+	// Splash screen is expected to be 640x480.
+	// If the window has a different aspect ratio or corrected aspect ratio,
+	// then scale to appropriate size and center.
+	frac_t aspectRatio = Common::Rational(scr->w, scr->h).toFrac();
+	if (aspectRatio != Common::Rational(320, 240).toFrac() &&
+		aspectRatio != Common::Rational(320, 200).toFrac()) {
+		Common::Rational scaleFactorX(scr->w, srcSurface->w);
+		Common::Rational scaleFactorY(scr->h, srcSurface->h);
+		Common::Rational scale = scaleFactorX < scaleFactorY ? scaleFactorX : scaleFactorY;
+
+		dest.setWidth((srcSurface->w * scale).toInt());
+		dest.setHeight((srcSurface->h * scale).toInt());
+		dest.moveTo((scr->w - dest.width()) / 2, (scr->h - dest.height()) / 2);
+	}
+
+	scr->transBlitFrom(*srcSurface, Common::Rect(0, 0, srcSurface->w, srcSurface->h), dest);
 	scr->update();
 	// Handle a single event to get the splash screen shown
 	Common::Event event;

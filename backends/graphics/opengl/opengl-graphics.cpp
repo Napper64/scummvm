@@ -25,7 +25,9 @@
 #include "backends/graphics/opengl/pipelines/pipeline.h"
 #include "backends/graphics/opengl/pipelines/fixed.h"
 #include "backends/graphics/opengl/pipelines/shader.h"
+#include "backends/graphics/opengl/pipelines/libretro.h"
 #include "backends/graphics/opengl/shader.h"
+#include "graphics/opengl/debug.h"
 
 #include "common/array.h"
 #include "common/textconsole.h"
@@ -59,6 +61,10 @@
 
 #include "common/text-to-speech.h"
 
+#if !USE_FORCED_GLES
+#include "backends/graphics/opengl/pipelines/libretro/parser.h"
+#endif
+
 namespace OpenGL {
 
 OpenGLGraphicsManager::OpenGLGraphicsManager()
@@ -70,6 +76,9 @@ OpenGLGraphicsManager::OpenGLGraphicsManager()
 	  _cursorHotspotX(0), _cursorHotspotY(0),
 	  _cursorHotspotXScaled(0), _cursorHotspotYScaled(0), _cursorWidthScaled(0), _cursorHeightScaled(0),
 	  _cursorKeyColor(0), _cursorDontScale(false), _cursorPaletteEnabled(false), _shakeOffsetScaled()
+#if !USE_FORCED_GLES
+	  , _libretroPipeline(nullptr)
+#endif
 #ifdef USE_OSD
 	  , _osdMessageChangeRequest(false), _osdMessageAlpha(0), _osdMessageFadeStartTime(0), _osdMessageSurface(nullptr),
 	  _osdIconSurface(nullptr)
@@ -79,7 +88,7 @@ OpenGLGraphicsManager::OpenGLGraphicsManager()
 #endif
 	{
 	memset(_gamePalette, 0, sizeof(_gamePalette));
-	g_context.reset();
+	OpenGLContext.reset();
 }
 
 OpenGLGraphicsManager::~OpenGLGraphicsManager() {
@@ -106,6 +115,11 @@ bool OpenGLGraphicsManager::hasFeature(OSystem::Feature f) const {
 #endif
 		return true;
 
+#if !USE_FORCED_GLES
+	case OSystem::kFeatureShaders:
+		return LibRetroPipeline::isSupportedByContext();
+#endif
+
 	case OSystem::kFeatureOverlaySupportsAlpha:
 		return _defaultFormatAlpha.aBits() > 3;
 
@@ -124,22 +138,6 @@ void OpenGLGraphicsManager::setFeatureState(OSystem::Feature f, bool enable) {
 	case OSystem::kFeatureFilteringMode:
 		assert(_transactionMode != kTransactionNone);
 		_currentState.filtering = enable;
-
-		if (_gameScreen) {
-			_gameScreen->enableLinearFiltering(enable);
-		}
-
-		if (_cursor) {
-			_cursor->enableLinearFiltering(enable);
-		}
-
-		// The overlay UI should also obey the filtering choice (managed via the Filter Graphics checkbox in Graphics Tab).
-		// Thus, when overlay filtering is disabled, scaling in OPENGL is done with GL_NEAREST (nearest neighbor scaling).
-		// It may look crude, but it should be crispier and it's left to user choice to enable filtering.
-		if (_overlay) {
-			_overlay->enableLinearFiltering(enable);
-		}
-
 		break;
 
 	case OSystem::kFeatureCursorPalette:
@@ -335,6 +333,41 @@ uint OpenGLGraphicsManager::getScaleFactor() const {
 }
 #endif
 
+#if !USE_FORCED_GLES
+bool OpenGLGraphicsManager::setShader(const Common::String &fileName) {
+	assert(_transactionMode != kTransactionNone);
+
+	// Special case for the 'default' shader
+	if (fileName == "default")
+		_currentState.shader = "";
+	else
+		_currentState.shader = fileName;
+
+	return true;
+}
+#endif
+
+bool OpenGLGraphicsManager::loadShader(const Common::String &fileName) {
+#if !USE_FORCED_GLES
+	if (!_libretroPipeline) {
+		warning("Libretro is not supported");
+		return true;
+	}
+
+	// Load selected shader preset
+	if (!fileName.empty()) {
+		if (!_libretroPipeline->open(Common::FSNode(fileName))) {
+			warning("Failed to load shader %s", fileName.c_str());
+			return false;
+		}
+	} else {
+		_libretroPipeline->close();
+	}
+#endif
+
+	return true;
+}
+
 void OpenGLGraphicsManager::beginGFXTransaction() {
 	assert(_transactionMode == kTransactionNone);
 
@@ -380,6 +413,10 @@ OSystem::TransactionError OpenGLGraphicsManager::endGFXTransaction() {
 		const uint requestedWidth  = _currentState.gameWidth;
 		const uint requestedHeight = intToFrac(requestedWidth) / desiredAspect;
 
+		// Consider that shader is OK by default
+		// If loadVideoMode fails, we won't consider that shader was the error
+		bool shaderOK = true;
+
 		if (!loadVideoMode(requestedWidth, requestedHeight,
 #ifdef USE_RGB_COLOR
 		                   _currentState.gameFormat
@@ -387,12 +424,13 @@ OSystem::TransactionError OpenGLGraphicsManager::endGFXTransaction() {
 		                   Graphics::PixelFormat::createFormatCLUT8()
 #endif
 		                  )
+			|| !(shaderOK = loadShader(_currentState.shader))
 		   // HACK: This is really nasty but we don't have any guarantees of
 		   // a context existing before, which means we don't know the maximum
 		   // supported texture size before this. Thus, we check whether the
 		   // requested game resolution is supported over here.
-		   || (   _currentState.gameWidth  > (uint)g_context.maxTextureSize
-		       || _currentState.gameHeight > (uint)g_context.maxTextureSize)) {
+		   || (   _currentState.gameWidth  > (uint)OpenGLContext.maxTextureSize
+		       || _currentState.gameHeight > (uint)OpenGLContext.maxTextureSize)) {
 			if (_transactionMode == kTransactionActive) {
 				// Try to setup the old state in case its valid and is
 				// actually different from the new one.
@@ -426,11 +464,22 @@ OSystem::TransactionError OpenGLGraphicsManager::endGFXTransaction() {
 					}
 #endif
 
+#if !USE_FORCED_GLES
+					if (_oldState.shader != _currentState.shader) {
+						transactionError |= OSystem::kTransactionShaderChangeFailed;
+					}
+#endif
 					// Roll back to the old state.
 					_currentState = _oldState;
 					_transactionMode = kTransactionRollback;
 
 					// Try to set up the old state.
+					continue;
+				}
+				// If the shader failed and we had not a valid old state, try to unset the shader and do it again
+				if (!shaderOK && !_currentState.shader.empty()) {
+					_currentState.shader = "";
+					_transactionMode = kTransactionRollback;
 					continue;
 				}
 			}
@@ -470,7 +519,6 @@ OSystem::TransactionError OpenGLGraphicsManager::endGFXTransaction() {
 #endif
 
 		_gameScreen->allocate(_currentState.gameWidth, _currentState.gameHeight);
-		_gameScreen->enableLinearFiltering(_currentState.filtering);
 		// We fill the screen to all black or index 0 for CLUT8.
 #ifdef USE_RGB_COLOR
 		if (_currentState.gameFormat.bytesPerPixel == 1) {
@@ -487,6 +535,7 @@ OSystem::TransactionError OpenGLGraphicsManager::endGFXTransaction() {
 	// aspect ratio correction and game screen changes correctly.
 	recalculateDisplayAreas();
 	recalculateCursorScaling();
+	updateLinearFiltering();
 
 	// Something changed, so update the screen change ID.
 	++_screenChangeID;
@@ -557,6 +606,9 @@ void OpenGLGraphicsManager::updateScreen() {
 	if (   !_forceRedraw
 		&& !_cursorNeedsRedraw
 	    && !_gameScreen->isDirty()
+#if !USE_FORCED_GLES
+	    && !(_libretroPipeline && _libretroPipeline->isAnimated())
+#endif
 	    && !(_overlayVisible && _overlay->isDirty())
 	    && !(_cursorVisible && _cursor && _cursor->isDirty())
 #ifdef USE_OSD
@@ -573,6 +625,14 @@ void OpenGLGraphicsManager::updateScreen() {
 	}
 	_overlay->updateGLTexture();
 
+#if !USE_FORCED_GLES
+	if (_libretroPipeline) {
+		_libretroPipeline->beginScaling();
+	}
+#endif
+
+	_pipeline->activate();
+
 	// Clear the screen buffer.
 	GL_CALL(glClear(GL_COLOR_BUFFER_BIT));
 
@@ -583,25 +643,52 @@ void OpenGLGraphicsManager::updateScreen() {
 		_backBuffer.enableScissorTest(true);
 	}
 
+	// Don't draw cursor if it's not visible or there is none
+	bool drawCursor = _cursorVisible && _cursor;
+
 	// Alpha blending is disabled when drawing the screen
 	_backBuffer.enableBlend(Framebuffer::kBlendModeDisabled);
 
 	// First step: Draw the (virtual) game screen.
-	g_context.getActivePipeline()->drawTexture(_gameScreen->getGLTexture(), _gameDrawRect.left, _gameDrawRect.top, _gameDrawRect.width(), _gameDrawRect.height());
+	_pipeline->drawTexture(_gameScreen->getGLTexture(), _gameDrawRect.left, _gameDrawRect.top, _gameDrawRect.width(), _gameDrawRect.height());
 
-	// Second step: Draw the overlay if visible.
+	// Second step: Draw the cursor if necessary and we are not in GUI and it
+#if !USE_FORCED_GLES
+	if (_libretroPipeline) {
+		// If we are in game, draw the cursor through scaler
+		// This has the disadvantage of having overlay (subtitles) drawn above it
+		// but the cursor will look nicer
+		if (!_overlayInGUI && drawCursor) {
+			_backBuffer.enableBlend(Framebuffer::kBlendModePremultipliedTransparency);
+
+			_pipeline->drawTexture(_cursor->getGLTexture(),
+									 _cursorX - _cursorHotspotXScaled + _shakeOffsetScaled.x,
+									 _cursorY - _cursorHotspotYScaled + _shakeOffsetScaled.y,
+									 _cursorWidthScaled, _cursorHeightScaled);
+			drawCursor = false;
+
+			// Everything we need to clip has been clipped
+			_backBuffer.enableScissorTest(false);
+		}
+
+		// Overlay must not be scaled and its cursor won't be either
+		_libretroPipeline->finishScaling();
+	}
+#endif
+
+	// Third step: Draw the overlay if visible.
 	if (_overlayVisible) {
 		int dstX = (_windowWidth - _overlayDrawRect.width()) / 2;
 		int dstY = (_windowHeight - _overlayDrawRect.height()) / 2;
 		_backBuffer.enableBlend(Framebuffer::kBlendModeTraditionalTransparency);
-		g_context.getActivePipeline()->drawTexture(_overlay->getGLTexture(), dstX, dstY, _overlayDrawRect.width(), _overlayDrawRect.height());
+		_pipeline->drawTexture(_overlay->getGLTexture(), dstX, dstY, _overlayDrawRect.width(), _overlayDrawRect.height());
 	}
 
-	// Third step: Draw the cursor if visible.
-	if (_cursorVisible && _cursor) {
+	// Fourth step: Draw the cursor if we didn't before.
+	if (drawCursor) {
 		_backBuffer.enableBlend(Framebuffer::kBlendModePremultipliedTransparency);
 
-		g_context.getActivePipeline()->drawTexture(_cursor->getGLTexture(),
+		_pipeline->drawTexture(_cursor->getGLTexture(),
 		                         _cursorX - _cursorHotspotXScaled + _shakeOffsetScaled.x,
 		                         _cursorY - _cursorHotspotYScaled + _shakeOffsetScaled.y,
 		                         _cursorWidthScaled, _cursorHeightScaled);
@@ -631,17 +718,17 @@ void OpenGLGraphicsManager::updateScreen() {
 		}
 
 		// Set the OSD transparency.
-		g_context.getActivePipeline()->setColor(1.0f, 1.0f, 1.0f, _osdMessageAlpha / 100.0f);
+		_pipeline->setColor(1.0f, 1.0f, 1.0f, _osdMessageAlpha / 100.0f);
 
 		int dstX = (_windowWidth - _osdMessageSurface->getWidth()) / 2;
 		int dstY = (_windowHeight - _osdMessageSurface->getHeight()) / 2;
 
 		// Draw the OSD texture.
-		g_context.getActivePipeline()->drawTexture(_osdMessageSurface->getGLTexture(),
+		_pipeline->drawTexture(_osdMessageSurface->getGLTexture(),
 		                                           dstX, dstY, _osdMessageSurface->getWidth(), _osdMessageSurface->getHeight());
 
 		// Reset color.
-		g_context.getActivePipeline()->setColor(1.0f, 1.0f, 1.0f, 1.0f);
+		_pipeline->setColor(1.0f, 1.0f, 1.0f, 1.0f);
 
 		if (_osdMessageAlpha <= 0) {
 			delete _osdMessageSurface;
@@ -658,8 +745,8 @@ void OpenGLGraphicsManager::updateScreen() {
 		int dstY = kOSDIconTopMargin;
 
 		// Draw the OSD icon texture.
-		g_context.getActivePipeline()->drawTexture(_osdIconSurface->getGLTexture(),
-		                                           dstX, dstY, _osdIconSurface->getWidth(), _osdIconSurface->getHeight());
+		_pipeline->drawTexture(_osdIconSurface->getGLTexture(),
+		                       dstX, dstY, _osdIconSurface->getWidth(), _osdIconSurface->getHeight());
 	}
 #endif
 
@@ -808,7 +895,7 @@ void OpenGLGraphicsManager::setMouseCursor(const void *buf, uint w, uint h, int 
 		}
 		_cursor = createSurface(textureFormat, true, wantScaler);
 		assert(_cursor);
-		_cursor->enableLinearFiltering(_currentState.filtering);
+		updateLinearFiltering();
 #ifdef USE_SCALERS
 		if (wantScaler) {
 			_cursor->setScaler(_currentState.scalerIndex, _currentState.scaleFactor);
@@ -1019,15 +1106,15 @@ void OpenGLGraphicsManager::handleResizeImpl(const int width, const int height) 
 	// possible and then scale it to the physical display size. This sounds
 	// bad but actually all recent chips should support full HD resolution
 	// anyway. Thus, it should not be a real issue for modern hardware.
-	if (   overlayWidth  > (uint)g_context.maxTextureSize
-	    || overlayHeight > (uint)g_context.maxTextureSize) {
+	if (   overlayWidth  > (uint)OpenGLContext.maxTextureSize
+	    || overlayHeight > (uint)OpenGLContext.maxTextureSize) {
 		const frac_t outputAspect = intToFrac(_windowWidth) / _windowHeight;
 
 		if (outputAspect > (frac_t)FRAC_ONE) {
-			overlayWidth  = g_context.maxTextureSize;
+			overlayWidth  = OpenGLContext.maxTextureSize;
 			overlayHeight = intToFrac(overlayWidth) / outputAspect;
 		} else {
-			overlayHeight = g_context.maxTextureSize;
+			overlayHeight = OpenGLContext.maxTextureSize;
 			overlayWidth  = fracToInt(overlayHeight * outputAspect);
 		}
 	}
@@ -1045,62 +1132,72 @@ void OpenGLGraphicsManager::handleResizeImpl(const int width, const int height) 
 
 		_overlay = createSurface(_defaultFormatAlpha);
 		assert(_overlay);
-		// We should NOT always filter the overlay with GL_LINEAR.
-		// In previous versions we always did use GL_LINEAR to assure the UI
-		// would be readable in case it needed to be scaled -- it would not affect it otherwise.
-		// However in modern devices due to larger screen size the UI display looks blurry
-		// when using the linear filtering scaling, and we got bug report(s) for it.
-		//   eg. https://bugs.scummvm.org/ticket/11742
-		// So, we now respect the choice for "Filter Graphics" made via ScummVM GUI (under Graphics Tab)
-		_overlay->enableLinearFiltering(_currentState.filtering);
 	}
 	_overlay->allocate(overlayWidth, overlayHeight);
 	_overlay->fill(0);
 
-	// Re-setup the scaling for the screen and cursor
+	// Re-setup the scaling and filtering for the screen and cursor
 	recalculateDisplayAreas();
 	recalculateCursorScaling();
+	updateLinearFiltering();
 
 	// Something changed, so update the screen change ID.
 	++_screenChangeID;
 }
 
-void OpenGLGraphicsManager::notifyContextCreate(const Graphics::PixelFormat &defaultFormat, const Graphics::PixelFormat &defaultFormatAlpha) {
-	// Initialize context for use.
-	initializeGLContext();
-
+void OpenGLGraphicsManager::notifyContextCreate(ContextType type,
+	const Graphics::PixelFormat &defaultFormat,
+	const Graphics::PixelFormat &defaultFormatAlpha) {
 	// Initialize pipeline.
 	delete _pipeline;
 	_pipeline = nullptr;
 
 #if !USE_FORCED_GLES
-	if (g_context.shadersSupported) {
+	// _libretroPipeline has just been destroyed as the pipeline
+	_libretroPipeline = nullptr;
+#endif
+
+	OpenGLContext.initialize(type);
+
+	// Try to setup LibRetro pipeline first if available.
+#if !USE_FORCED_GLES
+	if (LibRetroPipeline::isSupportedByContext()) {
+		ShaderMan.notifyCreate();
+		_libretroPipeline = new LibRetroPipeline();
+		_pipeline = _libretroPipeline;
+	}
+#endif
+
+#if !USE_FORCED_GLES
+	if (!_pipeline && OpenGLContext.shadersSupported) {
 		ShaderMan.notifyCreate();
 		_pipeline = new ShaderPipeline(ShaderMan.query(ShaderManager::kDefault));
 	}
 #endif
 
 #if !USE_FORCED_GLES2
-	if (_pipeline == nullptr) {
+	if (!_pipeline) {
 		_pipeline = new FixedPipeline();
 	}
 #endif
 
-	g_context.setPipeline(_pipeline);
+	if (!_pipeline) {
+		error("Can't initialize any pipeline");
+	}
 
 	// Disable 3D properties.
 	GL_CALL(glDisable(GL_CULL_FACE));
 	GL_CALL(glDisable(GL_DEPTH_TEST));
 	GL_CALL(glDisable(GL_DITHER));
 
-	g_context.getActivePipeline()->setColor(1.0f, 1.0f, 1.0f, 1.0f);
+	_pipeline->setColor(1.0f, 1.0f, 1.0f, 1.0f);
 
 	// Setup backbuffer state.
 
 	// Default to black as clear color.
 	_backBuffer.setClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
-	g_context.getActivePipeline()->setFramebuffer(&_backBuffer);
+	_pipeline->setFramebuffer(&_backBuffer);
 
 	// We use a "pack" alignment (when reading from textures) to 4 here,
 	// since the only place where we really use it is the BMP screenshot
@@ -1165,18 +1262,22 @@ void OpenGLGraphicsManager::notifyContextDestroy() {
 #endif
 
 #if !USE_FORCED_GLES
-	if (g_context.shadersSupported) {
+	if (OpenGLContext.shadersSupported) {
 		ShaderMan.notifyDestroy();
 	}
 #endif
 
 	// Destroy rendering pipeline.
-	g_context.setPipeline(nullptr);
 	delete _pipeline;
 	_pipeline = nullptr;
 
+#if !USE_FORCED_GLES
+	// _libretroPipeline has just been destroyed as the pipeline
+	_libretroPipeline = nullptr;
+#endif
+
 	// Rest our context description since the context is gone soon.
-	g_context.reset();
+	OpenGLContext.reset();
 }
 
 Surface *OpenGLGraphicsManager::createSurface(const Graphics::PixelFormat &format, bool wantAlpha, bool wantScaler) {
@@ -1213,7 +1314,7 @@ Surface *OpenGLGraphicsManager::createSurface(const Graphics::PixelFormat &forma
 		}
 	} else if (getGLPixelFormat(format, glIntFormat, glFormat, glType)) {
 		return new Texture(glIntFormat, glFormat, glType, format);
-	} else if (g_context.packedPixelsSupported && format == Graphics::PixelFormat(2, 5, 5, 5, 0, 10, 5, 0, 0)) {
+	} else if (OpenGLContext.packedPixelsSupported && format == Graphics::PixelFormat(2, 5, 5, 5, 0, 10, 5, 0, 0)) {
 		// OpenGL ES does not support a texture format usable for RGB555.
 		// Since SCUMM uses this pixel format for some games (and there is no
 		// hope for this to change anytime soon) we use pixel format
@@ -1244,7 +1345,7 @@ bool OpenGLGraphicsManager::getGLPixelFormat(const Graphics::PixelFormat &pixelF
 		glFormat = GL_RGBA;
 		glType = GL_UNSIGNED_BYTE;
 		return true;
-	} else if (!g_context.packedPixelsSupported) {
+	} else if (!OpenGLContext.packedPixelsSupported) {
 		return false;
 	} else if (pixelFormat == Graphics::PixelFormat(2, 5, 6, 5, 0, 11, 5, 0, 0)) { // RGB565
 		glIntFormat = GL_RGB;
@@ -1346,6 +1447,14 @@ void OpenGLGraphicsManager::recalculateDisplayAreas() {
 
 	WindowedGraphicsManager::recalculateDisplayAreas();
 
+#if !USE_FORCED_GLES
+	if (_libretroPipeline) {
+		const GLTexture &gameScreenTexture = _gameScreen->getGLTexture();
+		_libretroPipeline->setDisplaySizes(gameScreenTexture.getLogicalWidth(), gameScreenTexture.getLogicalHeight(),
+				_gameDrawRect);
+	}
+#endif
+
 	// Setup drawing limitation for game graphics.
 	// This involves some trickery because OpenGL's viewport coordinate system
 	// is upside down compared to ours.
@@ -1354,8 +1463,8 @@ void OpenGLGraphicsManager::recalculateDisplayAreas() {
 	                          _gameDrawRect.width(),
 	                          _gameDrawRect.height());
 
-	_shakeOffsetScaled = Common::Point(_gameScreenShakeXOffset * _activeArea.drawRect.width() / _activeArea.width,
-		_gameScreenShakeYOffset * _activeArea.drawRect.height() / _activeArea.height);
+	_shakeOffsetScaled = Common::Point(_gameScreenShakeXOffset * _gameDrawRect.width() / _currentState.gameWidth,
+		_gameScreenShakeYOffset * _gameDrawRect.height() / _currentState.gameHeight);
 
 	// Update the cursor position to adjust for new display area.
 	setMousePosition(_cursorX, _cursorY);
@@ -1401,6 +1510,30 @@ void OpenGLGraphicsManager::recalculateCursorScaling() {
 		_cursorHotspotYScaled = fracToInt(_cursorHotspotYScaled * screenScaleFactorY);
 		_cursorHeightScaled   = fracToInt(_cursorHeightScaled   * screenScaleFactorY);
 	}
+}
+
+void OpenGLGraphicsManager::updateLinearFiltering() {
+#if !USE_FORCED_GLES
+	if (_libretroPipeline) {
+		_libretroPipeline->enableLinearFiltering(_currentState.filtering);
+	}
+#endif
+
+	if (_gameScreen) {
+		_gameScreen->enableLinearFiltering(_currentState.filtering);
+	}
+
+	if (_cursor) {
+		_cursor->enableLinearFiltering(_currentState.filtering);
+	}
+
+	// The overlay UI should also obey the filtering choice (managed via the Filter Graphics checkbox in Graphics Tab).
+	// Thus, when overlay filtering is disabled, scaling in OPENGL is done with GL_NEAREST (nearest neighbor scaling).
+	// It may look crude, but it should be crispier and it's left to user choice to enable filtering.
+	if (_overlay) {
+		_overlay->enableLinearFiltering(_currentState.filtering);
+	}
+
 }
 
 #ifdef USE_OSD

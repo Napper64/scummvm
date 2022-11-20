@@ -117,11 +117,11 @@ static const ADGameDescription gameDescriptions[] = {
 	// Bugreport #11074
 	{
 		"neverhood",
-		_s("Missing game code"), // Reason for being unsupported
+		"",
 		AD_ENTRY1s("hd.blb", "c791725bbbc23c0f8bf78eece4555565", 4308928),
 		Common::JA_JPN,
 		Common::kPlatformWindows,
-		ADGF_DROPPLATFORM | ADGF_UNSUPPORTED,
+		ADGF_DROPPLATFORM,
 		GUIO1(GUIO_NONE)
 	},
 
@@ -130,61 +130,24 @@ static const ADGameDescription gameDescriptions[] = {
 
 } // End of namespace Neverhood
 
-static const ExtraGuiOption neverhoodExtraGuiOption1 = {
-	_s("Use original save/load screens"),
-	_s("Use the original save/load screens instead of the ScummVM ones"),
-	"originalsaveload",
-	false,
-	0,
-	0
-};
-
-static const ExtraGuiOption neverhoodExtraGuiOption2 = {
-	_s("Skip the Hall of Records storyboard scenes"),
-	_s("Allows the player to skip past the Hall of Records storyboard scenes"),
-	"skiphallofrecordsscenes",
-	false,
-	0,
-	0
-};
-
-static const ExtraGuiOption neverhoodExtraGuiOption3 = {
-	_s("Scale the making of videos to full screen"),
-	_s("Scale the making of videos, so that they use the whole screen"),
-	"scalemakingofvideos",
-	false,
-	0,
-	0
-};
-
 
 class NeverhoodMetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
 	NeverhoodMetaEngineDetection() : AdvancedMetaEngineDetection(Neverhood::gameDescriptions, sizeof(ADGameDescription), neverhoodGames) {
-		_guiOptions = GUIO2(GUIO_NOSUBTITLES, GUIO_NOMIDI);
-	}
-
-	const char *getEngineId() const override {
-		return "neverhood";
+		_guiOptions = GUIO5(GUIO_NOSUBTITLES, GUIO_NOMIDI, GAMEOPTION_ORIGINAL_SAVELOAD, GAMEOPTION_SKIP_HALL_OF_RECORDS, GAMEOPTION_SCALE_MAKING_OF_VIDEOS);
 	}
 
 	const char *getName() const override {
+		return "neverhood";
+	}
+
+	const char *getEngineName() const override {
 		return "The Neverhood Chronicles";
 	}
 
 	const char *getOriginalCopyright() const override {
 		return "The Neverhood Chronicles (C) The Neverhood, Inc.";
 	}
-
-	const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const override;
 };
-
-const ExtraGuiOptions NeverhoodMetaEngineDetection::getExtraGuiOptions(const Common::String &target) const {
-	ExtraGuiOptions options;
-	options.push_back(neverhoodExtraGuiOption1);
-	options.push_back(neverhoodExtraGuiOption2);
-	options.push_back(neverhoodExtraGuiOption3);
-	return options;
-}
 
 REGISTER_PLUGIN_STATIC(NEVERHOOD_DETECTION, PLUGIN_TYPE_ENGINE_DETECTION, NeverhoodMetaEngineDetection);

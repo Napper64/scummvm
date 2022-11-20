@@ -41,7 +41,11 @@ enum InputEvent {
 	kInputApplicationRestoreState,
 	kInputSwipe,
 	kInputTap,
-	kInputMainMenu
+	kInputMainMenu,
+	kInputJoystickAxisMotion,
+	kInputJoystickButtonDown,
+	kInputJoystickButtonUp,
+	kInputChanged
 };
 
 enum ScreenOrientation {
@@ -65,7 +69,7 @@ enum UIViewTapDescription {
 
 struct VideoContext {
 	VideoContext() : asprectRatioCorrection(), screenWidth(), screenHeight(), overlayVisible(false),
-	                 overlayWidth(), overlayHeight(), mouseX(), mouseY(),
+	                 overlayInGUI(false), overlayWidth(), overlayHeight(), mouseX(), mouseY(),
 	                 mouseHotspotX(), mouseHotspotY(), mouseWidth(), mouseHeight(),
 	                 mouseIsVisible(), filtering(false), shakeXOffset(), shakeYOffset() {
 	}
@@ -77,6 +81,7 @@ struct VideoContext {
 
 	// Overlay state
 	bool overlayVisible;
+	bool overlayInGUI;
 	uint overlayWidth, overlayHeight;
 	Graphics::Surface overlayTexture;
 
@@ -112,7 +117,6 @@ bool iOS7_isBigDevice();
 
 void iOS7_buildSharedOSystemInstance();
 void iOS7_main(int argc, char **argv);
-void *iOS7_getProcAddress(const char *name);
 const char *iOS7_getDocumentsDir();
 bool iOS7_touchpadModeEnabled();
 

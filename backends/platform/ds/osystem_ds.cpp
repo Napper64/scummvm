@@ -46,7 +46,7 @@ OSystem_DS *OSystem_DS::_instance = NULL;
 OSystem_DS::OSystem_DS()
 	: _eventSource(NULL), _disableCursorPalette(true),
 	_graphicsMode(GFX_HWSCALE), _stretchMode(100),
-	_paletteDirty(false), _cursorDirty(false),
+	_paletteDirty(false), _cursorDirty(false), _overlayInGUI(false),
 	_pfCLUT8(Graphics::PixelFormat::createFormatCLUT8()),
 	_pfABGR1555(Graphics::PixelFormat(2, 5, 5, 5, 1, 0, 5, 10, 15)),
 	_callbackTimer(10), _currentTimeMillis(0), _subScreenActive(true)
@@ -136,8 +136,29 @@ void OSystem_DS::quit() {
 
 void OSystem_DS::logMessage(LogMessageType::Type type, const char *message) {
 #ifndef DISABLE_TEXT_CONSOLE
-	printf("%s", message);
+	if (type == LogMessageType::kError) {
+		printf("\x1b[41m%s\x1b[39m", message);
+	} else {
+		printf("%s", message);
+	}
 #endif
+}
+
+void OSystem_DS::messageBox(LogMessageType::Type type, const char *message) {
+	if (type == LogMessageType::kError) {
+#ifdef DISABLE_TEXT_CONSOLE
+		consoleDemoInit();
+		printf("\x1b[41m%s\x1b[39m", message);
+#endif
+
+		printf("\nPress any button to continue\n");
+
+		while(1) {
+			swiWaitForVBlank();
+			scanKeys();
+			if (keysDown()) break;
+		}
+	}
 }
 
 static const Common::HardwareInputTableEntry ndsJoystickButtons[] = {

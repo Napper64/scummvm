@@ -23,6 +23,7 @@
 
 #include "engines/advancedDetector.h"
 
+#include "common/config-manager.h"
 #include "common/translation.h"
 #include "common/savefile.h"
 #include "common/str-array.h"
@@ -30,7 +31,6 @@
 
 #include "toltecs/toltecs.h"
 #include "toltecs/detection.h"
-
 
 static const PlainGameDescriptor toltecsGames[] = {
 	{"toltecs", "3 Skulls of the Toltecs"},
@@ -51,7 +51,7 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
@@ -65,7 +65,7 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
@@ -79,7 +79,7 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_PIRATED,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
@@ -92,7 +92,7 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			Common::RU_RUS,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
@@ -105,7 +105,7 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			Common::DE_DEU,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
@@ -119,7 +119,7 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			Common::PL_POL,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
@@ -132,7 +132,7 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			Common::FR_FRA,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
@@ -145,7 +145,7 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			Common::ES_ESP,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
@@ -159,7 +159,7 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			Common::HU_HUN,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
@@ -173,7 +173,7 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			Common::CS_CZE,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
@@ -181,12 +181,12 @@ static const ToltecsGameDescription gameDescriptions[] = {
 		// 3 Skulls of the Toltecs English Demo version
 		{
 			"toltecs",
-			0,
+			"Demo",
 			AD_ENTRY1s("WESTERN", "53a0abd1c0bc5cad8ba18f0e56877705", 46241833),
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_DEMO,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
@@ -194,13 +194,26 @@ static const ToltecsGameDescription gameDescriptions[] = {
 		// 3 Skulls of the Toltecs German Demo version
 		{
 			"toltecs",
-			0,
+			"Demo",
 			AD_ENTRY1s("WESTERN", "1c85e82712d24f1d5c1ea2a66ddd75c2", 47730038),
 			Common::DE_DEU,
 			Common::kPlatformDOS,
 			ADGF_DEMO,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
+	},
+
+	{
+		// Fenimore Fillmore: 3 Skulls of the Toltecs, 2019 Casual Brothers remaster (GOG, Steam)
+		{
+			"toltecs",
+			_s("Missing game code"), // Reason for being unsupported
+			AD_ENTRY1s("RData.lzma", "e0adae53ab5e821595a64032a4c2d5bc", 653477695),
+			Common::UNK_LANG,
+			Common::kPlatformWindows,
+			ADGF_REMASTERED | ADGF_UNSUPPORTED,
+			GUIO1(GUIO_NONE)
+		}
 	},
 
 	{ AD_TABLE_END_MARKER }
@@ -208,39 +221,22 @@ static const ToltecsGameDescription gameDescriptions[] = {
 
 } // End of namespace Toltecs
 
-static const ExtraGuiOption toltecsExtraGuiOption = {
-	_s("Use original save/load screens"),
-	_s("Use the original save/load screens instead of the ScummVM ones"),
-	"originalsaveload",
-	false,
-	0,
-	0
-};
-
 class ToltecsMetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
 	ToltecsMetaEngineDetection() : AdvancedMetaEngineDetection(Toltecs::gameDescriptions, sizeof(Toltecs::ToltecsGameDescription), toltecsGames) {
 	}
 
-	const char *getEngineId() const override {
+	const char *getName() const override {
 		return "toltecs";
 	}
 
-	const char *getName() const override {
+	const char *getEngineName() const override {
 		return "3 Skulls of the Toltecs";
 	}
 
 	const char *getOriginalCopyright() const override {
 		return "3 Skulls of the Toltecs (C) Revistronic 1996";
 	}
-
-	const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const override;
 };
-
-const ExtraGuiOptions ToltecsMetaEngineDetection::getExtraGuiOptions(const Common::String &target) const {
-	ExtraGuiOptions options;
-	options.push_back(toltecsExtraGuiOption);
-	return options;
-}
 
 REGISTER_PLUGIN_STATIC(TOLTECS_DETECTION, PLUGIN_TYPE_ENGINE_DETECTION, ToltecsMetaEngineDetection);

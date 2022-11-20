@@ -26,6 +26,7 @@
 
 #include "common/array.h"
 #include "common/fs.h"
+#include "common/rect.h"
 #include "common/str.h"
 #include "common/str-array.h"
 
@@ -41,8 +42,11 @@ namespace Common {
  * @brief API for Macintosh resource fork manager.
  *
  * @details Used in engines:
+ *          - director
  *          - groovie
+ *          - kyra
  *          - mohawk
+ *          - mtropolis
  *          - pegasus
  *          - sci
  *          - scumm
@@ -51,6 +55,68 @@ namespace Common {
 
 typedef Array<uint16> MacResIDArray;
 typedef Array<uint32> MacResTagArray;
+
+/**
+ * Class containing the raw data bytes for a Macintosh Finder Info data block.
+ */
+struct MacFinderInfoData {
+	byte data[16];
+};
+
+/**
+ * Class containing the raw data bytes for a Macintosh Extended Finder Info data block.
+ */
+struct MacFinderExtendedInfoData {
+	byte data[16];
+};
+
+/**
+ * Class containing Macintosh Finder Info.
+ */
+struct MacFinderInfo {
+	enum FinderFlags {
+		kFinderFlagAlias = (1 << 15),
+		kFinderFlagInvisible = (1 << 14),
+		kFinderFlagBundle = (1 << 13),
+		kFinderFlagNameLocked = (1 << 12),
+		kFinderFlagStationery = (1 << 11),
+		kFinderFlagCustomIcon = (1 << 10),
+		kFinderFlagInited = (1 << 8),
+		kFinderFlagNoInit = (1 << 7),
+		kFinderFlagShared = (1 << 6),
+
+		kFinderFlagColorBit2 = (1 << 3),
+		kFinderFlagColorBit1 = (1 << 2),
+		kFinderFlagColorBit0 = (1 << 1),
+	};
+
+	MacFinderInfo();
+	explicit MacFinderInfo(const MacFinderInfoData &data);
+
+	MacFinderInfoData toData() const;
+
+	byte type[4];
+	byte creator[4];
+	uint16 flags;
+	Common::Point position;
+	int16 windowID;
+};
+
+/**
+ * Class containing Macintosh Extended Finder Info.
+ */
+struct MacFinderExtendedInfo {
+	static const uint kDataSize = 16;
+
+	MacFinderExtendedInfo();
+	explicit MacFinderExtendedInfo(const MacFinderExtendedInfoData &data);
+
+	MacFinderExtendedInfoData toData() const;
+
+	int16 iconID;
+	int16 commentID;
+	int32 homeDirectoryID;
+};
 
 /**
  * Class for handling Mac data and resource forks.
@@ -85,6 +151,13 @@ public:
 	 * @return True on success
 	 */
 	bool open(const Path &fileName, Archive &archive);
+
+	/**
+	 * Opens file named fileName or data fork extracted as macbin
+	 * @return The stream if found, 0 otherwise
+	 */
+	static SeekableReadStream *openFileOrDataFork(const Path &fileName, Archive &archive);
+	static SeekableReadStream *openFileOrDataFork(const Path &fileName);
 
 	/**
 	 * See if a Mac data/resource fork pair exists.
@@ -195,7 +268,7 @@ public:
 	/**
 	 * Load from stream in MacBinary format
 	 */
-	bool loadFromMacBinary(SeekableReadStream &stream);
+	bool loadFromMacBinary(SeekableReadStream *stream);
 
 	/**
 	 * Dump contents of the archive to ./dumps directory
@@ -224,10 +297,10 @@ private:
 	SeekableReadStream *_stream;
 	Path _baseFileName;
 
-	bool load(SeekableReadStream &stream);
+	bool load(SeekableReadStream *stream);
 
-	bool loadFromRawFork(SeekableReadStream &stream);
-	bool loadFromAppleDouble(SeekableReadStream &stream);
+	bool loadFromRawFork(SeekableReadStream *stream);
+	bool loadFromAppleDouble(SeekableReadStream *stream);
 
 	static Path constructAppleDoubleName(Path name);
 	static Path disassembleAppleDoubleName(Path name, bool *isAppleDouble);

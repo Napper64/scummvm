@@ -104,9 +104,10 @@ bool engine_init_backend() {
 }
 
 void winclosehook() {
-	_G(want_exit) = 1;
-	_G(abort_engine) = 1;
+	_G(want_exit) = true;
+	_G(abort_engine) = true;
 	_G(check_dynamic_sprites_at_exit) = 0;
+	AbortGame();
 }
 
 void engine_setup_window() {
@@ -509,7 +510,6 @@ void show_preload() {
 
 int engine_init_sprites() {
 	Debug::Printf(kDbgMsg_Info, "Initialize sprites");
-
 	HError err = _GP(spriteset).InitFile(SpriteFile::DefaultSpriteFileName, SpriteFile::DefaultSpriteIndexName);
 	if (!err) {
 		sys_main_shutdown();
@@ -521,6 +521,8 @@ int engine_init_sprites() {
 		return EXIT_ERROR;
 	}
 
+	if (_GP(usetup).SpriteCacheSize > 0)
+		_GP(spriteset).SetMaxCacheSize(_GP(usetup).SpriteCacheSize);
 	return 0;
 }
 
@@ -558,18 +560,10 @@ void engine_init_game_settings() {
 	if (_G(playerchar)->view >= 0)
 		precache_view(_G(playerchar)->view);
 
-	/*  dummygui.guiId = -1;
-	dummyguicontrol.guin = -1;
-	dummyguicontrol.objn = -1;*/
-
 	_G(our_eip) = -6;
-	//  _GP(game).chars[0].talkview=4;
-	//init_language_text(_GP(game).langcodes[0]);
 
 	for (ee = 0; ee < MAX_ROOM_OBJECTS; ee++) {
 		_G(scrObj)[ee].id = ee;
-		// 64 bit: Using the id instead
-		// _G(scrObj)[ee].obj = NULL;
 	}
 
 	for (ee = 0; ee < _GP(game).numcharacters; ee++) {
@@ -737,7 +731,7 @@ void engine_init_game_settings() {
 	_GP(play).speech_textwindow_gui = _GP(game).options[OPT_TWCUSTOM];
 	if (_GP(play).speech_textwindow_gui == 0)
 		_GP(play).speech_textwindow_gui = -1;
-	strcpy(_GP(play).game_name, _GP(game).gamename);
+	snprintf(_GP(play).game_name, sizeof(_GP(play).game_name), "%s", _GP(game).gamename);
 	_GP(play).lastParserEntry[0] = 0;
 	_GP(play).follow_change_room_timer = 150;
 	for (ee = 0; ee < MAX_ROOM_BGFRAMES; ee++)
@@ -749,6 +743,8 @@ void engine_init_game_settings() {
 
 	GUI::Options.DisabledStyle = static_cast<GuiDisableStyle>(_GP(game).options[OPT_DISABLEOFF]);
 	GUI::Options.ClipControls = _GP(game).options[OPT_CLIPGUICONTROLS] != 0;
+	// Force GUI metrics recalculation, accomodating for loaded fonts
+	GUI::MarkForFontUpdate(-1);
 
 	memset(&_GP(play).walkable_areas_on[0], 1, MAX_WALK_AREAS + 1);
 	memset(&_GP(play).script_timers[0], 0, MAX_TIMERS * sizeof(int));
@@ -1174,7 +1170,7 @@ int initialize_engine(const ConfigTree &startup_opts) {
 	// Configure game window after renderer was initialized
 	engine_setup_window();
 
-	SetMultitasking(0);
+	SetMultitasking(_GP(usetup).multitasking);
 
 	sys_window_show_cursor(false); // hide the system cursor
 

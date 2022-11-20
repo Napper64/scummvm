@@ -35,6 +35,33 @@
 
 namespace Cine {
 
+static const ADExtraGuiOptionsMap optionsList[] = {
+	{
+		GAMEOPTION_ORIGINAL_SAVELOAD,
+		{
+			_s("Use original save/load screens"),
+			_s("Use the original save/load screens instead of the ScummVM ones"),
+			"originalsaveload",
+			false,
+			0,
+			0
+		}
+	},
+	{
+		GAMEOPTION_TRANSPARENT_DIALOG_BOXES,
+		{
+			_s("Use transparent dialog boxes in 16 color scenes"),
+			_s("Use transparent dialog boxes in 16 color scenes even if the original game version did not support them"),
+			"transparentdialogboxes",
+			false,
+			0,
+			0
+		}
+	},
+
+	AD_EXTRA_GUI_OPTIONS_TERMINATOR
+};
+
 #define MAX_SAVEGAMES (ARRAYSIZE(Cine::currentSaveName))
 #define SAVEGAME_NAME_LEN (sizeof(Cine::currentSaveName[0]))
 #define SAVELIST_SIZE (MAX_SAVEGAMES * SAVEGAME_NAME_LEN)
@@ -51,6 +78,10 @@ class CineMetaEngine : public AdvancedMetaEngine {
 public:
 	const char *getName() const override {
 		return "cine";
+	}
+
+	const ADExtraGuiOptionsMap *getAdvancedExtraGuiOptions() const override {
+		return Cine::optionsList;
 	}
 
 	Common::Error createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override;
@@ -161,7 +192,7 @@ SaveStateList CineMetaEngine::listSaves(const char *target) const {
 int CineMetaEngine::getMaximumSaveSlot() const { return MAX_SAVEGAMES - 1; }
 
 Common::String CineMetaEngine::getSavegameFile(int saveGameIdx, const char *target) const {
-	return Common::String::format("%s.%d", target == nullptr ? getEngineId() : target, saveGameIdx);
+	return Common::String::format("%s.%d", target == nullptr ? getName() : target, saveGameIdx);
 }
 
 SaveStateDescriptor CineMetaEngine::querySaveMetaInfos(const char *target, int slot) const {

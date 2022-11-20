@@ -111,10 +111,16 @@ public:
 	bool renderTransition(uint16 frameId);
 	void renderFrame(uint16 frameId, RenderMode mode = kRenderModeNormal);
 	void renderSprites(uint16 frameId, RenderMode mode = kRenderModeNormal);
+	bool renderPrePaletteCycle(uint16 frameId, RenderMode mode = kRenderModeNormal);
+	void renderPaletteCycle(uint16 frameId, RenderMode mode = kRenderModeNormal);
 	void renderCursor(Common::Point pos, bool forceUpdate = false);
 	void updateWidgets(bool hasVideoPlayback);
 
-	void playSoundChannel(uint16 frameId);
+	void invalidateRectsForMember(CastMember *member);
+
+	void playSoundChannel(uint16 frameId, bool puppetOnly);
+
+	Common::String formatChannelInfo();
 
 private:
 	void update();
@@ -136,10 +142,14 @@ public:
 	byte _puppetTempo;
 	bool _puppetPalette;
 	int _lastPalette;
+	int _paletteTransitionIndex;
+	byte _paletteSnapshotBuffer[768];
 
 	PlayState _playState;
 	uint32 _nextFrameTime;
+	int _lastTempo;
 	int _waitForChannel;
+	int _waitForVideoChannel;
 	bool _waitForClick;
 	bool _waitForClickCursor;
 	bool _cursorDirty;

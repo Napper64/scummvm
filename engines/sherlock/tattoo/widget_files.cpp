@@ -157,7 +157,7 @@ void WidgetFiles::render(FilesRenderMode mode) {
 		yp += _surface.fontHeight() + 1;
 	}
 
-	// Draw the Scrollbar if neccessary
+	// Draw the Scrollbar if necessary
 	if (mode != RENDER_NAMES)
 		drawScrollBar(_savegameIndex, FILES_LINES_COUNT, _savegames.size());
 }
@@ -210,7 +210,7 @@ void WidgetFiles::handleEvents() {
 		}
 	}
 
-	// Only redraw the window if the the scrollbar position has changed
+	// Only redraw the window if the scrollbar position has changed
 	if (ui._scrollHighlight != oldHighlight || oldScrollIndex != _savegameIndex || _selector != _oldSelector)
 		render(RENDER_NAMES_AND_SCROLLBAR);
 	_oldSelector = _selector;

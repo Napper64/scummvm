@@ -21,6 +21,7 @@
 
 
 #include "bladerunner/bladerunner.h"
+#include "bladerunner/detection.h"
 #include "bladerunner/savefile.h"
 
 #include "backends/keymapper/action.h"
@@ -35,9 +36,98 @@
 
 #include "engines/advancedDetector.h"
 
+namespace BladeRunner {
+
+static const ADExtraGuiOptionsMap optionsList[] = {
+	{
+		GAMEOPTION_SITCOM,
+		{
+			_s("Sitcom mode"),
+			_s("Game will add laughter after actor's line or narration"),
+			"sitcom",
+			false,
+			0,
+			0
+		}
+	},
+	{
+		GAMEOPTION_SHORTY,
+		{
+			_s("Shorty mode"),
+			_s("Game will shrink the actors and make their voices high pitched"),
+			"shorty",
+			false,
+			0,
+			0
+		}
+	},
+	{
+		GAMEOPTION_FRAMELIMITER_NODELAYMILLIS,
+		{
+			_s("Frame limiter high performance mode"),
+			_s("This mode may result in high CPU usage! It avoids use of delayMillis() function."),
+			"nodelaymillisfl",
+			false,
+			0,
+			0
+		}
+	},
+	{
+		GAMEOPTION_FRAMELIMITER_FPS,
+		{
+			_s("Max frames per second limit"),
+			_s("This mode targets a maximum of 120 fps. When disabled, the game targets 60 fps"),
+			"frames_per_secondfl",
+			false,
+			0,
+			0
+		}
+	},
+	{
+		GAMEOPTION_DISABLE_STAMINA_DRAIN,
+		{
+			_s("Disable McCoy's quick stamina drain"),
+			_s("When running, McCoy won't start slowing down as soon as the player stops clicking the mouse"),
+			"disable_stamina_drain",
+			false,
+			0,
+			0
+		}
+	},
+	{
+		GAMEOPTION_SHOW_SUBS_IN_CRAWL,
+		{
+			_s("Show subtitles during text crawl"),
+			_s("During the intro cutscene, show subtitles during the text crawl"),
+			"use_crawl_subs",
+			true,
+			0,
+			0
+		}
+	},
+	{
+		GAMEOPTION_FIX_SPANISH_CREDITS,
+		{
+			_s("Fix credits for voice actors"),
+			_s("Updates the end credits with corrected credits for the Spanish voice actors"),
+			"correct_spanish_credits",
+			false,
+			0,
+			0
+		}
+	},
+	AD_EXTRA_GUI_OPTIONS_TERMINATOR
+};
+
+} // End of namespace BladeRunner
+
 class BladeRunnerMetaEngine : public AdvancedMetaEngine {
 public:
 	const char *getName() const override;
+
+	const ADExtraGuiOptionsMap *getAdvancedExtraGuiOptions() const override {
+		return BladeRunner::optionsList;
+	}
 
 	Common::Error createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override;
 	bool hasFeature(MetaEngineFeature f) const override;
@@ -86,6 +176,8 @@ Common::KeymapArray BladeRunnerMetaEngine::initKeymaps(const char *target) const
 		gameDesc = "Blade Runner";
 	} else if (gameId == "bladerunner-final") {
 		gameDesc = "Blade Runner (Restored Content)";
+	} else if (gameId == "bladerunner-ee") {
+		gameDesc = "Blade Runner: Enhanced Edition";
 	}
 
 	if (gameDesc.empty()) {
@@ -212,6 +304,14 @@ Common::KeymapArray BladeRunnerMetaEngine::initKeymaps(const char *target) const
 	act->setCustomEngineActionEvent(BladeRunnerEngine::kMpActionScrollDown);
 	act->addDefaultInputMapping("MOUSE_WHEEL_DOWN");
 	act->addDefaultInputMapping("JOY_DOWN");
+	kiaOnlyKeymap->addAction(act);
+
+	// I18N: This keymap allows (in KIA only) for a clue to be set as private or public
+	// (only when the KIA is upgraded).
+	act = new Action("KIATOGGLECLUEPRIVACY", _("Toggle Clue Privacy"));
+	act->setCustomEngineActionEvent(BladeRunnerEngine::kMpActionToggleCluePrivacy);
+	act->addDefaultInputMapping("MOUSE_RIGHT");
+	act->addDefaultInputMapping("JOY_RIGHT_SHOULDER");
 	kiaOnlyKeymap->addAction(act);
 
 	// I18N: This keymap opens KIA's HELP tab.

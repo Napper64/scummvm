@@ -214,12 +214,12 @@ void apply_debug_config(const ConfigTree &cfg) {
 	legacy_log_enabled, {
 		DbgGroupOption(kDbgGroup_Main, kDbgMsg_All),
 		DbgGroupOption(kDbgGroup_Game, kDbgMsg_Info),
-#ifdef DEBUG_SPRITECACHE
+#if DEBUG_SPRITECACHE
 		DbgGroupOption(kDbgGroup_SprCache, kDbgMsg_All),
 #else
 		DbgGroupOption(kDbgGroup_SprCache, kDbgMsg_Info),
 #endif
-#ifdef DEBUG_MANAGED_OBJECTS
+#if DEBUG_MANAGED_OBJECTS
 		DbgGroupOption(kDbgGroup_ManObj, kDbgMsg_All),
 #else
 		DbgGroupOption(kDbgGroup_ManObj, kDbgMsg_Info),
@@ -309,8 +309,8 @@ void debug_script_log(const char *msg, ...) {
 }
 
 struct Breakpoint {
-	char scriptName[80];
-	int lineNumber;
+	char scriptName[80]{};
+	int lineNumber = 0;
 };
 
 bool send_message_to_editor(const char *msg, const char *errorMsg) {
@@ -360,9 +360,11 @@ bool init_editor_debugging() {
 		}
 
 		send_message_to_editor("START");
+		Debug::Printf(kDbgMsg_Info, "External debugger initialized");
 		return true;
 	}
 
+	Debug::Printf(kDbgMsg_Error, "Failed to initialize external debugger");
 	return false;
 }
 
@@ -395,32 +397,28 @@ int check_for_messages_from_editor() {
 			bool isDelete = (msgPtr[0] == 'D');
 			// Format:  SETBREAK $scriptname$lineNumber$
 			msgPtr += 10;
-			char scriptNameBuf[100];
-			int i = 0;
-			while (msgPtr[0] != '$') {
-				scriptNameBuf[i] = msgPtr[0];
-				msgPtr++;
-				i++;
+			char scriptNameBuf[sizeof(Breakpoint::scriptName)]{};
+			for (size_t i = 0; msgPtr[0] != '$'; ++msgPtr, ++i) {
+				if (i < sizeof(scriptNameBuf) - 1)
+					scriptNameBuf[i] = msgPtr[0];
 			}
-			scriptNameBuf[i] = 0;
 			msgPtr++;
 
 			int lineNumber = atoi(msgPtr);
 
 			if (isDelete) {
-				for (i = 0; i < _G(numBreakpoints); i++) {
+				for (size_t i = 0; i < _G(breakpoints).size(); ++i) {
 					if ((_G(breakpoints)[i].lineNumber == lineNumber) &&
 					        (strcmp(_G(breakpoints)[i].scriptName, scriptNameBuf) == 0)) {
-						_G(numBreakpoints)--;
 						_G(breakpoints).erase(_G(breakpoints).begin() + i);
 						break;
 					}
 				}
 			} else {
-				_G(breakpoints).push_back(Globals::Breakpoint());
-				strcpy(_G(breakpoints)[_G(numBreakpoints)].scriptName, scriptNameBuf);
-				_G(breakpoints)[_G(numBreakpoints)].lineNumber = lineNumber;
-				_G(numBreakpoints)++;
+				Globals::Breakpoint bp;
+				snprintf(bp.scriptName, sizeof(Breakpoint::scriptName), "%s", scriptNameBuf);
+				bp.lineNumber = lineNumber;
+				_G(breakpoints).push_back(bp);
 			}
 		} else if (strncmp(msgPtr, "RESUME", 6) == 0) {
 			_G(game_paused_in_debugger) = 0;
@@ -428,8 +426,8 @@ int check_for_messages_from_editor() {
 			_G(game_paused_in_debugger) = 0;
 			_G(break_on_next_script_step) = 1;
 		} else if (strncmp(msgPtr, "EXIT", 4) == 0) {
-			_G(want_exit) = 1;
-			_G(abort_engine) = 1;
+			_G(want_exit) = true;
+			_G(abort_engine) = true;
 			_G(check_dynamic_sprites_at_exit) = 0;
 		}
 
@@ -445,7 +443,7 @@ int check_for_messages_from_editor() {
 
 bool send_exception_to_editor(const char *qmsg) {
 #if AGS_PLATFORM_OS_WINDOWS
-	_G(want_exit) = 0;
+	_G(want_exit) = false;
 	// allow the editor to break with the error message
 	if (editor_window_handle != NULL)
 		SetForegroundWindow(editor_window_handle);
@@ -453,7 +451,7 @@ bool send_exception_to_editor(const char *qmsg) {
 	if (!send_message_to_editor("ERROR", qmsg))
 		return false;
 
-	while ((check_for_messages_from_editor() == 0) && (_G(want_exit) == 0)) {
+	while ((check_for_messages_from_editor() == 0) && (!_G(want_exit))) {
 		_G(platform)->Delay(10);
 	}
 #endif
@@ -505,7 +503,7 @@ void scriptDebugHook(ccInstance *ccinst, int linenum) {
 
 	const char *scriptName = ccinst->runningInst->instanceof->GetSectionName(ccinst->pc);
 
-	for (int i = 0; i < _G(numBreakpoints); i++) {
+	for (size_t i = 0; i < _G(breakpoints).size(); ++i) {
 		if ((_G(breakpoints)[i].lineNumber == linenum) &&
 		        (strcmp(_G(breakpoints)[i].scriptName, scriptName) == 0)) {
 			break_into_debugger();

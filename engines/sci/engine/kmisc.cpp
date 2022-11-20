@@ -55,9 +55,46 @@ reg_t kRestartGame16(EngineState *s, int argc, reg_t *argv) {
 	return NULL_REG;
 }
 
-/* kGameIsRestarting():
-** Returns the restarting_flag in acc
-*/
+/** 
+ * kGameIsRestarting returns the EngineState::gameIsRestarting flag.
+ * If zero is passed then the flag is cleared before returning its previous value.
+ *
+ * kGameIsRestarting(0) is unique because it is called by (almost) every game from
+ * the game loop (Game:doit, etc) and nowhere else. For that reason, we use this
+ * normally simple function as our main speed throttler. It prevents unthrottled
+ * games from running as fast as the CPU will allow. This creates a consistent
+ * playable experience and avoids the many script bugs that occur when thousands
+ * of game cycles run per second on a modern CPU.
+ *
+ * Early games throttle their own speed by calling kWait on every game cycle.
+ * The delay passed to kWait is the game speed selected by the user. At every speed
+ * except the fastest (kWait(1), or 17 ms) the kWait delay is greater than our
+ * speed throttle delay (30 ms). This means that our kGameIsRestarting throttle
+ * has no effect on these games other than to make the user-selected fastest speed
+ * run barely faster than the next-fastest selection (33 ms). It's unclear if that
+ * is intentional or a side-effect of throttling meant for unthrottled games.
+ * The speed throttling code is over a decade old and its details were uncommented.
+ * There have also been significant fixes to ScummVM's SCI timing code since then.
+ * It may be better to remove kGameIsRestarting throttling from kWait games to
+ * simplify things instead of having two overlapping throttlers run. That would
+ * allow those to run at their original speed when the user selects Fastest.
+ * kWait games are not the ones that run too fast at fast CPU speeds.
+ *
+ * If a scene in a game needs to be throttled further for compatibility then we
+ * add a workaround here. We also use script patches to make unthrottled inner loops
+ * call this function so that the program remains responsive and delays are
+ * consistent instead of CPU-bound.
+ *
+ * kGameIsRestarting was removed from SCI2 but Sierra left it in the PC interpreter
+ * as a no-op. Game scripts kept calling it even though it didn't do anything.
+ * That allows us to keep throttling those games this way; this is why this function
+ * is included in the kernel table for all SCI versions. SCI2 Mac scripts removed
+ * the call so they are unthrottled by this mechanism. They currently run faster
+ * than their PC versions. kGameIsRestarting was completely removed from SCI3.
+ *
+ * SCI2+ games (or versions) that don't call kGameIsRestarting are still limited
+ * to 60fps by GfxFrameout::throttle().
+ */
 reg_t kGameIsRestarting(EngineState *s, int argc, reg_t *argv) {
 	// Always return the previous flag value
 	const int16 previousRestartingFlag = s->gameIsRestarting;
@@ -71,7 +108,7 @@ reg_t kGameIsRestarting(EngineState *s, int argc, reg_t *argv) {
 		return make_reg(0, previousRestartingFlag);
 	}
 
-	uint32 neededSleep = 30;
+	uint32 neededSleep = g_sci->_speedThrottleDelay; // 30 ms (kSpeedThrottleDefaultDelay)
 
 	// WORKAROUNDS for scripts that are polling too quickly in scenes that
 	// are not animating much
@@ -100,17 +137,6 @@ reg_t kGameIsRestarting(EngineState *s, int argc, reg_t *argv) {
 			neededSleep = 60;
 		}
 		break;
-	case GID_SQ4:
-		// In SQ4 (floppy and CD) the sequel police appear way too quickly in
-		// the Skate-o-rama rooms, resulting in all sorts of timer issues, like
-		// #5514 (which occurs because a police officer instantly teleports
-		// just before Roger exits and shoots him). We throttle these scenes a
-		// bit more, in order to prevent timer bugs related to the sequel police.
-		if (s->currentRoomNumber() == 405 || s->currentRoomNumber() == 406 ||
-			s->currentRoomNumber() == 410 || s->currentRoomNumber() == 411) {
-			s->_throttleTrigger = true;
-			neededSleep = 60;
-		}
 	default:
 		break;
 	}
@@ -408,26 +434,26 @@ reg_t kGetConfig(EngineState *s, int argc, reg_t *argv) {
 	setting.toLowercase();
 
 	if (setting == "videospeed") {
-		s->_segMan->strcpy(data, "500");
+		s->_segMan->strcpy_(data, "500");
 	} else if (setting == "cpu") {
 		// We always return the fastest CPU setting that CPUID can detect
 		// (i.e. 586).
-		s->_segMan->strcpy(data, "586");
+		s->_segMan->strcpy_(data, "586");
 	} else if (setting == "cpuspeed") {
-		s->_segMan->strcpy(data, "500");
+		s->_segMan->strcpy_(data, "500");
 	} else if (setting == "language") {
 		Common::String languageId = Common::String::format("%d", g_sci->getSciLanguage());
-		s->_segMan->strcpy(data, languageId.c_str());
+		s->_segMan->strcpy_(data, languageId.c_str());
 	} else if (setting == "torindebug") {
 		// Used to enable the debug mode in Torin's Passage (French).
 		// If true, the debug mode is enabled.
-		s->_segMan->strcpy(data, "");
+		s->_segMan->strcpy_(data, "");
 	} else if (setting == "leakdump") {
 		// An unknown setting in LSL7. Likely used for debugging.
-		s->_segMan->strcpy(data, "");
+		s->_segMan->strcpy_(data, "");
 	} else if (setting == "startroom") {
 		// Debug setting in LSL7, specifies the room to start from.
-		s->_segMan->strcpy(data, "");
+		s->_segMan->strcpy_(data, "");
 	} else if (setting == "game") {
 		// Hoyle 5 startup, specifies the number of the game to start.
 		if (g_sci->getGameId() == GID_HOYLE5 &&
@@ -435,25 +461,25 @@ reg_t kGetConfig(EngineState *s, int argc, reg_t *argv) {
 			g_sci->getResMan()->testResource(ResourceId(kResourceTypeScript, 700))) {
 			// Special case for Hoyle 5 Bridge: only one game is included (Bridge),
 			// so mimic the setting in 700.cfg and set the starting room number to 700.
-			s->_segMan->strcpy(data, "700");
+			s->_segMan->strcpy_(data, "700");
 		} else {
-			s->_segMan->strcpy(data, "");
+			s->_segMan->strcpy_(data, "");
 		}
 	} else if (setting == "laptop") {
 		// Hoyle 5 startup.
-		s->_segMan->strcpy(data, "");
+		s->_segMan->strcpy_(data, "");
 	} else if (setting == "jumpto") {
 		// Hoyle 5 startup.
-		s->_segMan->strcpy(data, "");
+		s->_segMan->strcpy_(data, "");
 	} else if (setting == "klonchtsee") {
 		// Hoyle 5 - starting Solitaire.
-		s->_segMan->strcpy(data, "");
+		s->_segMan->strcpy_(data, "");
 	} else if (setting == "klonchtarr") {
 		// Hoyle 5 - starting Solitaire.
-		s->_segMan->strcpy(data, "");
+		s->_segMan->strcpy_(data, "");
 	} else if (setting == "deflang") {
 		// MGDX 4-language startup.
-		s->_segMan->strcpy(data, "");
+		s->_segMan->strcpy_(data, "");
 	} else {
 		error("GetConfig: Unknown configuration setting %s", setting.c_str());
 	}
@@ -462,7 +488,7 @@ reg_t kGetConfig(EngineState *s, int argc, reg_t *argv) {
 }
 
 // Likely modelled after the Windows 3.1 function GetPrivateProfileInt:
-// http://msdn.microsoft.com/en-us/library/windows/desktop/ms724345%28v=vs.85%29.aspx
+// https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getprivateprofileint
 reg_t kGetSierraProfileInt(EngineState *s, int argc, reg_t *argv) {
 	if (g_sci->getPlatform() != Common::kPlatformWindows) {
 		return s->r_acc;
@@ -597,7 +623,7 @@ reg_t kMacKq7SaveGame(EngineState *s) {
 		error("kMacKq7SaveGame: save game hasn't been initialized");
 	}
 
-	const reg_t version = s->variables[VAR_GLOBAL][kGlobalVarVersion];
+	const reg_t version = s->variables[VAR_GLOBAL][kGlobalVarVersionNew];
 	const Common::String versionString = s->_segMan->getString(version);
 	if (gamestate_save(s, s->_kq7MacSaveGameId, s->_kq7MacSaveGameDescription, versionString)) {
 		return TRUE_REG;
@@ -638,7 +664,7 @@ reg_t kMacSaveGame(EngineState *s, int argc, reg_t *argv) {
 
 	const int saveId = shiftSciToScummVMSaveId(argv[1].toUint16());
 	const Common::String description = s->_segMan->getString(argv[2]);
-	const reg_t version = s->variables[VAR_GLOBAL][kGlobalVarVersion];
+	const reg_t version = s->variables[VAR_GLOBAL][kGlobalVarVersionNew];
 	const Common::String versionString = s->_segMan->getString(version);
 	if (gamestate_save(s, saveId, description, versionString)) {
 		return TRUE_REG;
@@ -735,8 +761,6 @@ reg_t kPlatform(EngineState *s, int argc, reg_t *argv) {
 		kPlatformWin311OrHigher = 7
 	};
 
-	bool isWindows = g_sci->getPlatform() == Common::kPlatformWindows;
-
 	if (argc == 0) {
 		// This is called in KQ5CD with no parameters, where it seems to do some
 		// graphics driver check. This kernel function didn't have subfunctions
@@ -746,10 +770,9 @@ reg_t kPlatform(EngineState *s, int argc, reg_t *argv) {
 		return NULL_REG;
 	}
 
-	if (g_sci->forceHiresGraphics()) {
-		// force Windows platform, so that hires-graphics are enabled
-		isWindows = true;
-	}
+	// treat DOS with hires graphics as Windows so that hires graphics are enabled
+	bool isWindows = (g_sci->getPlatform() == Common::kPlatformWindows) ||
+		             (g_sci->getPlatform() == Common::kPlatformDOS && g_sci->forceHiresGraphics());
 
 	uint16 operation = (argc == 0) ? 0 : argv[0].toUint16();
 

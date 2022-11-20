@@ -111,7 +111,7 @@ void Lua_V1::FunctionName() {
 	lua_Object param1 = lua_getparam(1);
 
 	if (!lua_isfunction(param1)) {
-		sprintf(buf, "function InvalidArgsToFunctionName");
+		Common::sprintf_s(buf, "function InvalidArgsToFunctionName");
 		lua_pushstring(buf);
 		return;
 	}
@@ -119,28 +119,29 @@ void Lua_V1::FunctionName() {
 	lua_funcinfo(param1, &filename, &line);
 	switch (*lua_getobjname(param1, &name)) {
 	case 'g':
-		sprintf(buf, "function %.100s", name);
+		Common::sprintf_s(buf, "function %.100s", name);
 		break;
 	case 't':
-		sprintf(buf, "`%.100s' tag method", name);
+		Common::sprintf_s(buf, "`%.100s' tag method", name);
 		break;
 	default:
 		{
 			if (line == 0)
-				sprintf(buf, "main of %.100s", filename);
+				Common::sprintf_s(buf, "main of %.100s", filename);
 			else if (line < 0)
-				sprintf(buf, "%.100s", filename);
+				Common::sprintf_s(buf, "%.100s", filename);
 			else {
-				sprintf(buf, "function (%.100s:%d)", filename, (int)line);
+				Common::sprintf_s(buf, "function (%.100s:%d)", filename, (int)line);
 				filename = nullptr;
 			}
 		}
 	}
 	int curr_line = lua_currentline(param1);
+	size_t pos = strlen(buf);
 	if (curr_line > 0)
-		sprintf(buf + strlen(buf), " at line %d", curr_line);
+		Common::sprintf_s(buf + pos, sizeof(buf) - pos, " at line %d", curr_line);
 	if (filename)
-		sprintf(buf + strlen(buf), " [in file %.100s]", filename);
+		Common::sprintf_s(buf + pos, sizeof(buf) - pos, " [in file %.100s]", filename);
 	lua_pushstring(buf);
 }
 
@@ -330,7 +331,7 @@ void Lua_V1::Enumerate3DDevices() {
 	lua_Object numObj = lua_getparam(1);
 	if (!lua_isnumber(numObj))
 		return;
-/*	int num = (int)lua_getnumber(numObj);*/
+	//int num = (int)lua_getnumber(numObj);
 	lua_pushobject(result);
 	lua_pushnumber(-1.0);
 	if (g_driver->isHardwareAccelerated()) {
@@ -397,6 +398,28 @@ void Lua_V1::RotateVector() {
 	lua_settable();
 
 	lua_pushobject(resObj);
+}
+
+void Lua_V1::WorldToScreen() {
+	lua_Object worldX = lua_getparam(1);
+	lua_Object worldY = lua_getparam(2);
+	lua_Object worldZ = lua_getparam(3);
+	if (!lua_isnumber(worldX) || !lua_isnumber(worldY) || !lua_isnumber(worldZ)) {
+		return;
+	}
+	Math::Vector4d worldVec(lua_getnumber(worldX), lua_getnumber(worldY), lua_getnumber(worldZ), 1.0f);
+	Math::Matrix4 projModelView = g_driver->getProjection() * g_driver->getModelView();
+	Math::Vector4d screenPos = projModelView * worldVec;
+	screenPos /= screenPos.w();
+	float winX = (1 + screenPos.x()) / 2.0f * g_driver->getScreenWidth();
+	float winY = g_driver->getScreenHeight() - (1 + screenPos.y()) / 2.0f * g_driver->getScreenHeight();
+	if (winX >= 0 && winX < g_driver->getScreenWidth() && winY >= 0 && winY < g_driver->getScreenHeight()) {
+		lua_pushnumber(winX);
+		lua_pushnumber(winY);
+	} else {
+		lua_pushnil();
+		lua_pushnil();
+	}
 }
 
 void Lua_V1::FileFindDispose() {
@@ -491,7 +514,7 @@ void Lua_V1::GetControlState() {
 		lua_pushnumber(g_grim->getControlAxis(num));
 	else {
 		pushbool(g_grim->getControlState(num)); // key down, originaly it push number if key down
-		//pushnil or number, what is is ?
+		// pushnil or number, what is is ?
 	}
 }
 
@@ -510,8 +533,8 @@ void Lua_V1::GetSpeechMode() {
 }
 
 void Lua_V1::GetDiskFreeSpace() {
-	//the ps2 version of emi wants more than 600 KB
-	//grim: amount of free space in MB, used for creating saves
+	// The ps2 version of emi wants more than 600 KB
+	// Grim: amount of free space in MB, used for creating saves
 	lua_pushnumber(700);
 }
 
@@ -588,7 +611,7 @@ void Lua_V1::SubmitSaveGameData() {
 	}
 	savedState->endSection();
 
-	//give ps2 saves a human-readable name
+	// Give ps2 saves a human-readable name
 	if (g_grim->getGameType() == GType_MONKEY4 &&
 		g_grim->getGamePlatform() == Common::kPlatformPS2) {
 		savedState->beginSection('PS2S');
@@ -718,6 +741,7 @@ void Lua_V1::JustLoaded() {
 }
 
 void Lua_V1::EnableDebugKeys() {
+	// nothing to implement
 }
 
 void Lua_V1::FlushControls() {
@@ -762,18 +786,6 @@ void Lua_V1::SpewStartup() {
 void Lua_V1::SetCameraInterest() {
 	// nothing to implement
 	// it's referenced once in Grim dead lua code
-}
-
-void Lua_V1::GetCameraLookVector() {
-	warning("Stub function: GetCameraLookVector");
-}
-
-void Lua_V1::GetCameraPosition() {
-	warning("Stub function: GetCameraPosition");
-}
-
-void Lua_V1::WorldToScreen() {
-	warning("Stub function: WorldToScreen");
 }
 
 #define STUB_FUNC(name) void name() {}
@@ -1078,7 +1090,6 @@ void Lua_V1::boot() {
 }
 
 void Lua_V1::postRestoreHandle() {
-
 	if (g_grim->getGameType() == GType_GRIM) {
 		lua_beginblock();
 		// Set the developerMode, since the save contains the value of

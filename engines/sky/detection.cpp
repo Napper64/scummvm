@@ -27,19 +27,9 @@
 #include "common/system.h"
 #include "common/file.h"
 #include "common/textconsole.h"
-#include "common/translation.h"
 
 static const PlainGameDescriptor skySetting =
 	{"sky", "Beneath a Steel Sky" };
-
-static const ExtraGuiOption skyExtraGuiOption = {
-	_s("Floppy intro"),
-	_s("Use the floppy version's intro (CD version only)"),
-	"alt_intro",
-	false,
-	0,
-	0
-};
 
 struct SkyVersion {
 	int dinnerTableEntries;
@@ -66,20 +56,19 @@ static const SkyVersion skyVersions[] = {
 
 class SkyMetaEngineDetection : public MetaEngineDetection {
 public:
-	const char *getName() const override;
+	const char *getEngineName() const override;
 	const char *getOriginalCopyright() const override;
 
-	const char *getEngineId() const override {
+	const char *getName() const override {
 		return "sky";
 	}
 
 	PlainGameList getSupportedGames() const override;
-	const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const override;
 	PlainGameDescriptor findGame(const char *gameid) const override;
-	DetectedGames detectGames(const Common::FSList &fslist) override;
+	DetectedGames detectGames(const Common::FSList &fslist, uint32 /*skipADFlags*/, bool /*skipIncomplete*/) override;
 };
 
-const char *SkyMetaEngineDetection::getName() const {
+const char *SkyMetaEngineDetection::getEngineName() const {
 	return "Beneath a Steel Sky";
 }
 
@@ -93,32 +82,13 @@ PlainGameList SkyMetaEngineDetection::getSupportedGames() const {
 	return games;
 }
 
-const ExtraGuiOptions SkyMetaEngineDetection::getExtraGuiOptions(const Common::String &target) const {
-	Common::String guiOptions;
-	ExtraGuiOptions options;
-
-	if (target.empty()) {
-		options.push_back(skyExtraGuiOption);
-		return options;
-	}
-
-	if (ConfMan.hasKey("guioptions", target)) {
-		guiOptions = ConfMan.get("guioptions", target);
-		guiOptions = parseGameGUIOptions(guiOptions);
-	}
-
-	if (!guiOptions.contains(GUIO_NOSPEECH))
-		options.push_back(skyExtraGuiOption);
-	return options;
-}
-
 PlainGameDescriptor SkyMetaEngineDetection::findGame(const char *gameid) const {
 	if (0 == scumm_stricmp(gameid, skySetting.gameId))
 		return skySetting;
 	return PlainGameDescriptor::empty();
 }
 
-DetectedGames SkyMetaEngineDetection::detectGames(const Common::FSList &fslist) {
+DetectedGames SkyMetaEngineDetection::detectGames(const Common::FSList &fslist, uint32 /*skipADFlags*/, bool /*skipIncomplete*/) {
 	DetectedGames detectedGames;
 	bool hasSkyDsk = false;
 	bool hasSkyDnr = false;
@@ -162,12 +132,12 @@ DetectedGames SkyMetaEngineDetection::detectGames(const Common::FSList &fslist) 
 		if (sv->dinnerTableEntries) {
 			Common::String extra = Common::String::format("v0.0%d %s", sv->version, sv->extraDesc);
 
-			DetectedGame game = DetectedGame(getEngineId(), skySetting.gameId, skySetting.description, Common::UNK_LANG, Common::kPlatformUnknown, extra);
+			DetectedGame game = DetectedGame(getName(), skySetting.gameId, skySetting.description, Common::UNK_LANG, Common::kPlatformUnknown, extra);
 			game.setGUIOptions(sv->guioptions);
 
 			detectedGames.push_back(game);
 		} else {
-			detectedGames.push_back(DetectedGame(getEngineId(), skySetting.gameId, skySetting.description));
+			detectedGames.push_back(DetectedGame(getName(), skySetting.gameId, skySetting.description));
 		}
 	}
 

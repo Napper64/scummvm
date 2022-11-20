@@ -25,6 +25,7 @@
 #include "ags/lib/std/memory.h"
 #include "ags/lib/std/vector.h"
 #include "ags/shared/ac/character_info.h"
+#include "ags/shared/ac/keycode.h"
 #include "ags/engine/ac/runtime_defines.h"
 #include "ags/engine/ac/speech.h"
 #include "ags/engine/ac/timer.h"
@@ -65,7 +66,6 @@ enum GameStateSvgVersion {
 	kGSSvgVersion_350_9 = 2,
 	kGSSvgVersion_350_10 = 3,
 };
-
 
 
 // Adding to this might need to modify AGSDEFNS.SH and AGSPLUGIN.H
@@ -254,12 +254,12 @@ struct GameState {
 	int  complete_overlay_on = 0;
 	// Is there a blocking text overlay on screen (contains overlay ID)
 	int  text_overlay_on = 0;
-	// Script overlay objects, because we must return same pointers
+	// Script overlay handles, because we must return same script objects
 	// whenever user script queries for them.
-	// Blocking speech overlay managed object, for accessing in scripts
-	ScriptOverlay *speech_text_scover = nullptr;
-	// Speech portrait overlay managed object
-	ScriptOverlay *speech_face_scover = nullptr;
+	// Blocking speech overlay managed handle
+	int  speech_text_schandle = 0;
+	// Speech portrait overlay managed handle
+	int  speech_face_schandle = 0;
 
 	int shake_screen_yoff = 0; // y offset of the shaking screen
 
@@ -359,10 +359,13 @@ struct GameState {
 
 	// Set how the last blocking wait was skipped
 	void SetWaitSkipResult(int how, int data = 0);
-	// Returns the code of the latest blocking wait skip method.
-	// * positive value means a key code;
-	// * negative value means a -(mouse code + 1);
-	// * 0 means timeout.
+	void SetWaitKeySkip(const KeyInput &kp) {
+		SetWaitSkipResult(SKIP_KEYPRESS, AGSKeyToScriptKey(kp.Key) | kp.Mod);
+	}
+	// Returns the information about how the latest blocking wait was skipped.
+	// The information is packed into int32 value like this:
+	// | 0xFF       | 0xFF    | 0xF      | 0xFFF                     |
+	// | eInputType | eKeyMod | reserved | eKeyCode, MouseButton etc |
 	int GetWaitSkipResult() const;
 
 	//
@@ -404,11 +407,10 @@ private:
 	std::vector<PViewport> _roomViewportsSorted;
 	// Cameras defines the position of a "looking eye" inside the room.
 	std::vector<PCamera> _roomCameras;
-	// Script viewports and cameras are references to real data export to
-	// user script. They became invalidated as the actual object gets
-	// destroyed, but are kept in memory to prevent script errors.
-	std::vector<std::pair<ScriptViewport *, int32_t>> _scViewportRefs;
-	std::vector<std::pair<ScriptCamera *, int32_t>> _scCameraRefs;
+	// We keep handles to the script refs to viewports and cameras, so that we
+	// could address them and invalidate as the actual object gets destroyed.
+	std::vector<int32_t> _scViewportHandles;
+	std::vector<int32_t> _scCameraHandles;
 
 	// Tells that the main viewport's position has changed since last game update
 	bool  _mainViewportHasChanged = false;

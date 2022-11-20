@@ -258,10 +258,9 @@ bool ScScript::create(const char *filename, byte *buffer, uint32 size, BaseScrip
 	delete[] _threadEvent;
 	_threadEvent = nullptr;
 
-	_filename = new char[strlen(filename) + 1];
-	if (_filename) {
-		strcpy(_filename, filename);
-	}
+	size_t filenameSize = strlen(filename) + 1;
+	_filename = new char[filenameSize];
+	Common::strcpy_s(_filename, filenameSize, filename);
 
 	_buffer = new byte [size];
 	if (!_buffer) {
@@ -293,21 +292,15 @@ bool ScScript::createThread(ScScript *original, uint32 initIP, const Common::Str
 	_thread = true;
 	_methodThread = false;
 	_threadEvent = new char[eventName.size() + 1];
-	if (_threadEvent) {
-		strcpy(_threadEvent, eventName.c_str());
-	}
+	Common::strcpy_s(_threadEvent, eventName.size() + 1, eventName.c_str());
 
 	// copy filename
-	_filename = new char[strlen(original->_filename) + 1];
-	if (_filename) {
-		strcpy(_filename, original->_filename);
-	}
+	size_t filenameSize = strlen(original->_filename) + 1;
+	_filename = new char[filenameSize];
+	Common::strcpy_s(_filename, filenameSize, original->_filename);
 
 	// copy buffer
 	_buffer = new byte [original->_bufferSize];
-	if (!_buffer) {
-		return STATUS_FAILED;
-	}
 
 	memcpy(_buffer, original->_buffer, original->_bufferSize);
 	_bufferSize = original->_bufferSize;
@@ -350,21 +343,15 @@ bool ScScript::createMethodThread(ScScript *original, const Common::String &meth
 	_thread = true;
 	_methodThread = true;
 	_threadEvent = new char[methodName.size() + 1];
-	if (_threadEvent) {
-		strcpy(_threadEvent, methodName.c_str());
-	}
+	Common::strcpy_s(_threadEvent, methodName.size() + 1, methodName.c_str());
 
 	// copy filename
-	_filename = new char[strlen(original->_filename) + 1];
-	if (_filename) {
-		strcpy(_filename, original->_filename);
-	}
+	size_t filenameSize = strlen(original->_filename) + 1;
+	_filename = new char[filenameSize];
+	Common::strcpy_s(_filename, filenameSize, original->_filename);
 
 	// copy buffer
 	_buffer = new byte [original->_bufferSize];
-	if (!_buffer) {
-		return STATUS_FAILED;
-	}
 
 	memcpy(_buffer, original->_buffer, original->_bufferSize);
 	_bufferSize = original->_bufferSize;
@@ -640,8 +627,9 @@ bool ScScript::executeInstruction() {
 		// push var
 		// push string
 		str = _stack->pop()->getString();
-		char *methodName = new char[strlen(str) + 1];
-		strcpy(methodName, str);
+		size_t methodNameSize = strlen(str) + 1;
+		char *methodName = new char[methodNameSize];
+		Common::strcpy_s(methodName, methodNameSize, str);
 
 		ScValue *var = _stack->pop();
 		if (var->_type == VAL_VARIABLE_REF) {
@@ -755,12 +743,13 @@ bool ScScript::executeInstruction() {
 
 	case II_PUSH_VAR: {
 		ScValue *var = getVar(_symbols[getDWORD()]);
-		if (false && /*var->_type==VAL_OBJECT ||*/ var->_type == VAL_NATIVE) {
+		// Disabled in original code
+		/*if (false && var->_type==VAL_OBJECT || var->_type == VAL_NATIVE) {
 			_operand->setReference(var);
 			_stack->push(_operand);
-		} else {
+		} else {*/
 			_stack->push(var);
-		}
+		//}
 		break;
 	}
 
@@ -806,10 +795,8 @@ bool ScScript::executeInstruction() {
 		_stack->pushFloat(getFloat());
 		break;
 
-
 	case II_PUSH_BOOL:
 		_stack->pushBool(getDWORD() != 0);
-
 		break;
 
 	case II_PUSH_STRING:
@@ -894,9 +881,10 @@ bool ScScript::executeInstruction() {
 		if (op1->isNULL() || op2->isNULL()) {
 			_operand->setNULL();
 		} else if (op1->getType() == VAL_STRING || op2->getType() == VAL_STRING) {
-			char *tempStr = new char [strlen(op1->getString()) + strlen(op2->getString()) + 1];
-			strcpy(tempStr, op1->getString());
-			strcat(tempStr, op2->getString());
+			size_t tempStrSize = strlen(op1->getString()) + strlen(op2->getString()) + 1;
+			char *tempStr = new char [tempStrSize];
+			Common::strcpy_s(tempStr, tempStrSize, op1->getString());
+			Common::strcat_s(tempStr, tempStrSize, op2->getString());
 			_operand->setString(tempStr);
 			delete[] tempStr;
 		} else if (op1->getType() == VAL_INT && op2->getType() == VAL_INT) {
@@ -1373,6 +1361,27 @@ bool ScScript::persist(BasePersistenceManager *persistMgr) {
 
 
 //////////////////////////////////////////////////////////////////////////
+void ScScript::afterLoad() {
+	if (_buffer == nullptr) {
+		byte *buffer = _engine->getCompiledScript(_filename, &_bufferSize);
+		if (!buffer) {
+			_gameRef->LOG(0, "Error reinitializing script '%s' after load. Script will be terminated.", _filename);
+			_state = SCRIPT_ERROR;
+			return;
+		}
+
+		_buffer = new byte [_bufferSize];
+		memcpy(_buffer, buffer, _bufferSize);
+
+		delete _scriptStream;
+		_scriptStream = new Common::MemoryReadStream(_buffer, _bufferSize);
+
+		initTables();
+	}
+}
+
+
+//////////////////////////////////////////////////////////////////////////
 ScScript *ScScript::invokeEventHandler(const Common::String &eventName, bool unbreakable) {
 	//if (_state!=SCRIPT_PERSISTENT) return nullptr;
 
@@ -1512,25 +1521,6 @@ bool ScScript::finishThreads() {
 	return STATUS_OK;
 }
 
-//////////////////////////////////////////////////////////////////////////
-void ScScript::afterLoad() {
-	if (_buffer == nullptr) {
-		byte *buffer = _engine->getCompiledScript(_filename, &_bufferSize);
-		if (!buffer) {
-			_gameRef->LOG(0, "Error reinitializing script '%s' after load. Script will be terminated.", _filename);
-			_state = SCRIPT_ERROR;
-			return;
-		}
-
-		_buffer = new byte [_bufferSize];
-		memcpy(_buffer, buffer, _bufferSize);
-
-		delete _scriptStream;
-		_scriptStream = new Common::MemoryReadStream(_buffer, _bufferSize);
-
-		initTables();
-	}
-}
 
 void ScScript::preInstHook(uint32 inst) {}
 

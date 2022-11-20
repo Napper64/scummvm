@@ -19,7 +19,6 @@
  *
  */
 
-#include "common/translation.h"
 #include "common/file.h"
 #include "common/md5.h"
 #include "common/debug.h"
@@ -33,81 +32,9 @@
 
 namespace Adl {
 
-// Mystery House was designed for monochrome display, so we default to
-// monochrome mode there. All the other games default to color mode.
-#define GAMEOPTION_COLOR_DEFAULT_OFF GUIO_GAMEOPTIONS1
-#define GAMEOPTION_SCANLINES         GUIO_GAMEOPTIONS2
-#define GAMEOPTION_COLOR_DEFAULT_ON  GUIO_GAMEOPTIONS3
-#define GAMEOPTION_NTSC              GUIO_GAMEOPTIONS4
-#define GAMEOPTION_MONO_TEXT         GUIO_GAMEOPTIONS5
-
 static const DebugChannelDef debugFlagList[] = {
 	{Adl::kDebugChannelScript, "Script", "Trace script execution"},
 	DEBUG_CHANNEL_END
-};
-
-static const ADExtraGuiOptionsMap optionsList[] = {
-	{
-		GAMEOPTION_NTSC,
-		{
-			_s("TV emulation"),
-			_s("Emulate composite output to an NTSC TV"),
-			"ntsc",
-			true,
-			0,
-			0
-		}
-	},
-
-	{
-		GAMEOPTION_COLOR_DEFAULT_OFF,
-		{
-			_s("Color graphics"),
-			_s("Use color graphics instead of monochrome"),
-			"color",
-			false,
-			0,
-			0
-		}
-	},
-
-	{
-		GAMEOPTION_COLOR_DEFAULT_ON,
-		{
-			_s("Color graphics"),
-			_s("Use color graphics instead of monochrome"),
-			"color",
-			true,
-			0,
-			0
-		}
-	},
-
-	{
-		GAMEOPTION_SCANLINES,
-		{
-			_s("Show scanlines"),
-			_s("Darken every other scanline to mimic the look of a CRT"),
-			"scanlines",
-			false,
-			0,
-			0
-		}
-	},
-
-	{
-		GAMEOPTION_MONO_TEXT,
-		{
-			_s("Always use sharp monochrome text"),
-			_s("Do not emulate NTSC artifacts for text"),
-			"monotext",
-			true,
-			0,
-			0
-		}
-	},
-
-	AD_EXTRA_GUI_OPTIONS_TERMINATOR
 };
 
 #define DEFAULT_OPTIONS GUIO5(GAMEOPTION_NTSC, GAMEOPTION_COLOR_DEFAULT_ON, GAMEOPTION_MONO_TEXT, GAMEOPTION_SCANLINES, GUIO_NOMIDI)
@@ -470,13 +397,13 @@ static const AdlGameDescription gameDiskDescriptions[] = {
 
 class AdlMetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
-	AdlMetaEngineDetection() : AdvancedMetaEngineDetection(gameFileDescriptions, sizeof(AdlGameDescription), adlGames, optionsList) { }
+	AdlMetaEngineDetection() : AdvancedMetaEngineDetection(gameFileDescriptions, sizeof(AdlGameDescription), adlGames) { }
 
-	const char *getName() const override {
+	const char *getEngineName() const override {
 		return "ADL";
 	}
 
-	const char *getEngineId() const override {
+	const char *getName() const override {
 		return "adl";
 	}
 
@@ -488,7 +415,7 @@ public:
 		return debugFlagList;
 	}
 
-	ADDetectedGames detectGame(const Common::FSNode &parent, const FileMap &allFiles, Common::Language language, Common::Platform platform, const Common::String &extra) override;
+	ADDetectedGames detectGame(const Common::FSNode &parent, const FileMap &allFiles, Common::Language language, Common::Platform platform, const Common::String &extra, uint32 skipADFlags, bool skipIncomplete) override;
 
 	bool addFileProps(const FileMap &allFiles, Common::String fname, FilePropertiesMap &filePropsMap) const;
 };
@@ -512,9 +439,9 @@ bool AdlMetaEngineDetection::addFileProps(const FileMap &allFiles, Common::Strin
 }
 
 // Based on AdvancedMetaEngine::detectGame
-ADDetectedGames AdlMetaEngineDetection::detectGame(const Common::FSNode &parent, const FileMap &allFiles, Common::Language language, Common::Platform platform, const Common::String &extra) {
+ADDetectedGames AdlMetaEngineDetection::detectGame(const Common::FSNode &parent, const FileMap &allFiles, Common::Language language, Common::Platform platform, const Common::String &extra, uint32 skipADFlags, bool skipIncomplete) {
 	// We run the file-based detector first, if it finds a match we do not search for disk images
-	ADDetectedGames matched = AdvancedMetaEngineDetection::detectGame(parent, allFiles, language, platform, extra);
+	ADDetectedGames matched = AdvancedMetaEngineDetection::detectGame(parent, allFiles, language, platform, extra, skipADFlags, skipIncomplete);
 
 	if (!matched.empty())
 		return matched;

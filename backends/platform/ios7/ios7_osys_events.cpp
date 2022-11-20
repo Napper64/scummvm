@@ -123,6 +123,27 @@ bool OSystem_iOS7::pollEvent(Common::Event &event) {
 			_queuedEventTime = getMillis() + kQueuedInputEventDelay;
 			break;
 
+		case kInputJoystickAxisMotion:
+			event.type = Common::EVENT_JOYAXIS_MOTION;
+			event.joystick.axis = internalEvent.value1;
+			event.joystick.position = internalEvent.value2;
+			break;
+
+		case kInputJoystickButtonDown:
+			event.type = Common::EVENT_JOYBUTTON_DOWN;
+			event.joystick.button = internalEvent.value1;
+			break;
+
+		case kInputJoystickButtonUp:
+			event.type = Common::EVENT_JOYBUTTON_UP;
+			event.joystick.button = internalEvent.value1;
+
+		case kInputChanged:
+			event.type = Common::EVENT_INPUT_CHANGED;
+			_queuedInputEvent.type = Common::EVENT_INVALID;
+			_queuedEventTime = getMillis() + kQueuedInputEventDelay;
+			break;
+
 		default:
 			break;
 		}
@@ -209,7 +230,7 @@ bool OSystem_iOS7::handleEvent_secondMouseUp(Common::Event &event, int x, int y)
 
 	if (curTime - _lastSecondaryDown < 400) {
 		//printf("Right tap!\n");
-		if (curTime - _lastSecondaryTap < 400 && !_videoContext->overlayVisible) {
+		if (curTime - _lastSecondaryTap < 400 && !_videoContext->overlayInGUI) {
 			//printf("Right escape!\n");
 			event.type = Common::EVENT_KEYDOWN;
 			_queuedInputEvent.type = Common::EVENT_KEYUP;
@@ -262,8 +283,8 @@ bool OSystem_iOS7::handleEvent_mouseDragged(Common::Event &event, int x, int y) 
 		mouseNewPosX = (int)(_videoContext->mouseX - deltaX / 0.5f);
 		mouseNewPosY = (int)(_videoContext->mouseY - deltaY / 0.5f);
 
-		int widthCap = _videoContext->overlayVisible ? _videoContext->overlayWidth : _videoContext->screenWidth;
-		int heightCap = _videoContext->overlayVisible ? _videoContext->overlayHeight : _videoContext->screenHeight;
+		int widthCap = _videoContext->overlayInGUI ? _videoContext->overlayWidth : _videoContext->screenWidth;
+		int heightCap = _videoContext->overlayInGUI ? _videoContext->overlayHeight : _videoContext->screenHeight;
 
 		if (mouseNewPosX < 0)
 			mouseNewPosX = 0;

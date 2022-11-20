@@ -21,14 +21,6 @@
 
 namespace Agi {
 
-#define GAMEOPTION_ORIGINAL_SAVELOAD          GUIO_GAMEOPTIONS1
-#define GAMEOPTION_AMIGA_ALTERNATIVE_PALETTE  GUIO_GAMEOPTIONS2
-#define GAMEOPTION_DISABLE_MOUSE              GUIO_GAMEOPTIONS3
-#define GAMEOPTION_USE_HERCULES_FONT          GUIO_GAMEOPTIONS4
-#define GAMEOPTION_COMMAND_PROMPT_WINDOW      GUIO_GAMEOPTIONS5
-#define GAMEOPTION_APPLE2GS_ADD_SPEED_MENU    GUIO_GAMEOPTIONS6
-	// TODO: properly implement GAMEOPTIONs
-
 #define GAMEOPTIONS_DEFAULT                   GUIO4(GAMEOPTION_ORIGINAL_SAVELOAD,GAMEOPTION_DISABLE_MOUSE,GAMEOPTION_USE_HERCULES_FONT,GAMEOPTION_COMMAND_PROMPT_WINDOW)
 #define GAMEOPTIONS_AMIGA                     GUIO4(GAMEOPTION_ORIGINAL_SAVELOAD,GAMEOPTION_AMIGA_ALTERNATIVE_PALETTE,GAMEOPTION_USE_HERCULES_FONT,GAMEOPTION_COMMAND_PROMPT_WINDOW)
 #define GAMEOPTIONS_APPLE2GS                  GUIO5(GAMEOPTION_ORIGINAL_SAVELOAD,GAMEOPTION_DISABLE_MOUSE,GAMEOPTION_USE_HERCULES_FONT,GAMEOPTION_COMMAND_PROMPT_WINDOW, GAMEOPTION_APPLE2GS_ADD_SPEED_MENU)
@@ -672,7 +664,7 @@ static const AGIGameDescription gameDescriptions[] = {
 	// Mickey's Space Adventure
 	// Preagi game
 	GAMEpre_P("mickey", "", "1.pic", "b6ec04c91a05df374792872c4d4ce66d", 2489,
-							"FLASHLIT.OOO", "d60a7b6ff96720037f7e88863f48c5d4", 97, 0x0000, GID_MICKEY, Common::kPlatformDOS),
+							"OBJ/FLASHLIT.OOO", "d60a7b6ff96720037f7e88863f48c5d4", 97, 0x0000, GID_MICKEY, Common::kPlatformDOS),
 
 	// Mixed-Up Mother Goose (Amiga) 1.1
 	// Problematic: crashes
@@ -717,7 +709,7 @@ static const AGIGameDescription gameDescriptions[] = {
 	GAME("pq1", "2.0G 1987-12-03", "d194e5d88363095f55d5096b8e32fbbb", 0x2917, GID_PQ1),
 
 	// Police Quest 1 (PC) 2.0G 12/3/87; with Hebrew translation
-	GAME_LVFPN("pq1", "2.0G 1987-12-03", "PQ1.WAG", "59e1b2fb6d025968b8ed7388f107c7b5", -1, Common::HE_ISR, 0x2917, 0, GID_PQ1, Common::kPlatformDOS, GType_V2, GAMEOPTIONS_DEFAULT),
+	GAME_LVFPN("pq1", "2.0G 1987-12-03", "PQ1.WAG", "59e1b2fb6d025968b8ed7388f107c7b5", -1, Common::HE_ISR, 0x2917, GF_EXTCHAR, GID_PQ1, Common::kPlatformDOS, GType_V2, GAMEOPTIONS_DEFAULT),
 
 	// Police Quest 1 (CoCo3 360k) [AGI 2.023]
 	GAME_PS("pq1", "", "28a077041f75aab78f66804800940085", 375, 0x2440, GID_PQ1, Common::kPlatformCoCo3),
@@ -756,6 +748,9 @@ static const AGIGameDescription gameDescriptions[] = {
 
 	// Space Quest 1 (PC 5.25"/3.5") 2.2 [AGI 2.426/2.917]
 	GAME("sq1", "2.2 1987-05-07 5.25\"/3.5\"", "5d67630aba008ec5f7f9a6d0a00582f4", 0x2440, GID_SQ1),
+
+	// Space Quest 1 (PC 5.25"/3.5") 2.2 [AGI 2.917]; French Translation
+	GAME_LVFPN("sq1", "2.2 1987-05-07 5.25\"/3.5\"", "words.tok.extended", "3f1730f3c9d4622a986f735af0f8734a", 12665, Common::FR_FRA, 0x2917, GF_EXTCHAR, GID_SQ1, Common::kPlatformDOS, GType_V2, GAMEOPTIONS_DEFAULT),
 
 	// Space Quest 1 (CoCo3 360k) [AGI 2.072]
 	GAME_PS("sq1", "", "5d67630aba008ec5f7f9a6d0a00582f4", 372, 0x2440, GID_SQ1, Common::kPlatformCoCo3),
@@ -846,8 +841,8 @@ static const AGIGameDescription gameDescriptions[] = {
 							"obj.40",    "188636a4a340fcfd8e7fab1e8e0ac53b", 657, 0x0000, GID_WINNIE, Common::kPlatformDOS),
 
 	// Winnie the Pooh in the Hundred Acre Wood (Amiga)
-	GAMEpre_PO("winnie", "", "title",   "2e7900c1ccaa7671d65405f6d1efed30", 1334,
-							 "room.62", "d56297aa9a1714dc654034f8db9f05c9", 1319, 0x0000, GID_WINNIE, Common::kPlatformAmiga, GAMEOPTIONS_AMIGA),
+	GAMEpre_PO("winnie", "", "misc/title",    "2e7900c1ccaa7671d65405f6d1efed30", 1334,
+							 "rooms/room.62", "d56297aa9a1714dc654034f8db9f05c9", 1319, 0x0000, GID_WINNIE, Common::kPlatformAmiga, GAMEOPTIONS_AMIGA),
 
 	// Winnie the Pooh in the Hundred Acre Wood (C64)
 	GAMEpre_P("winnie", "", "title.pic", "d4eb97cffc866110f71e1ec9f84fe643", 4097,

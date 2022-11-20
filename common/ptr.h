@@ -238,6 +238,14 @@ public:
 		return _pointer != r.get();
 	}
 
+	bool operator==(std::nullptr_t) const {
+		return _pointer == nullptr;
+	}
+
+	bool operator!=(std::nullptr_t) const {
+		return _pointer != nullptr;
+	}
+
 	/**
 	 * Implicit conversion operator to bool for convenience, to make
 	 * checks like "if (sharedPtr) ..." possible.
@@ -366,7 +374,7 @@ private:
 
 
 /**
- * Implements a smart pointer that holds a non-owning ("weak") refrence to
+ * Implements a smart pointer that holds a non-owning ("weak") reference to
  * a pointer. It needs to be converted to a SharedPtr to access it.
  */
 template<class T>
@@ -549,6 +557,14 @@ struct DefaultDeleter {
 	inline void operator()(T *object) {
 		STATIC_ASSERT(sizeof(T) > 0, cannot_delete_incomplete_type);
 		delete object;
+	}
+};
+
+template <typename T>
+struct ArrayDeleter {
+	inline void operator()(T *object) {
+		STATIC_ASSERT(sizeof(T) > 0, cannot_delete_incomplete_type);
+		delete[] object;
 	}
 };
 

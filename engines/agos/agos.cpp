@@ -58,6 +58,7 @@ static const GameSpecificSettings simon2_settings = {
 	"SIMON2",                               // speech_filename
 };
 
+#ifdef ENABLE_AGOS2
 static const GameSpecificSettings dimp_settings = {
 	"Gdimp",                                // base_filename
 	"",                                     // restore_filename
@@ -90,7 +91,6 @@ static const GameSpecificSettings swampy_settings = {
 	"MUSIC",                                // speech_filename
 };
 
-#ifdef ENABLE_AGOS2
 AGOSEngine_DIMP::AGOSEngine_DIMP(OSystem *system, const AGOSGameDescription *gd)
 	: AGOSEngine_PuzzlePack(system, gd) {
 
@@ -371,7 +371,8 @@ AGOSEngine::AGOSEngine(OSystem *system, const AGOSGameDescription *gd)
 
 	_fastFadeCount = 0;
 	_fastFadeInFlag = 0;
-	_fastFadeOutFlag = 0;
+	_fastFadeOutFlag = false;
+	_neverFade = false;
 	_exitCutscene = 0;
 	_paletteFlag = 0;
 	_bottomPalette = false;
@@ -603,14 +604,18 @@ Common::Error AGOSEngine::init() {
 		_internalHeight <<= 1;
 	}
 
+	if (ConfMan.hasKey("disable_fade_effects"))
+		_neverFade = ConfMan.getBool("disable_fade_effects");
+
 	initGraphics(_internalWidth, _internalHeight);
 
 	_midi = new MidiPlayer(this);
 
 	if ((getGameType() == GType_SIMON2 && getPlatform() == Common::kPlatformWindows) ||
-		(getGameType() == GType_SIMON1 && getPlatform() == Common::kPlatformWindows) ||
-		((getFeatures() & GF_TALKIE) && getPlatform() == Common::kPlatformAcorn) ||
-		(getPlatform() == Common::kPlatformDOS || getPlatform() == Common::kPlatformPC98)) {
+			(getGameType() == GType_SIMON1 && getPlatform() == Common::kPlatformWindows) ||
+			((getFeatures() & GF_TALKIE) && getPlatform() == Common::kPlatformAcorn) ||
+			(getPlatform() == Common::kPlatformDOS && getGameType() != GType_PN && getGameType() != GType_FF) ||
+			getPlatform() == Common::kPlatformPC98) {
 
 		int ret = _midi->open();
 		if (ret)

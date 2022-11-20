@@ -20,7 +20,6 @@
  */
 
 #include "base/plugins.h"
-#include "common/translation.h"
 #include "engines/advancedDetector.h"
 
 #include "sword25/detection.h"
@@ -43,28 +42,19 @@ static const char *directoryGlobs[] = {
 	0
 };
 
-static const ExtraGuiOption sword25ExtraGuiOption = {
-	_s("Use English speech"),
-	_s("Use English speech instead of German for every language other than German"),
-	"english_speech",
-	false,
-	0,
-	0
-};
-
 class Sword25MetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
 	Sword25MetaEngineDetection() : AdvancedMetaEngineDetection(Sword25::gameDescriptions, sizeof(ADGameDescription), sword25Game) {
-		_guiOptions = GUIO1(GUIO_NOMIDI);
+		_guiOptions = GUIO2(GUIO_NOMIDI, GAMEOPTION_ENGLISH_SPEECH);
 		_maxScanDepth = 2;
 		_directoryGlobs = directoryGlobs;
 	}
 
-	const char *getEngineId() const override {
+	const char *getName() const override {
 		return "sword25";
 	}
 
-	const char *getName() const override {
+	const char *getEngineName() const override {
 		return "Broken Sword 2.5";
 	}
 
@@ -75,14 +65,6 @@ public:
 	const DebugChannelDef *getDebugChannels() const override {
 		return debugFlagList;
 	}
-
-	const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const override;
 };
-
-const ExtraGuiOptions Sword25MetaEngineDetection::getExtraGuiOptions(const Common::String &target) const {
-	ExtraGuiOptions options;
-	options.push_back(sword25ExtraGuiOption);
-	return options;
-}
 
 REGISTER_PLUGIN_STATIC(SWORD25_DETECTION, PLUGIN_TYPE_ENGINE_DETECTION, Sword25MetaEngineDetection);

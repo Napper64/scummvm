@@ -16,6 +16,7 @@ MODULE_OBJS := \
 	dialogs.o \
 	file.o \
 	file_nes.o \
+	gfx_gui.o \
 	gfx_mac.o \
 	gfx_towns.o \
 	gfx.o \
@@ -32,6 +33,7 @@ MODULE_OBJS := \
 	imuse/sysex_scumm.o \
 	imuse/drivers/amiga.o \
 	imuse/drivers/fmtowns.o \
+	imuse/drivers/midi.o \
 	imuse/drivers/mac_m68k.o \
 	imuse/drivers/pcspk.o \
 	input.o \

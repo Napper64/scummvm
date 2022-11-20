@@ -30,7 +30,7 @@
 #include "lure/events.h"
 #include "lure/lure.h"
 
-#if defined(__SYMBIAN32__) || defined(__ANDROID__) || defined(__WII__)
+#if defined(__ANDROID__) || defined(__WII__)
 #define LURE_CLICKABLE_MENUS
 #endif
 
@@ -385,9 +385,9 @@ uint16 PopupMenu::ShowItems(Action contextAction, uint16 roomNumber) {
 	if (numItems == 0) {
 		// No items, so add a 'nothing' to the statusLine
 		if (LureEngine::getReference().getLanguage() == Common::RU_RUS)
-			strcat(room.statusLine(), "(ybxtuj ytn)");
+			Common::strcat_s(room.statusLine(), MAX_DESC_SIZE, "(ybxtuj ytn)");
 		else
-			strcat(room.statusLine(), "(nothing)");
+			Common::strcat_s(room.statusLine(), MAX_DESC_SIZE, "(nothing)");
 	}
 
 	room.update();

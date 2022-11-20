@@ -67,7 +67,8 @@ enum AgiGameFeatures {
 	GF_AGI256      = (1 << 2), // marks fanmade AGI-256 games
 	GF_FANMADE     = (1 << 3), // marks fanmade games
 	GF_OLDAMIGAV20 = (1 << 4),
-	GF_2GSOLDSOUND = (1 << 5)
+	GF_2GSOLDSOUND = (1 << 5),
+	GF_EXTCHAR = (1 << 6) // use WORDS.TOK.EXTENDED
 };
 
 enum BooterDisks {
@@ -83,6 +84,14 @@ struct AGIGameDescription {
 	uint32 features;
 	uint16 version;
 };
+
+#define GAMEOPTION_ORIGINAL_SAVELOAD          GUIO_GAMEOPTIONS1
+#define GAMEOPTION_AMIGA_ALTERNATIVE_PALETTE  GUIO_GAMEOPTIONS2
+#define GAMEOPTION_DISABLE_MOUSE              GUIO_GAMEOPTIONS3
+#define GAMEOPTION_USE_HERCULES_FONT          GUIO_GAMEOPTIONS4
+#define GAMEOPTION_COMMAND_PROMPT_WINDOW      GUIO_GAMEOPTIONS5
+#define GAMEOPTION_APPLE2GS_ADD_SPEED_MENU    GUIO_GAMEOPTIONS6
+	// TODO: properly implement GAMEOPTIONs
 
 } // End of namespace Agi
 

@@ -28,6 +28,7 @@
 #include "engines/wintermute/base/base_parser.h"
 #include "engines/wintermute/base/base_engine.h"
 #include "engines/wintermute/base/base_frame.h"
+#include "engines/wintermute/base/base_game.h"
 #include "engines/wintermute/base/base_object.h"
 #include "engines/wintermute/base/base_dynamic_buffer.h"
 #include "engines/wintermute/base/sound/base_sound_manager.h"
@@ -79,6 +80,11 @@ bool BaseFrame::draw(int x, int y, BaseObject *registerOwner, float zoomX, float
 	bool res;
 
 	for (uint32 i = 0; i < _subframes.size(); i++) {
+		// filter out subframes unsupported by current renderer
+		if (!allFrames) {
+			if ((_subframes[i]->_2DOnly && _gameRef->_useD3D) || (_subframes[i]->_3DOnly && !_gameRef->_useD3D))
+				continue;
+		}
 		res = _subframes[i]->draw(x, y, registerOwner, zoomX, zoomY, precise, alpha, rotate, blendMode);
 		if (DID_FAIL(res)) {
 			return res;
@@ -274,8 +280,9 @@ bool BaseFrame::loadBuffer(char *buffer, int lifeTime, bool keepLoaded) {
 		break;
 
 		case TOKEN_APPLY_EVENT: {
-			char *event = new char[strlen(params) + 1];
-			strcpy(event, params);
+			size_t eventSize = strlen(params) + 1;
+			char *event = new char[eventSize];
+			Common::strcpy_s(event, eventSize, params);
 			_applyEvent.add(event);
 		}
 		break;

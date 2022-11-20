@@ -24,6 +24,7 @@
  *
  */
 
+#include "engines/icb/icb.h"
 #include "engines/icb/common/px_common.h"
 #include "engines/icb/surface_manager.h"
 #include "engines/icb/mission.h"
@@ -100,7 +101,7 @@ void _surface_manager::PrintTimer(char label, uint32 time, uint32 limit) {
 		if (percIndex > 5)
 			percIndex = 5;
 		char message[64];
-		sprintf(message, "%c%3.1f", label, perc);
+		Common::sprintf_s(message, "%c%3.1f", label, perc);
 		/*      Get_surface_DC( working_buffer_id, dc );
 		        SetBkColor( dc, colours[percIndex] );
 		        SetTextColor( dc, 0x01010101 );
@@ -158,7 +159,10 @@ uint32 _surface_manager::Init_direct_draw() {
 	// Debug info
 	Zdebug("*SURFACE_MANAGER* Initalizing the SDL video interface");
 
-	g_system->setWindowCaption(Common::U32String("In Cold Blood (C)2000 Revolution Software Ltd"));
+	if (g_icb->getGameType() == GType_ICB)
+		g_system->setWindowCaption(Common::U32String("In Cold Blood"));
+	else
+		g_system->setWindowCaption(Common::U32String("The Road to El Dorado"));
 	initGraphics(SCREEN_WIDTH, SCREEN_DEPTH, nullptr);
 
 	screenSurface = new Graphics::Surface();

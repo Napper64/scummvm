@@ -54,6 +54,7 @@
 #include "sci/graphics/controls16.h"
 #include "sci/graphics/coordadjuster.h"
 #include "sci/graphics/cursor.h"
+#include "sci/graphics/macfont.h"
 #include "sci/graphics/maciconbar.h"
 #include "sci/graphics/menu.h"
 #include "sci/graphics/paint16.h"
@@ -99,6 +100,7 @@ SciEngine::SciEngine(OSystem *syst, const ADGameDescription *desc, SciGameId gam
 	_gfxScreen(nullptr),
 	_gfxText16(nullptr),
 	_gfxTransitions(nullptr),
+	_gfxMacFontManager(nullptr),
 	_gfxMacIconBar(nullptr),
 #ifdef ENABLE_SCI32
 	_gfxControls32(nullptr),
@@ -119,6 +121,7 @@ SciEngine::SciEngine(OSystem *syst, const ADGameDescription *desc, SciGameId gam
 	_guestAdditions(nullptr),
 	_opcode_formats(nullptr),
 	_debugState(),
+	_speedThrottleDelay(kSpeedThrottleDefaultDelay),
 	_gameDescription(desc),
 	_gameId(gameId),
 	_resMan(nullptr),
@@ -245,6 +248,7 @@ SciEngine::~SciEngine() {
 	//_console deleted by Engine
 	delete _guestAdditions;
 	delete _features;
+	delete _gfxMacFontManager;
 	delete _gfxMacIconBar;
 
 	delete _eventMan;
@@ -285,12 +289,19 @@ Common::Error SciEngine::run() {
 	_scriptPatcher = new ScriptPatcher();
 	SegManager *segMan = new SegManager(_resMan, _scriptPatcher);
 
+	// Load the Mac executable and fonts if available
+	if (getSciVersion() < SCI_VERSION_2 && getPlatform() == Common::kPlatformMacintosh) {
+		loadMacExecutable();
+		loadMacFonts();
+	}
+
 	// Read user option for forcing hires graphics
 	// Only show/selectable for:
 	//  - King's Quest 6 CD
 	//  - King's Quest 6 CD demo
 	//  - Gabriel Knight 1 CD
 	//  - Police Quest 4 CD
+	//  - SCI1/1.1 Mac games with hires fonts
 	//
 	// Gabriel Knight 1 on Mac is hi-res only, so it should NOT get this option.
 	// Confirmed by [md5] and originally by clone2727.
@@ -300,6 +311,9 @@ Common::Error SciEngine::run() {
 		// We need to do this, because the option's default is "true", but we don't want "true"
 		// for any game that does not have this option.
 		_forceHiresGraphics = ConfMan.getBool("enable_high_resolution_graphics");
+	} else if (hasMacFonts()) {
+		// Default to using hires Mac fonts if GUI option isn't present, as it was added later.
+		_forceHiresGraphics = true;
 	}
 
 	if (getSciVersion() < SCI_VERSION_2) {
@@ -353,9 +367,6 @@ Common::Error SciEngine::run() {
 	// Must be called after game_init(), as they use _features
 	_kernel->loadKernelNames(_features);
 
-	// Load our Mac executable here for icon bar palettes and high-res fonts
-	loadMacExecutable();
-
 	// Initialize all graphics related subsystems
 	initGraphics();
 
@@ -377,7 +388,7 @@ Common::Error SciEngine::run() {
 
 		// Jones only initializes its menus when restarting/restoring, thus set
 		// the gameIsRestarting flag here before initializing. Fixes bug #6536.
-		if (g_sci->getGameId() == GID_JONES)
+		if (getGameId() == GID_JONES)
 			_gamestate->gameIsRestarting = GAMEISRESTARTING_RESTORE;
 	}
 
@@ -603,7 +614,7 @@ void SciEngine::initGraphics() {
 #ifdef ENABLE_SCI32
 	if (getSciVersion() >= SCI_VERSION_2) {
 		// SCI32 graphic objects creation
-		if (g_sci->getPlatform() == Common::kPlatformMacintosh && _resMan->hasResourceType(kResourceTypeCursor)) {
+		if (getPlatform() == Common::kPlatformMacintosh && _resMan->hasResourceType(kResourceTypeCursor)) {
 			_gfxCursor32 = new GfxMacCursor32();
 		} else {
 			_gfxCursor32 = new GfxCursor32();
@@ -626,7 +637,7 @@ void SciEngine::initGraphics() {
 		_gfxTransitions = new GfxTransitions(_gfxScreen, _gfxPalette16);
 		_gfxPaint16 = new GfxPaint16(_resMan, _gamestate->_segMan, _gfxCache, _gfxPorts, _gfxCoordAdjuster, _gfxScreen, _gfxPalette16, _gfxTransitions, _audio);
 		_gfxAnimate = new GfxAnimate(_gamestate, _scriptPatcher, _gfxCache, _gfxPorts, _gfxPaint16, _gfxScreen, _gfxPalette16, _gfxCursor, _gfxTransitions);
-		_gfxText16 = new GfxText16(_gfxCache, _gfxPorts, _gfxPaint16, _gfxScreen);
+		_gfxText16 = new GfxText16(_gfxCache, _gfxPorts, _gfxPaint16, _gfxScreen, _gfxMacFontManager);
 		_gfxControls16 = new GfxControls16(_gamestate->_segMan, _gfxPorts, _gfxPaint16, _gfxText16, _gfxScreen);
 		_gfxMenu = new GfxMenu(_eventMan, _gamestate->_segMan, _gfxPorts, _gfxPaint16, _gfxText16, _gfxScreen, _gfxCursor);
 
@@ -786,8 +797,12 @@ bool SciEngine::hasParser() const {
 			getGameId() == GID_LSL3 || getGameId() == GID_SQ3;
 }
 
+bool SciEngine::hasMacFonts() const {
+	return _gfxMacFontManager != nullptr;
+}
+
 bool SciEngine::hasMacIconBar() const {
-	return _resMan->isSci11Mac() && getSciVersion() == SCI_VERSION_1_1 &&
+	return _resMan->isSci11Mac() &&
 			(getGameId() == GID_KQ6 || getGameId() == GID_FREDDYPHARKAS);
 }
 
@@ -866,7 +881,7 @@ void SciEngine::sleep(uint32 msecs) {
 		_eventMan->getSciEvent(kSciEventPeek);
 
 		// There is no point in waiting any more if we are just waiting to quit
-		if (g_engine->shouldQuit()) {
+		if (shouldQuit()) {
 			return;
 		}
 
@@ -875,7 +890,7 @@ void SciEngine::sleep(uint32 msecs) {
 		// movement is still occurring and the screen needs to be updated to
 		// reflect it
 		if (getSciVersion() >= SCI_VERSION_2) {
-			g_sci->_gfxFrameout->updateScreen();
+			_gfxFrameout->updateScreen();
 		}
 #endif
 		time = g_system->getMillis();
@@ -903,7 +918,7 @@ void SciEngine::setLauncherLanguage() {
 		case Common::JA_JPN: {
 			// Set Japanese for FM-Towns games
 			// KQ5 on FM-Towns has no initial language set
-			if (g_sci->getPlatform() == Common::kPlatformFMTowns) {
+			if (getPlatform() == Common::kPlatformFMTowns) {
 				languageToSet = K_LANG_JAPANESE;
 			}
 		}
@@ -945,22 +960,7 @@ void SciEngine::updateSoundMixerVolumes() {
 }
 
 void SciEngine::loadMacExecutable() {
-	if (getPlatform() != Common::kPlatformMacintosh || getSciVersion() < SCI_VERSION_1_EARLY || getSciVersion() > SCI_VERSION_1_1)
-		return;
-
-	Common::String filename;
-
-	switch (getGameId()) {
-	case GID_KQ6:
-		filename = "King's Quest VI";
-		break;
-	case GID_FREDDYPHARKAS:
-		filename = "Freddy Pharkas";
-		break;
-	default:
-		break;
-	}
-
+	Common::String filename = _resMan->getMacExecutableName();
 	if (filename.empty())
 		return;
 
@@ -968,16 +968,55 @@ void SciEngine::loadMacExecutable() {
 		// KQ6/Freddy require the executable to load their icon bar palettes
 		if (hasMacIconBar())
 			error("Could not load Mac resource fork '%s'", filename.c_str());
+	}
+}
 
-		// TODO: Show some sort of warning dialog saying they can't get any
-		// high-res Mac fonts, when we get to that point ;)
+void SciEngine::loadMacFonts() {
+	// Load Mac fonts from the appropriate place, depending on the game.
+	// If we're unable to load Mac fonts, then fall back to using SCI fonts.
+	// Mac font support was added after these games were supported, so it's
+	// important to not require that fonts be present.
+	switch (g_sci->getGameId()) {
+	case GID_CASTLEBRAIN:
+	case GID_FREDDYPHARKAS:
+	// case GID_KQ5: // not supported yet
+	case GID_KQ6:
+	case GID_LSL1:
+	case GID_LSL5:
+	case GID_SQ1:
+		// These Mac games have fonts in the resource fork of their executable
+		// along with a SCI to Mac font mapping table.
+		if (_macExecutable.hasResFork()) {
+			_gfxMacFontManager = new GfxMacFontManager(&_macExecutable);
+			if (!_gfxMacFontManager->hasFonts()) {
+				delete _gfxMacFontManager;
+				_gfxMacFontManager = nullptr;
+			}
+		} else {
+			Common::String filename = _resMan->getMacExecutableName();
+			warning("Macintosh executable \"%s\" not found, using SCI fonts", filename.c_str());
+		}
+		break;
+	case GID_LSL6:
+	case GID_QFG1VGA:
+		// These Mac games have interpreters that are hard-coded to use Palatino.
+		// Attempt to load Palatino from classicmacfonts.dat.
+		_gfxMacFontManager = new GfxMacFontManager();
+		if (!_gfxMacFontManager->hasFonts()) {
+			warning("Classic Macintosh fonts not found, using SCI fonts");
+			delete _gfxMacFontManager;
+			_gfxMacFontManager = nullptr;
+		}
+		break;
+	default:
+		break;
 	}
 }
 
 uint32 SciEngine::getTickCount() {
-	return g_engine->getTotalPlayTime() * 60 / 1000;
+	return getTotalPlayTime() * 60 / 1000;
 }
 void SciEngine::setTickCount(const uint32 ticks) {
-	return g_engine->setTotalPlayTime(ticks * 1000 / 60);
+	return setTotalPlayTime(ticks * 1000 / 60);
 }
 } // End of namespace Sci

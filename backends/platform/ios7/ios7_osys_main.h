@@ -25,6 +25,7 @@
 #include "graphics/surface.h"
 #include "backends/platform/ios7/ios7_common.h"
 #include "backends/modular-backend.h"
+#include "backends/keymapper/hardware-input.h"
 #include "common/events.h"
 #include "common/str.h"
 #include "common/ustr.h"
@@ -143,6 +144,9 @@ public:
 	Graphics::PixelFormat getScreenFormat() const override { return _framebuffer.format; }
 	Common::List<Graphics::PixelFormat> getSupportedFormats() const override;
 #endif
+#if defined(USE_OPENGL) && defined(USE_GLAD)
+	void *getOpenGLProcAddress(const char *name) const override;
+#endif
 
 	PaletteManager *getPaletteManager() override { return this; }
 
@@ -160,7 +164,7 @@ public:
 	void unlockScreen() override;
 	void setShakePos(int shakeXOffset, int shakeYOffset) override;
 
-	void showOverlay() override;
+	void showOverlay(bool inGUI) override;
 	void hideOverlay() override;
 	bool isOverlayVisible() const override { return _videoContext->overlayVisible; }
 	void clearOverlay() override;
@@ -189,6 +193,8 @@ public:
 
 	void addSysArchivesToSearchSet(Common::SearchSet &s, int priority = 0) override;
 	void getTimeAndDate(TimeDate &td, bool skipRecord = false) const override;
+
+	Common::HardwareInputSet *getHardwareInputSet() override;
 
 	Audio::Mixer *getMixer() override;
 

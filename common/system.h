@@ -483,7 +483,7 @@ public:
 		/**
 		* Shaders.
 		*/
-		kFeatureShader,
+		kFeatureShaders,
 
 		/**
 		* Support for using the native system file browser dialog
@@ -745,70 +745,35 @@ public:
 	 *
 	 * @return the OpenGL type of context which is supported.
 	 */
-	virtual OpenGL::ContextOGLType getOpenGLType() const {
-		return OpenGL::kOGLContextNone;
+	virtual OpenGL::ContextType getOpenGLType() const {
+		return OpenGL::kContextNone;
 	}
 
+#if defined(USE_OPENGL) && defined(USE_GLAD)
 	/**
-	 * Retrieve a list of all hardware shaders supported by this backend.
+	 * Query the address of an OpenGL function by name.
 	 *
-	 * This can be only hardware shaders.
-	 * It is completely up to the backend maintainer to decide what is
-	 * appropriate here and what not.
-	 * The list is terminated by an all-zero entry.
+	 * This can only be used after a context has been created.
+	 * Please note that this function can return valid addresses even if the
+	 * OpenGL context does not support the function.
 	 *
-	 * @return List of supported shaders.
+	 * @param name The name of the OpenGL function.
+	 * @return An function pointer for the requested OpenGL function or
+	 *         nullptr in case of failure.
 	 */
-	virtual const GraphicsMode *getSupportedShaders() const {
-		static const OSystem::GraphicsMode no_shader[2] = {{"NONE", "Normal (no shader)", 0}, {nullptr, nullptr, 0}};
-		return no_shader;
-	}
+	virtual void *getOpenGLProcAddress(const char *name) const { return nullptr; }
+#endif
 
 	/**
-	 * Return the ID of the 'default' shader mode.
+	 * Load the specified shader.
 	 *
-	 * What exactly this means is up to the backend.
-	 * This mode is set by the client code when no user overrides
-	 * are present (i.e. if no custom shader mode is selected using
-	 * the command line or a config file).
+	 * If loading the new shader fails, this method returns false.
 	 *
-	 * @return ID of the 'default' shader mode.
-	 */
-	virtual int getDefaultShader() const { return 0; }
-
-	/**
-	 * Switch to the specified shader mode.
-	 *
-	 * If switching to the new mode fails, this method returns false.
-	 *
-	 * @param id ID of the new shader mode.
+	 * @param fileNode File node of the new shader.
 	 *
 	 * @return True if the switch was successful, false otherwise.
 	 */
-	virtual bool setShader(int id) { return false; }
-
-	/**
-	 * Switch to the shader mode with the given name.
-	 *
-	 * If @p name is unknown, or if switching to the new mode fails,
-	 * this method returns false.
-	 *
-	 * @param name Name of the new shader mode.
-	 *
-	 * @return True if the switch was successful, false otherwise.
-	 *
-	 * @note This is implemented using the setShader(int) method, as well
-	 *       as getSupportedShaders() and getDefaultShader().
-	 *       In particular, backends do not have to overload this!
-	 */
-	bool setShader(const char *name);
-
-	/**
-	 * Determine which shader is currently active.
-	 *
-	 * @return ID of the active shader.
-	 */
-	virtual int getShader() const { return 0; }
+	virtual bool setShader(const Common::String &fileName) { return false; }
 
 	/**
 	 * Retrieve a list of all stretch modes supported by this backend.
@@ -884,8 +849,8 @@ public:
 	 * Return the 'default' scale factor.
 	 *
 	 * This mode is set by the client code when no user overrides
-	 * are present (i.e. if no custom shader mode is selected using
-	 * the command line or a config file).
+	 * are present (i.e. if no custom scaler is selected using the
+	 * command line or a config file).
 	 *
 	 * @return The 'default' scale factor.
 	 */
@@ -1026,7 +991,8 @@ public:
 		kTransactionSizeChangeFailed = (1 << 3),        /**< Failed switching the screen dimensions (initSize) */
 		kTransactionFormatNotSupported = (1 << 4),      /**< Failed setting the color format */
 		kTransactionFilteringFailed = (1 << 5),         /**< Failed setting the filtering mode */
-		kTransactionStretchModeSwitchFailed = (1 << 6)  /**< Failed setting the stretch mode */
+		kTransactionStretchModeSwitchFailed = (1 << 6), /**< Failed setting the stretch mode */
+		kTransactionShaderChangeFailed = (1 << 7),      /**< Failed setting the shader */
 	};
 
 	/**
@@ -1215,10 +1181,13 @@ public:
 	 * and then manually compose whatever graphics we want to show in the overlay.
 	 * This works because we assume the game to be "paused" whenever an overlay
 	 * is active.
+	 *
+	 * @param inGame Whether the overlay is used to display GUI or in game images
+	 *
 	 */
 
 	/** Activate the overlay mode. */
-	virtual void showOverlay() = 0;
+	virtual void showOverlay(bool inGUI = true) = 0;
 
 	/** Deactivate the overlay mode. */
 	virtual void hideOverlay() = 0;

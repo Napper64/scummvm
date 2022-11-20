@@ -53,9 +53,10 @@ const char *String_Copy(const char *srcString) {
 }
 
 const char *String_Append(const char *thisString, const char *extrabit) {
-	char *buffer = (char *)malloc(strlen(thisString) + strlen(extrabit) + 1);
-	strcpy(buffer, thisString);
-	strcat(buffer, extrabit);
+	size_t ln = strlen(thisString) + strlen(extrabit) + 1;
+	char *buffer = (char *)malloc(ln);
+	Common::strcpy_s(buffer, ln, thisString);
+	Common::strcat_s(buffer, ln, extrabit);
 	return CreateNewScriptString(buffer, false);
 }
 
@@ -66,8 +67,9 @@ const char *String_AppendChar(const char *thisString, int extraOne) {
 		chw = Utf8::SetChar(extraOne, chr, sizeof(chr));
 	else
 		chr[0] = extraOne;
-	char *buffer = (char *)malloc(strlen(thisString) + chw + 1);
-	sprintf(buffer, "%s%s", thisString, chr);
+	size_t ln = strlen(thisString) + chw + 1;
+	char *buffer = (char *)malloc(ln);
+	Common::sprintf_s(buffer, ln, "%s%s", thisString, chr);
 	return CreateNewScriptString(buffer, false);
 }
 
@@ -256,7 +258,7 @@ DynObjectRef CreateNewScriptStringObj(const char *fromText, bool reAllocate) {
 	if (reAllocate) {
 		str = new ScriptString(fromText);
 	} else { // TODO: refactor to avoid const casts!
-		str = new ScriptString((char *)fromText, true);
+		str = new ScriptString(const_cast<char *>(fromText), true);
 	}
 	void *obj_ptr = str->GetTextPtr();
 	int32_t handle = ccRegisterManagedObject(obj_ptr, str);
@@ -317,7 +319,7 @@ void check_strlen(char *ptt) {
 /*void GetLanguageString(int indxx,char*buffr) {
 VALIDATE_STRING(buffr);
 char*bptr=get_language_text(indxx);
-if (bptr==NULL) strcpy(buffr,"[language string error]");
+if (bptr==NULL) Common::strcpy_s(buffr, 200, "[language string error]");
 else strncpy(buffr,bptr,199);
 buffr[199]=0;
 }*/
@@ -325,11 +327,7 @@ buffr[199]=0;
 void my_strncpy(char *dest, const char *src, int len) {
 	// the normal strncpy pads out the string with zeros up to the
 	// max length -- we don't want that
-	if (strlen(src) >= (unsigned)len) {
-		strncpy(dest, src, len);
-		dest[len] = 0;
-	} else
-		strcpy(dest, src);
+	Common::strcpy_s(dest, len + 1, src);
 }
 
 //=============================================================================

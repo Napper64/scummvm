@@ -163,10 +163,7 @@ void initHardware() {
 	irqSet(IRQ_VBLANK, VBlankHandler);
 	irqEnable(IRQ_VBLANK);
 
-#ifndef DISABLE_TEXT_CONSOLE
-	videoSetModeSub(MODE_0_2D);
-	consoleInit(NULL, 1, BgType_Text4bpp, BgSize_T_256x256, 30, 0, false, true);
-#else
+#ifdef DISABLE_TEXT_CONSOLE
 	videoSetModeSub(MODE_3_2D | DISPLAY_BG3_ACTIVE);
 #endif
 }
@@ -221,7 +218,7 @@ void OSystem_DS::setFeatureState(Feature f, bool enable) {
 			}
 #endif
 			_keyboard->show();
-		} else {
+		} else if (_keyboard->isVisible()) {
 			_keyboard->hide();
 #ifdef DISABLE_TEXT_CONSOLE
 			_subScreen.reset();
@@ -411,7 +408,9 @@ void OSystem_DS::updateScreen() {
 
 	if (_overlay.isVisible()) {
 		_overlay.update();
-	} else {
+	}
+
+	if (_framebuffer.isVisible()) {
 		if (_paletteDirty) {
 			dmaCopyHalfWords(3, _palette, BG_PALETTE, 256 * 2);
 #ifdef DISABLE_TEXT_CONSOLE
@@ -433,12 +432,14 @@ void OSystem_DS::setShakePos(int shakeXOffset, int shakeYOffset) {
 	DS::setShakePos(shakeXOffset, shakeYOffset);
 }
 
-void OSystem_DS::showOverlay() {
+void OSystem_DS::showOverlay(bool inGUI) {
+	_overlayInGUI = inGUI;
 	_overlay.reset();
 	_overlay.show();
 }
 
 void OSystem_DS::hideOverlay() {
+	_overlayInGUI = false;
 	_overlay.hide();
 }
 
@@ -474,7 +475,7 @@ Graphics::PixelFormat OSystem_DS::getOverlayFormat() const {
 }
 
 Common::Point OSystem_DS::transformPoint(int16 x, int16 y) {
-	if (_overlay.isVisible())
+	if (_overlayInGUI)
 		return Common::Point(x, y);
 	else
 		return _framebuffer.realToScaled(x, y);
@@ -487,7 +488,7 @@ bool OSystem_DS::showMouse(bool visible) {
 }
 
 void OSystem_DS::warpMouse(int x, int y) {
-	if (_overlay.isVisible())
+	if (_overlayInGUI)
 		_cursorPos = Common::Point(x, y);
 	else
 		_cursorPos = _framebuffer.scaledToReal(x, y);

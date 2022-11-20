@@ -66,6 +66,7 @@ class GfxControls16;
 class GfxControls32;
 class GfxCoordAdjuster16;
 class GfxCursor;
+class GfxMacFontManager;
 class GfxMacIconBar;
 class GfxMenu;
 class GfxPaint16;
@@ -153,6 +154,33 @@ public:
 	uint32 getTickCount();
 	void setTickCount(const uint32 ticks);
 
+	/**
+	 * Disable support for ScummVM autosaves.
+	 *
+	 * A lot of SCI games already have an autosaving mechanism.
+	 * Also, a lot of games have death screens when the player
+	 * does something wrong, and autosaves could kick in when the
+	 * death screen is shown, which makes them useless, since
+	 * the player can only restore or restart.
+	 *
+	 * Another place where autosaves could kick in is during
+	 * screens with internal loops, e.g. the inventory screen,
+	 * where the autosave created would be invalid, as the internal
+	 * loop isn't persisted in saved games.
+	 *
+	 * For now, we allow saving in places where the user has
+	 * control via GuestAdditions::userHasControl(), but as
+	 * mentioned above, these do not cover cases where the user
+	 * does have control, but saving would either be useless (e.g.
+	 * in death screens) or invalid saved would be created (e.g.
+	 * while the inventory screen is open).
+	 *
+	 * In the future, if we are able to detect all death screens,
+	 * all internal loops and generally all places where saving
+	 * shouldn't be allowed, we could re-enable this feature.
+	 */
+	int getAutosaveSlot() const override { return -1; }
+
 	const SciGameId &getGameId() const { return _gameId; }
 	const char *getGameIdStr() const;
 	Common::Language getLanguage() const;
@@ -166,7 +194,18 @@ public:
 	bool isBE() const;
 
 	bool hasParser() const;
+
+	/** Returns true if the game supports native Mac fonts and the fonts are available. */
+	bool hasMacFonts() const;
+	
+	/** Returns true if the game is a Mac version with an icon bar on the bottom. */
 	bool hasMacIconBar() const;
+
+	/**
+	 * Returns true if the game is a Mac version that used native Mac file dialogs
+	 * for saving and restoring. These versions do not include resources for the
+	 * normal save and restore screens, so the ScummVM UI must always be used.
+	 */
 	bool hasMacSaveRestoreDialogs() const;
 
 	inline ResourceManager *getResMan() const { return _resMan; }
@@ -256,6 +295,7 @@ public:
 	GfxText16 *_gfxText16;
 	GfxTransitions *_gfxTransitions; // transitions between screens for 16-bit gfx
 	GfxMacIconBar *_gfxMacIconBar; // Mac Icon Bar manager
+	GfxMacFontManager *_gfxMacFontManager; // null when not applicable
 	SciTTS *_tts;
 
 #ifdef ENABLE_SCI32
@@ -281,6 +321,7 @@ public:
 	opcode_format (*_opcode_formats)[4];
 
 	DebugState _debugState;
+	uint32 _speedThrottleDelay; // kGameIsRestarting maximum delay
 
 	Common::MacResManager *getMacExecutable() { return &_macExecutable; }
 
@@ -311,9 +352,21 @@ private:
 	void exitGame();
 
 	/**
-	 * Loads the Mac executable for SCI1 games
+	 * Loads the Mac executable for SCI1/1.1 games.
+	 * This function should only be called on Mac games.
+	 * If the executable isn't used, or is missing but optional,
+	 * then this function does nothing.
 	 */
 	void loadMacExecutable();
+
+	/**
+	 * Loads Mac native fonts for SCI1/1.1 games that support them.
+	 * This function should only be called on Mac games after loadMacExecutable()
+	 * has been called. Depending on the game, fonts are loaded from either the
+	 * executable or from classicmacfonts.dat. If fonts are not present, then a
+	 * warning is logged and SCI fonts are used instead.
+	 */
+	void loadMacFonts();
 
 	void initStackBaseWithSelector(Selector selector);
 

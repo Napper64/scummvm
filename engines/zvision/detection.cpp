@@ -33,16 +33,16 @@
 
 class ZVisionMetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
-	ZVisionMetaEngineDetection() : AdvancedMetaEngineDetection(ZVision::gameDescriptions, sizeof(ZVision::ZVisionGameDescription), ZVision::zVisionGames, ZVision::optionsList) {
+	ZVisionMetaEngineDetection() : AdvancedMetaEngineDetection(ZVision::gameDescriptions, sizeof(ZVision::ZVisionGameDescription), ZVision::zVisionGames) {
 		_maxScanDepth = 2;
 		_directoryGlobs = ZVision::directoryGlobs;
 	}
 
-	const char *getEngineId() const override {
+	const char *getName() const override {
 		return "zvision";
 	}
 
-	const char *getName() const override {
+	const char *getEngineName() const override {
 		return "Z-Vision";
 	}
 

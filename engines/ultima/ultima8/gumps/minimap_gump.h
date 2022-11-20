@@ -34,16 +34,18 @@ class MiniMapGump : public Gump {
 private:
 	Graphics::ManagedSurface _minimap;
 	unsigned int        _lastMapNum;
+	int32 _ax, _ay;
 
-	uint32 getPixelAt(int x, int y) const;
-	void setPixelAt(int x, int y, uint32 pixel);
-	uint32 sampleAtPoint(int x, int y, CurrentMap *map);
+	uint32 sampleAtPoint(CurrentMap *map, int x, int y);
+	uint32 sampleAtPoint(const Item *item, int x, int y);
 public:
 	ENABLE_RUNTIME_CLASSTYPE()
 
 	MiniMapGump();
 	MiniMapGump(int x, int y);
 	~MiniMapGump() override;
+
+	void run() override;
 
 	void        PaintThis(RenderSurface *surf, int32 lerp_factor, bool scaled) override;
 	uint16      TraceObjId(int32 mx, int32 my) override;

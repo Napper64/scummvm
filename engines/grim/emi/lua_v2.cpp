@@ -112,7 +112,7 @@ void Lua_V2::MakeScreenTextures() {
 	lua_Object indexObj = lua_getparam(1);
 
 	if (!lua_isnil(indexObj) && lua_isnumber(indexObj)) {
-		/*int index = (int)lua_getnumber(indexObj);*/
+		//int index = (int)lua_getnumber(indexObj);
 		// The index does not seem to matter
 
 		g_driver->makeScreenTextures();
@@ -123,8 +123,8 @@ void Lua_V2::MakeScreenTextures() {
 }
 
 void Lua_V2::ClearSpecialtyTexture() {
-	//This seems to be used in the save/load menu
-	//Not sure why the specialty textures need to be cleared.
+	// This seems to be used in the save/load menu
+	// Not sure why the specialty textures need to be cleared.
 	warning("Lua_V2::ClearSpecialtyTexture: stub");
 }
 
@@ -299,13 +299,6 @@ void Lua_V2::SetAmbientLight() {
 
 void Lua_V2::Display() {
 	// dummy
-}
-
-void Lua_V2::GetCameraPosition() {
-	Set::Setup *setup = g_grim->getCurrSet()->getCurrSetup();
-	lua_pushnumber(setup->_pos.x());
-	lua_pushnumber(setup->_pos.y());
-	lua_pushnumber(setup->_pos.z());
 }
 
 void Lua_V2::GetCameraPitch() {
@@ -560,7 +553,7 @@ void Lua_V2::LocalizeString() {
 	if (lua_isstring(strObj)) {
 		const char *str = lua_getstring(strObj);
 		Common::String msg = parseMsgText(str, msgId);
-		sprintf(buf, "/%s/%s", msgId, msg.c_str());
+		Common::sprintf_s(buf, "/%s/%s", msgId, msg.c_str());
 
 		lua_pushstring(buf);
 	}
@@ -629,7 +622,7 @@ void Lua_V2::NewLayer() {
 		til = lua_getstring(param1);
 		sortorder = (int)lua_getnumber(param2);
 
-		//This one is always specified, but also always 0...
+		// This one is always specified, but also always 0...
 		//zero = (int)lua_getnumber(param3);
 
 		Layer *layer = new Layer(til, sortorder);

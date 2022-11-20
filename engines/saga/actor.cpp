@@ -248,7 +248,7 @@ Actor::Actor(SagaEngine *vm) : _vm(vm) {
 
 		_vm->_resource->loadResource(_actorContext, _vm->getResourceDescription()->actorsStringsResourceId, stringsData);
 
-		_vm->loadStrings(_actorsStrings, stringsData);
+		_vm->loadStrings(_actorsStrings, stringsData, _vm->isBigEndian());
 	}
 
 	if (_vm->getGameId() == GID_ITE) {
@@ -1107,9 +1107,9 @@ void Actor::drawSpeech() {
 	outputString.resize(stringLength + 1);
 
 	if (_activeSpeech.speechFlags & kSpeakSlow)
-		strncpy(&outputString.front(), _activeSpeech.strings[0], _activeSpeech.slowModeCharIndex + 1);
+		Common::strlcpy(&outputString.front(), _activeSpeech.strings[0], _activeSpeech.slowModeCharIndex + 2);
 	else
-		strncpy(&outputString.front(), _activeSpeech.strings[0], stringLength);
+		Common::strlcpy(&outputString.front(), _activeSpeech.strings[0], stringLength + 1);
 
 	if (_activeSpeech.actorsCount > 1) {
 		height = _vm->_font->getHeight(kKnownFontScript);

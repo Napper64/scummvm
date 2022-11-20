@@ -31,6 +31,7 @@ class TwinEEngine;
 
 class TwinEConsole : public GUI::Debugger {
 private:
+	using Super = GUI::Debugger;
 	TwinEEngine *_engine;
 
 	bool doToggleSceneryView(int argc, const char **argv);
@@ -61,6 +62,7 @@ private:
 	bool doToggleFreeCamera(int argc, const char **argv);
 	bool doToggleSceneChanges(int argc, const char **argv);
 	bool doToggleSceneRendering(int argc, const char **argv);
+	bool doSetTrackObject(int argc, const char **argv);
 	bool doSkipSceneActorsBut(int argc, const char **argv);
 	bool doSetGameFlag(int argc, const char **argv);
 	bool doSetInventoryFlag(int argc, const char **argv);
@@ -68,6 +70,10 @@ private:
 	bool doAddMagicPoints(int argc, const char **argv);
 	bool doDumpFile(int argc, const char **argv);
 	bool doSetHolomapTrajectory(int argc, const char **argv);
+
+protected:
+	void preEnter() override;
+	void postEnter() override;
 
 public:
 	TwinEConsole(TwinEEngine *engine);

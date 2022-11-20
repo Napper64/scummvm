@@ -70,7 +70,7 @@ public:
 	virtual void setFeatureState(OSystem::Feature f, bool enable) override;
 	virtual bool getFeatureState(OSystem::Feature f) const override;
 
-	virtual void showOverlay() override;
+	virtual void showOverlay(bool inGUI) override;
 	virtual void hideOverlay() override;
 	virtual void clearOverlay() override;
 	virtual void grabOverlay(Graphics::Surface &surface) const override;
@@ -126,7 +126,9 @@ protected:
 	void updateScreenRect();
 	void updateCursorScaling();
 	const GLESBaseTexture *getActiveTexture() const;
-	void clipMouse(Common::Point &p) const;
+
+	Common::Point convertScreenToVirtual(int &x, int &y) const;
+	Common::Point convertVirtualToScreen(int x, int y) const;
 
 	void setSystemMousePosition(int x, int y) {}
 
@@ -170,6 +172,7 @@ private:
 	GLESTexture *_overlay_background;
 	GLESTexture *_overlay_texture;
 	bool _show_overlay;
+	bool _overlay_in_gui;
 
 	// Mouse layer
 	GLESBaseTexture *_mouse_texture;
@@ -183,7 +186,7 @@ private:
 
 	// Touch controls layer
 	GLESTexture *_touchcontrols_texture;
-	bool _old_touch_3d_mode;
+	int _old_touch_mode;
 };
 
 #endif

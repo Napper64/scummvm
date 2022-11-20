@@ -51,10 +51,15 @@ struct PaletteInfo {
 	byte firstColor;
 	byte lastColor;
 	byte flags;
+	bool colorCycling;
+	bool normal;
+	bool fadeToWhite;
+	bool fadeToBlack;
+	bool autoReverse;
+	bool overTime;
 	byte speed;
 	uint16 frameCount;
 	uint16 cycleCount;
-	uint16 cycleLength;
 	byte fade;
 	byte delay;
 	byte style;
@@ -63,8 +68,11 @@ struct PaletteInfo {
 	PaletteInfo() {
 		paletteId = 0;
 		firstColor = lastColor = 0;
-		flags = 0; speed = 0;
-		frameCount = cycleCount = cycleLength = 0;
+		flags = 0; colorCycling = false;
+		normal = false; fadeToWhite = false;
+		fadeToBlack = false; autoReverse = false;
+		overTime = false; speed = 0;
+		frameCount = cycleCount = 0;
 		fade = delay = style = colorCode = 0;
 	}
 };
@@ -83,10 +91,12 @@ public:
 
 	Score *getScore() const { return _score; }
 
-	void readChannels(Common::ReadStreamEndian *stream, uint16 version);
+	void readChannels(Common::SeekableReadStreamEndian *stream, uint16 version);
 	void readChannel(Common::SeekableReadStreamEndian &stream, uint16 offset, uint16 size);
 
 	void executeImmediateScripts();
+
+	Common::String formatChannelInfo();
 
 private:
 
@@ -107,6 +117,7 @@ public:
 	TransitionType _transType;
 	PaletteInfo _palette;
 	uint8 _tempo;
+	uint8 _scoreCachedTempo;
 
 	CastMemberID _sound1;
 	uint8 _soundType1;

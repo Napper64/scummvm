@@ -65,12 +65,13 @@ namespace Common {
 namespace Graphics {
 class MacMenu;
 struct WinCursorGroup;
+class PaletteLookup;
 }
 
 namespace Pink {
 
 class Console;
-class Director;
+class Screen;
 class Archive;
 class NamedObject;
 class Module;
@@ -84,6 +85,12 @@ enum {
 	kPinkDebugScripts = 1 << 3,
 	kPinkDebugActions = 1 << 4
 };
+
+enum {
+	GF_COMPRESSED = 1 << 0,
+};
+
+extern Graphics::PaletteLookup *g_paletteLookup;
 
 class PinkEngine : public Engine {
 public:
@@ -102,6 +109,7 @@ public:
 	Common::String getSaveStateName(int slot) const override {
 		return Common::String::format("%s.s%02d", _targetName.c_str(), slot);
 	}
+	SaveStateList listSaves() const;
 
 	friend class Console;
 
@@ -125,7 +133,7 @@ public:
 	OrbFile *getOrb()  { return &_orb; }
 	BroFile *getBro()  { return _bro; }
 	Common::RandomSource &getRnd() { return _rnd; };
-	Director *getDirector() { return _director; }
+	Screen *getScreen() { return _screen; }
 	PDAMgr &getPdaMgr() { return _pdaMgr; }
 
 	void setNextExecutors(const Common::String &nextModule, const Common::String &nextPage) { _nextModule = nextModule; _nextPage = nextPage; }
@@ -158,7 +166,7 @@ private:
 	BroFile *_bro;
 
 	Graphics::MacMenu *_menu;
-	Director *_director;
+	Screen *_screen;
 	LeadActor *_actor;
 
 	Module *_module;

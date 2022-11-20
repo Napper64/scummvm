@@ -121,11 +121,6 @@ void checkGlError(const char *expr, const char *file, int line) {
 }
 #endif
 
-void *androidGLgetProcAddress(const char *name) {
-	// This exists since Android 2.3 (API Level 9)
-	return (void *)eglGetProcAddress(name);
-}
-
 OSystem_Android::OSystem_Android(int audio_sample_rate, int audio_buffer_size) :
 	_audio_sample_rate(audio_sample_rate),
 	_audio_buffer_size(audio_buffer_size),
@@ -139,7 +134,7 @@ OSystem_Android::OSystem_Android(int audio_sample_rate, int audio_buffer_size) :
 	_eventScaleX(100),
 	_eventScaleY(100),
 	// TODO put these values in some option dlg?
-	_touchpad_mode(true),
+	_touch_mode(TOUCH_MODE_TOUCHPAD),
 	_touchpad_scale(66),
 	_dpad_scale(4),
 //	_fingersDown(0),
@@ -475,7 +470,7 @@ void OSystem_Android::initBackend() {
 	// The division by four happens because the Mixer stores the size in frame units
 	// instead of bytes; this means that, since we have audio in stereo (2 channels)
 	// with a word size of 16 bit (2 bytes), we have to divide the effective size by 4.
-	_mixer = new Audio::MixerImpl(_audio_sample_rate, _audio_buffer_size / 4);
+	_mixer = new Audio::MixerImpl(_audio_sample_rate, true, _audio_buffer_size / 4);
 	_mixer->setReady(true);
 
 	_timer_thread_exit = false;
@@ -792,5 +787,12 @@ int OSystem_Android::getGraphicsMode() const {
 	// We only support one mode
 	return 0;
 }
+
+#if defined(USE_OPENGL) && defined(USE_GLAD)
+void *OSystem_Android::getOpenGLProcAddress(const char *name) const {
+	// This exists since Android 2.3 (API Level 9)
+	return (void *)eglGetProcAddress(name);
+}
+#endif
 
 #endif

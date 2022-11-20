@@ -48,6 +48,7 @@
 #include "engines/wintermute/base/scriptables/script_stack.h"
 #include "engines/wintermute/base/scriptables/script_value.h"
 #include "engines/wintermute/base/sound/base_sound.h"
+
 #include "common/str.h"
 #include "common/util.h"
 
@@ -253,8 +254,9 @@ bool AdObject::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack
 		stack->correctParams(1);
 		const char *animName = stack->pop()->getString();
 		delete[] _forcedTalkAnimName;
-		_forcedTalkAnimName = new char[strlen(animName) + 1];
-		strcpy(_forcedTalkAnimName, animName);
+		size_t animNameSize = strlen(animName) + 1;
+		_forcedTalkAnimName = new char[animNameSize];
+		Common::strcpy_s(_forcedTalkAnimName, animNameSize, animName);
 		_forcedTalkAnimUsed = false;
 		stack->pushBool(true);
 		return STATUS_OK;

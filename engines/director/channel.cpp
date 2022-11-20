@@ -106,12 +106,18 @@ Channel::~Channel() {
 }
 
 DirectorPlotData Channel::getPlotData() {
-	DirectorPlotData pd(g_director->_wm, _sprite->_spriteType, _sprite->_ink, _sprite->_blend, _sprite->getBackColor(), _sprite->getForeColor());
-	pd.colorWhite = pd._wm->_colorWhite;
-	pd.colorBlack = pd._wm->_colorBlack;
+	DirectorPlotData pd(g_director, _sprite->_spriteType, _sprite->_ink, _sprite->_blend, _sprite->getBackColor(), _sprite->getForeColor());
+	pd.colorWhite = 255;
+	pd.colorBlack = 0;
 	pd.dst = nullptr;
 
 	pd.srf = getSurface();
+	if (_sprite->_spriteType == kBitmapSprite &&
+		_sprite->_cast && _sprite->_cast->_type == kCastBitmap &&
+		((BitmapCastMember *)_sprite->_cast)->_bitsPerPixel == 1) {
+		// Add override flag for 1-bit images
+		pd.oneBitImage = true;
+	}
 	if (!pd.srf && _sprite->_spriteType != kBitmapSprite) {
 		// Shapes come colourized from macDrawPixel
 		pd.ms = _sprite->getShape();
@@ -321,7 +327,7 @@ bool Channel::isActiveVideo() {
 }
 
 void Channel::updateVideoTime() {
-	if (_sprite)
+	if (isActiveVideo())
 		_movieTime = ((DigitalVideoCastMember *)_sprite->_cast)->getMovieCurrentTime();
 }
 
@@ -334,7 +340,20 @@ bool Channel::isVideoDirectToStage() {
 
 Common::Rect Channel::getBbox(bool unstretched) {
 	Common::Rect result(unstretched ? _sprite->_width : _width,
-											unstretched ? _sprite->_height : _height);
+						unstretched ? _sprite->_height : _height);
+	result.moveTo(getPosition());
+
+	if (_constraint > 0 && _constraint <= g_director->getCurrentMovie()->getScore()->_channels.size()) {
+		Common::Rect constraintBbox = g_director->getCurrentMovie()->getScore()->_channels[_constraint]->getBbox();
+		if (result.top < constraintBbox.top)
+			_currentPoint.y = constraintBbox.top;
+		if (result.left < constraintBbox.left)
+			_currentPoint.x = constraintBbox.left;
+		if (result.top > constraintBbox.bottom)
+			_currentPoint.y = constraintBbox.bottom;
+		if (result.left > constraintBbox.right)
+			_currentPoint.x = constraintBbox.right;
+	}
 	result.moveTo(getPosition());
 
 	return result;
@@ -491,6 +510,10 @@ void Channel::replaceSprite(Sprite *nextSprite) {
 		_sprite->_cast->releaseWidget();
 		newSprite = true;
 	}
+	if (_sprite->_castId != nextSprite->_castId && _sprite->_cast && _sprite->_cast->_type == kCastDigitalVideo) {
+		((DigitalVideoCastMember *)_sprite->_cast)->stopVideo();
+		((DigitalVideoCastMember *)_sprite->_cast)->rewindVideo();
+	}
 
 	int width = _width;
 	int height = _height;
@@ -517,26 +540,35 @@ void Channel::replaceSprite(Sprite *nextSprite) {
 }
 
 void Channel::setWidth(int w) {
-	if (_sprite->_puppet && _sprite->_stretch) {
+	if (_sprite->_puppet) {
+		if (!(_sprite->_cast && _sprite->_cast->_type == kCastShape) && !_sprite->_stretch)
+			return;
 		_width = MAX<int>(w, 0);
 	}
 }
 
 void Channel::setHeight(int h) {
-	if (_sprite->_puppet && _sprite->_stretch) {
+	if (_sprite->_puppet) {
+		if (!(_sprite->_cast && _sprite->_cast->_type == kCastShape) && !_sprite->_stretch)
+			return;
 		_height = MAX<int>(h, 0);
 	}
 }
 
 void Channel::setBbox(int l, int t, int r, int b) {
-	if (_sprite->_puppet && _sprite->_stretch) {
+	if (_sprite->_puppet) {
+		if (!(_sprite->_cast && _sprite->_cast->_type == kCastShape) && !_sprite->_stretch)
+			return;
 		_width = r - l;
 		_height = b - t;
 
-		_currentPoint.x = l;
-		_currentPoint.y = t;
+		_currentPoint.x = (int16)((l + r) / 2);
+		_currentPoint.y = (int16)((t + b) / 2);
 
 		addRegistrationOffset(_currentPoint, true);
+
+		_currentPoint.x -= (int16)((_sprite->_width) / 2);
+		_currentPoint.y -= (int16)((_sprite->_height) / 2);
 	}
 }
 
@@ -663,14 +695,14 @@ void Channel::addDelta(Common::Point pos) {
 		if (!constraintBbox.contains(currentBbox)) {
 			if (currentBbox.top < constraintBbox.top) {
 				pos.y += constraintBbox.top - currentBbox.top;
-			} else if (currentBbox.bottom > constraintBbox.bottom) {
-				pos.y += constraintBbox.bottom - currentBbox.bottom;
+			} else if (currentBbox.top > constraintBbox.bottom) {
+				pos.y += constraintBbox.bottom;
 			}
 
 			if (currentBbox.left < constraintBbox.left) {
 				pos.x += constraintBbox.left - currentBbox.left;
-			} else if (currentBbox.right > constraintBbox.right) {
-				pos.x += constraintBbox.right - currentBbox.right;
+			} else if (currentBbox.left > constraintBbox.right) {
+				pos.x += constraintBbox.right;
 			}
 		}
 	}

@@ -29,6 +29,7 @@
 #include "scumm/object.h"
 #include "scumm/resource.h"
 #include "scumm/scumm_v3.h"
+#include "scumm/scumm_v7.h"
 #include "scumm/sound.h"
 #include "scumm/util.h"
 
@@ -43,14 +44,19 @@ void ScummEngine::startScene(int room, Actor *a, int objectNr) {
 
 	debugC(DEBUG_GENERAL, "Loading room %d", room);
 
+#ifdef ENABLE_SCUMM_7_8
+	if (_game.version >= 7) {
+		((ScummEngine_v7 *)this)->removeBlastTexts();
+	}
+#endif
+
 	stopTalk();
 
 	fadeOut(_switchRoomEffect2);
 	_newEffect = _switchRoomEffect;
 
-	ScriptSlot *ss = &vm.slot[_currentScript];
-
 	if (_currentScript != 0xFF) {
+		ScriptSlot *ss = &vm.slot[_currentScript];
 		if (ss->where == WIO_ROOM || ss->where == WIO_FLOBJECT) {
 			if (ss->cutsceneOverride && _game.version >= 5)
 				error("Object %d stopped with active cutscene/override in exit", ss->number);
@@ -143,6 +149,11 @@ void ScummEngine::startScene(int room, Actor *a, int objectNr) {
 		_ENCD_offs = _EXCD_offs = 0;
 		_numObjectsInRoom = 0;
 		return;
+	} else if (_game.id == GID_LOOM && _game.version == 4) {
+		// This is specific for LOOM VGA Talkie. It forces a
+		// redraw of the verbs screen. The original interpreter
+		// does this here...
+		VAR(66) = 1;
 	}
 
 	setupRoomSubBlocks();
@@ -231,7 +242,7 @@ void ScummEngine::startScene(int room, Actor *a, int objectNr) {
 			hasCopyProtectionScreen = false;
 
 		// The unofficial talkie never shows any copy protection screen.
-		if (strcmp(_game.variant, "SE Talkie") == 0)
+		if (_game.features & GF_ULTIMATE_TALKIE)
 			hasCopyProtectionScreen = false;
 
 		if (hasCopyProtectionScreen) {
@@ -349,7 +360,7 @@ void ScummEngine::setupRoomSubBlocks() {
 
 			if (_dumpScripts) {
 				char buf[32];
-				sprintf(buf, "room-%d-", _roomResource);
+				Common::sprintf_s(buf, "room-%d-", _roomResource);
 				dumpResource(buf, id, ptr - _resourceHeaderSize);
 			}
 
@@ -369,7 +380,7 @@ void ScummEngine::setupRoomSubBlocks() {
 
 			if (_dumpScripts) {
 				char buf[32];
-				sprintf(buf, "room-%d-", _roomResource);
+				Common::sprintf_s(buf, "room-%d-", _roomResource);
 				dumpResource(buf, id, ptr - _resourceHeaderSize);
 			}
 		}
@@ -385,7 +396,7 @@ void ScummEngine::setupRoomSubBlocks() {
 
 			if (_dumpScripts) {
 				char buf[32];
-				sprintf(buf, "room-%d-", _roomResource);
+				Common::sprintf_s(buf, "room-%d-", _roomResource);
 				dumpResource(buf, id, ptr - _resourceHeaderSize);
 			}
 		}
@@ -412,7 +423,7 @@ void ScummEngine::setupRoomSubBlocks() {
 
 			if (_dumpScripts) {
 				char buf[32];
-				sprintf(buf, "room-%d-", _roomResource);
+				Common::sprintf_s(buf, "room-%d-", _roomResource);
 				dumpResource(buf, id, ptr - _resourceHeaderSize);
 			}
 		}
@@ -722,7 +733,7 @@ void ScummEngine_v3old::setupRoomSubBlocks() {
 
 			if (_dumpScripts) {
 				char buf[32];
-				sprintf(buf, "room-%d-", _roomResource);
+				Common::sprintf_s(buf, "room-%d-", _roomResource);
 
 				// HACK: to determine the sizes of the local scripts, we assume that
 				// a) their order in the data file is the same as in the index

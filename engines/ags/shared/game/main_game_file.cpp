@@ -96,9 +96,8 @@ String GetMainGameFileErrorText(MainGameFileErrorType err) {
 	return "Unknown error.";
 }
 
-LoadedGameEntities::LoadedGameEntities(GameSetupStruct &game, DialogTopic *&dialogs)
+LoadedGameEntities::LoadedGameEntities(GameSetupStruct &game)
 	: Game(game)
-	, Dialogs(dialogs)
 	, SpriteCount(0) {
 }
 
@@ -266,14 +265,12 @@ void ReadViews(GameSetupStruct &game, std::vector<ViewStruct> &views, Stream *in
 	}
 }
 
-void ReadDialogs(DialogTopic *&dialog,
+void ReadDialogs(std::vector<DialogTopic> &dialog,
                  std::vector< std::shared_ptr<unsigned char> > &old_dialog_scripts,
                  std::vector<String> &old_dialog_src,
                  std::vector<String> &old_speech_lines,
                  Stream *in, GameDataVersion data_ver, int dlg_count) {
-	// TODO: I suspect +5 was a hacky way to "supress" memory access mistakes;
-	// double check and remove if proved unnecessary
-	dialog = (DialogTopic *)malloc(sizeof(DialogTopic) * dlg_count + 5);
+	dialog.resize(dlg_count);
 	for (int i = 0; i < dlg_count; ++i) {
 		dialog[i].ReadFromFile(in);
 	}
@@ -293,7 +290,7 @@ void ReadDialogs(DialogTopic *&dialog,
 		if (script_text_len > 1) {
 			// Originally in the Editor +20000 bytes more were allocated, with comment:
 			//   "add a large buffer because it will get added to if another option is added"
-			// which probably refered to this data used by old editor directly to edit dialogs
+			// which probably referred to this data used by old editor directly to edit dialogs
 			char *buffer = new char[script_text_len + 1];
 			in->Read(buffer, script_text_len);
 			if (data_ver > kGameVersion_260)

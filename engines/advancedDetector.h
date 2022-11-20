@@ -86,27 +86,29 @@ struct ADGameFileDescription {
 
 /**
  * Flags used in the game description.
+ *
+ * Note that the lowest 16 bits are currently reserved for use by the client code.
  */
 enum ADGameFlags {
-	ADGF_NO_FLAGS        =  0,        ///< No flags.
-	ADGF_TAILMD5		 = (1 << 15), ///< Calculate the MD5 for this entry from the end of the file.
-	ADGF_REMASTERED      = (1 << 16), ///< Add "-remastered' to gameid.
-	ADGF_AUTOGENTARGET   = (1 << 17), ///< Automatically generate gameid from @ref ADGameDescription::extra.
-	ADGF_UNSTABLE        = (1 << 18), ///< Flag to designate not yet officially supported games that are not fit for public testing.
-	ADGF_TESTING         = (1 << 19), ///< Flag to designate not yet officially supported games that are fit for public testing.
-	ADGF_PIRATED         = (1 << 20), ///< Flag to designate well-known pirated versions with cracks.
-	ADGF_UNSUPPORTED     = (1 << 21), /*!< Flag to mark certain versions (like badly protected full games as demos) not to be run for various reasons.
-	                                       A custom message can be provided in the @ref ADGameDescription::extra field. */
-	ADGF_WARNING         = (1 << 22), /*!< Flag to mark certain versions to show confirmation warning before proceeding.
-	                                       A custom message should be provided in the @ref ADGameDescription::extra field. */
-	ADGF_ADDENGLISH      = (1 << 23), ///< Always add English as a language option.
-	ADGF_MACRESFORK      = (1 << 24), ///< Calculate the MD5 for this entry from the resource fork.
-	ADGF_USEEXTRAASTITLE = (1 << 25), ///< Use @ref ADGameDescription::extra as the main game title, not gameid.
-	ADGF_DROPLANGUAGE    = (1 << 26), ///< Do not add language to gameid.
-	ADGF_DROPPLATFORM    = (1 << 27), ///< Do not add platform to gameid.
-	ADGF_CD              = (1 << 28), ///< Add "-cd" to gameid.
-	ADGF_DVD             = (1 << 29), ///< Add "-dvd" to gameid.
-	ADGF_DEMO            = (1 << 30)  ///< Add "-demo" to gameid.
+	ADGF_NO_FLAGS        =  0u,        ///< No flags.
+	ADGF_TAILMD5         = (1u << 16), ///< Calculate the MD5 for this entry from the end of the file.
+	ADGF_AUTOGENTARGET   = (1u << 17), ///< Automatically generate gameid from @ref ADGameDescription::extra.
+	ADGF_UNSTABLE        = (1u << 18), ///< Flag to designate not yet officially supported games that are not fit for public testing.
+	ADGF_TESTING         = (1u << 19), ///< Flag to designate not yet officially supported games that are fit for public testing.
+	ADGF_PIRATED         = (1u << 20), ///< Flag to designate well-known pirated versions with cracks.
+	ADGF_UNSUPPORTED     = (1u << 21), /*!< Flag to mark certain versions (like badly protected full games as demos) not to be run for various reasons.
+	                                        A custom message can be provided in the @ref ADGameDescription::extra field. */
+	ADGF_WARNING         = (1u << 22), /*!< Flag to mark certain versions to show confirmation warning before proceeding.
+	                                        A custom message should be provided in the @ref ADGameDescription::extra field. */
+	ADGF_ADDENGLISH      = (1u << 23), ///< Always add English as a language option.
+	ADGF_MACRESFORK      = (1u << 24), ///< Calculate the MD5 for this entry from the resource fork.
+	ADGF_USEEXTRAASTITLE = (1u << 25), ///< Use @ref ADGameDescription::extra as the main game title, not gameid.
+	ADGF_DROPLANGUAGE    = (1u << 26), ///< Do not add language to gameid.
+	ADGF_DROPPLATFORM    = (1u << 27), ///< Do not add platform to gameid.
+	ADGF_CD              = (1u << 28), ///< Add "-cd" to gameid.
+	ADGF_DVD             = (1u << 29), ///< Add "-dvd" to gameid.
+	ADGF_DEMO            = (1u << 30), ///< Add "-demo" to gameid.
+	ADGF_REMASTERED      = (1u << 31)  ///< Add "-remastered' to gameid.
 };
 
 /**
@@ -282,11 +284,6 @@ protected:
 	const PlainGameDescriptor *_gameIds;
 
 	/**
-	 * A map containing all the extra game GUI options the engine supports.
-	 */
-	const ADExtraGuiOptionsMap * const _extraGuiOptions;
-
-	/**
 	 * The number of bytes to compute the MD5 checksum for.
 	 *
 	 * The Advanced Detector is primarily based on computing and matching
@@ -341,7 +338,7 @@ public:
 	/**
 	 * Initialize game detection using AdvancedMetaEngineDetection.
 	 */
-	AdvancedMetaEngineDetection(const void *descs, uint descItemSize, const PlainGameDescriptor *gameIds, const ADExtraGuiOptionsMap *extraGuiOptions = 0);
+	AdvancedMetaEngineDetection(const void *descs, uint descItemSize, const PlainGameDescriptor *gameIds);
 
 	/**
 	 * Return a list of targets supported by the engine.
@@ -358,7 +355,7 @@ public:
 	 * (possibly empty) list of games supported by the engine that were
 	 * found among the given files.
 	 */
-	DetectedGames detectGames(const Common::FSList &fslist) override;
+	DetectedGames detectGames(const Common::FSList &fslist, uint32 skipADFlags, bool skipIncomplete) override;
 
 	/**
 	 * A generic createInstance.
@@ -367,22 +364,6 @@ public:
 	 * and then the subclass implemented createInstance is called from within.
 	 */
 	Common::Error createInstance(OSystem *syst, Engine **engine);
-
-	/**
-	 * Return a list of extra GUI options for the specified target.
-	 *
-	 * If no target is specified, all of the available custom GUI options are
-	 * returned for the plugin (used to set default values).
-	 *
-	 * Currently, this only supports options with checkboxes.
-	 *
-	 * The default implementation returns an empty list.
-	 *
-	 * @param target    Name of a config manager target.
-	 *
-	 * @return A list of extra GUI options for an engine plugin and target.
-	 */
-	const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const override;
 
 	static Common::StringArray getPathsFromEntry(const ADGameDescription *g);
 
@@ -406,6 +387,7 @@ private:
 	void initSubSystems(const ADGameDescription *gameDesc) const;
 	void preprocessDescriptions();
 	bool isEntryGrayListed(const ADGameDescription *g) const;
+	void detectClashes() const;
 
 private:
 	Common::HashMap<Common::String, bool, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> _grayListMap;
@@ -419,15 +401,17 @@ protected:
 	 * Parameters @p language and @p platform are used to pass the values
 	 * specified by the user. This is used to restrict search scope.
 	 *
-	 * @param parent    Parent node of this file node.
-	 * @param allFiles  List of all present files, as computed by the @ref composeFileHashMap.
-	 * @param language  Restrict results to the specified language.
-	 * @param platform  Restrict results to the specified platform.
-	 * @param extra     Restrict results to the specified @c extra string (only if @ref kADFlagUseExtraAsHint is set).
+	 * @param parent		  Parent node of this file node.
+	 * @param allFiles		  List of all present files, as computed by the @ref composeFileHashMap.
+	 * @param language		  Restrict results to the specified language.
+	 * @param platform		  Restrict results to the specified platform.
+	 * @param extra			  Restrict results to the specified @c extra string (only if @ref kADFlagUseExtraAsHint is set).
+	 * @param skipADFlags	  Specify bitmask of ADGF flags to be ignored (for mass add).
+	 * @param skipIncomplete  Ignore results with incomplete file/md5/size matches (for mass add).
 	 *
 	 * @return A list of @ref ADGameDescription pointers corresponding to the matched games.
 	 */
-	virtual ADDetectedGames detectGame(const Common::FSNode &parent, const FileMap &allFiles, Common::Language language, Common::Platform platform, const Common::String &extra);
+	virtual ADDetectedGames detectGame(const Common::FSNode &parent, const FileMap &allFiles, Common::Language language, Common::Platform platform, const Common::String &extra, uint32 skipADFlags = 0, bool skipIncomplete = false);
 
 	/**
 	 * @return True if variant of a game with unknown files can be played with the engine and false otherwise.
@@ -456,7 +440,7 @@ protected:
 	void composeFileHashMap(FileMap &allFiles, const Common::FSList &fslist, int depth, const Common::String &parentName = Common::String()) const;
 
 	/** Get the properties (size and MD5) of this file. */
-	bool getFileProperties(const FileMap &allFiles, const ADGameDescription &game, const Common::String fname, FileProperties &fileProps) const;
+	bool getFileProperties(const FileMap &allFiles, const ADGameDescription &game, const Common::String &fname, FileProperties &fileProps) const;
 
 	/** Convert an AD game description into the shared game description format. */
 	virtual DetectedGame toDetectedGame(const ADDetectedGame &adGame, ADDetectedGameExtraInfo *extraInfo = nullptr) const;
@@ -491,7 +475,7 @@ public:
 	/**
 	 * Return the name of the engine plugin based on the engineID.
 	 *
-	 * The the engineID must match the one from MetaEngine.
+	 * The engineID must match the one from MetaEngine.
 	 *
 	 * @see MetaEngine::getName().
 	 */
@@ -525,7 +509,29 @@ public:
 	 *
 	 * Based on @ref MetaEngine::getFileProperties.
 	 */
-	bool getFilePropertiesExtern(uint md5Bytes, const FileMap &allFiles, const ADGameDescription &game, const Common::String fname, FileProperties &fileProps) const;
+	bool getFilePropertiesExtern(uint md5Bytes, const FileMap &allFiles, const ADGameDescription &game, const Common::String &fname, FileProperties &fileProps) const;
+
+protected:
+	/**
+	 * Return a list of extra GUI options for the specified target.
+	 *
+	 * If no target is specified, all of the available custom GUI options are
+	 * returned for the plugin (used to set default values).
+	 *
+	 * Currently, this only supports options with checkboxes.
+	 *
+	 * The default implementation returns an empty list.
+	 *
+	 * @param target    Name of a config manager target.
+	 *
+	 * @return A list of extra GUI options for an engine plugin and target.
+	 */
+	const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const override final;
+
+	/**
+	 * Returns a map containing all the extra game GUI options the engine supports.
+	 */
+	virtual const ADExtraGuiOptionsMap *getAdvancedExtraGuiOptions() const { return nullptr; }
 };
 
 /**

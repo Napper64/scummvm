@@ -689,22 +689,38 @@ void MarkAllGUIForUpdate() {
 	}
 }
 
-void MarkForFontUpdate(int font) {
+void MarkForTranslationUpdate() {
 	for (auto &btn : _GP(guibuts)) {
-		if (btn.Font == font)
+		if (btn.IsTranslated())
 			btn.MarkChanged();
 	}
 	for (auto &lbl : _GP(guilabels)) {
-		if (lbl.Font == font)
+		if (lbl.IsTranslated())
 			lbl.MarkChanged();
 	}
 	for (auto &list : _GP(guilist)) {
-		if (list.Font == font)
+		if (list.IsTranslated())
 			list.MarkChanged();
 	}
+}
+
+void MarkForFontUpdate(int font) {
+	const bool update_all = (font < 0);
+	for (auto &btn : _GP(guibuts)) {
+		if (update_all || btn.Font == font)
+			btn.OnResized();
+	}
+	for (auto &lbl : _GP(guilabels)) {
+		if (update_all || lbl.Font == font)
+			lbl.OnResized();
+	}
+	for (auto &list : _GP(guilist)) {
+		if (update_all || list.Font == font)
+			list.OnResized();
+	}
 	for (auto &tb : _GP(guitext)) {
-		if (tb.Font == font)
-			tb.MarkChanged();
+		if (update_all || tb.Font == font)
+			tb.OnResized();
 	}
 }
 

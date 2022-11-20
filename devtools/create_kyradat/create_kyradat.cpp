@@ -23,12 +23,12 @@
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 
 #include "create_kyradat.h"
+
+#include "md5.h"
+#include "pak.h"
 #include "resources.h"
 #include "types.h"
 
-#include "pak.h"
-
-#include "md5.h"
 #include "common/language.h"
 #include "common/platform.h"
 
@@ -38,7 +38,7 @@
 
 
 enum {
-	kKyraDatVersion = 116
+	kKyraDatVersion = 119
 };
 
 const ExtractFilename extractFilenames[] = {
@@ -1203,6 +1203,7 @@ const TypeTable languageTable[] = {
 	{ HE_ISR,  8 },
 	{ ZH_CHN,  9 },
 	{ ZH_TWN, 10 },
+	{ KO_KOR, 11 },
 	{ -1, -1 }
 };
 

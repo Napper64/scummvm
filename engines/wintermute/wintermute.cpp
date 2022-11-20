@@ -61,7 +61,7 @@ WintermuteEngine::WintermuteEngine(OSystem *syst, const WMEGameDescription *desc
 	// Put your engine in a sane state, but do nothing big yet;
 	// in particular, do not load data from files; rather, if you
 	// need to do such things, do them from init().
-	ConfMan.registerDefault("show_fps","false");
+	ConfMan.registerDefault("show_fps", "false");
 
 	// Do not initialize graphics here
 
@@ -91,7 +91,7 @@ bool WintermuteEngine::hasFeature(EngineFeature f) const {
 		return true;
 #ifdef ENABLE_WME3D
 	case kSupportsArbitraryResolutions:
-		return true;
+		return /*true*/false; // opengl renderers doesn't support it yet
 #endif
 	default:
 		return false;
@@ -438,6 +438,12 @@ bool WintermuteEngine::getGameInfo(const Common::FSList &fslist, Common::String 
 						}
 					}
 					caption = value;
+
+					for (uint i = 0; i< value.size(); i++) {
+						if ( int(value[i]) < 16 || int(value[i]) >= 127 ) {
+							caption = "(invalid)";
+						}
+					}
 				}
 			}
 		}

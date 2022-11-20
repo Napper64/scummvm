@@ -21,7 +21,6 @@
 
 #include "base/plugins.h"
 #include "common/file.h"
-#include "common/translation.h"
 
 #include "engines/advancedDetector.h"
 
@@ -294,41 +293,24 @@ static const DrasculaGameDescription gameDescriptions[] = {
 	{ AD_TABLE_END_MARKER }
 };
 
-static const ExtraGuiOption drasculaExtraGuiOption = {
-	_s("Use original save/load screens"),
-	_s("Use the original save/load screens instead of the ScummVM ones"),
-	"originalsaveload",
-	false,
-	0,
-	0
-};
-
 class DrasculaMetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
 	DrasculaMetaEngineDetection() : AdvancedMetaEngineDetection(Drascula::gameDescriptions, sizeof(Drascula::DrasculaGameDescription), drasculaGames) {
-		_guiOptions = GUIO1(GUIO_NOMIDI);
-	}
-
-	const char *getEngineId() const override {
-		return "drascula";
+		_guiOptions = GUIO2(GUIO_NOMIDI, GAMEOPTION_ORIGINAL_SAVELOAD);
 	}
 
 	const char *getName() const override {
+		return "drascula";
+	}
+
+	const char *getEngineName() const override {
 		return "Drascula: The Vampire Strikes Back";
 	}
 
 	const char *getOriginalCopyright() const override {
 		return "Drascula: The Vampire Strikes Back (C) 2000 Alcachofa Soft, (C) 1996 Digital Dreams Multimedia, (C) 1994 Emilio de Paz";
 	}
-
-	const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const override;
 };
-
-const ExtraGuiOptions DrasculaMetaEngineDetection::getExtraGuiOptions(const Common::String &target) const {
-	ExtraGuiOptions options;
-	options.push_back(drasculaExtraGuiOption);
-	return options;
-}
 
 } // End of namespace Drascula
 

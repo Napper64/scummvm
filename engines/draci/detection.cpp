@@ -38,7 +38,7 @@ static const DebugChannelDef debugFlagList[] = {
 };
 
 static const PlainGameDescriptor draciGames[] = {
-	{ "draci", "Draci Historie" },
+	{ "draci", "Dra\304\215\303\255 Historie" },
 	{ nullptr, nullptr }
 };
 
@@ -95,16 +95,16 @@ public:
 	DraciMetaEngineDetection() : AdvancedMetaEngineDetection(Draci::gameDescriptions, sizeof(ADGameDescription), draciGames) {
 	}
 
-	const char *getEngineId() const override {
+	const char *getName() const override {
 		return "draci";
 	}
 
-	const char *getName() const override {
-		return "Draci Historie";
+	const char *getEngineName() const override {
+		return "Dra\304\215\303\255 Historie";
 	}
 
 	const char *getOriginalCopyright() const override {
-		return "Draci Historie (C) 1995 NoSense";
+		return "Dra\304\215\303\255 Historie (C) 1995 NoSense";
 	}
 
 	const DebugChannelDef *getDebugChannels() const override {

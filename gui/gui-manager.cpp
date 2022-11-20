@@ -59,7 +59,7 @@ enum {
 };
 
 // Constructor
-GuiManager::GuiManager() : _redrawStatus(kRedrawDisabled), _stateIsSaved(false),
+GuiManager::GuiManager() : CommandSender(nullptr), _redrawStatus(kRedrawDisabled), _stateIsSaved(false),
 	_cursorAnimateCounter(0), _cursorAnimateTimer(0) {
 	_theme = nullptr;
 	_useStdCursor = false;
@@ -73,8 +73,12 @@ GuiManager::GuiManager() : _redrawStatus(kRedrawDisabled), _stateIsSaved(false),
 
 	_useRTL = false;
 
+	_iconsSetChanged = false;
+
 	_topDialogLeftPadding = 0;
 	_topDialogRightPadding = 0;
+
+	_displayTopDialogOnly = false;
 
 	// Clear the cursor
 	memset(_cursor, 0xFF, sizeof(_cursor));
@@ -87,6 +91,7 @@ GuiManager::GuiManager() : _redrawStatus(kRedrawDisabled), _stateIsSaved(false),
 
 	initTextToSpeech();
 	initIconsSet();
+	_iconsSetChanged = false;
 
 	ConfMan.registerDefault("gui_theme", "scummremastered");
 	Common::String themefile(ConfMan.get("gui_theme"));
@@ -114,11 +119,12 @@ struct ArchiveMemberListBackComparator {
 	}
 };
 void GuiManager::initIconsSet() {
+	Common::StackLock lock(_iconsMutex);
 	Common::Archive *dat;
 
 	_iconsSet.clear();
 
-	if (ConfMan.hasKey("iconspath")) {
+	if (!ConfMan.get("iconspath").empty()) {
 		Common::FSDirectory *iconDir = new Common::FSDirectory(ConfMan.get("iconspath"));
 		Common::ArchiveMemberList iconFiles;
 
@@ -169,6 +175,7 @@ void GuiManager::initIconsSet() {
 	}
 
 	_iconsSet.add(fname, dat);
+	_iconsSetChanged = true;
 
 	debug(2, "GUI: Loaded icon file: %s", fname);
 }
@@ -338,6 +345,15 @@ void GuiManager::redrawFull() {
 	_system->updateScreen();
 }
 
+void GuiManager::displayTopDialogOnly(bool mode) {
+	if (mode == _displayTopDialogOnly)
+		return;
+
+	_displayTopDialogOnly = mode;
+
+	redrawFull();
+}
+
 void GuiManager::redraw() {
 	ThemeEngine::ShadingStyle shading;
 
@@ -364,9 +380,11 @@ void GuiManager::redraw() {
 			_theme->clearAll();
 			_theme->drawToBackbuffer();
 
-			for (DialogStack::size_type i = 0; i < _dialogStack.size() - 1; i++) {
-				_dialogStack[i]->drawDialog(kDrawLayerBackground);
-				_dialogStack[i]->drawDialog(kDrawLayerForeground);
+			if (!_displayTopDialogOnly) {
+				for (DialogStack::size_type i = 0; i < _dialogStack.size() - 1; i++) {
+					_dialogStack[i]->drawDialog(kDrawLayerBackground);
+					_dialogStack[i]->drawDialog(kDrawLayerForeground);
+				}
 			}
 
 			// fall through
@@ -375,14 +393,23 @@ void GuiManager::redraw() {
 			// This case is an optimization to avoid redrawing the whole dialog
 			// stack when opening a new dialog.
 
-			_theme->drawToBackbuffer();
+			if (_displayTopDialogOnly) {
+				// When displaying only the top dialog clear the screen
+				if (_redrawStatus == kRedrawOpenDialog) {
+					_theme->clearAll();
+					_theme->drawToBackbuffer();
+				}
+			} else {
+				_theme->drawToBackbuffer();
 
-			if (_redrawStatus == kRedrawOpenDialog && _dialogStack.size() > 1) {
-				Dialog *previousDialog = _dialogStack[_dialogStack.size() - 2];
-				previousDialog->drawDialog(kDrawLayerForeground);
+				if (_redrawStatus == kRedrawOpenDialog && _dialogStack.size() > 1) {
+					Dialog *previousDialog = _dialogStack[_dialogStack.size() - 2];
+					previousDialog->drawDialog(kDrawLayerForeground);
+				}
+
+				_theme->applyScreenShading(shading);
 			}
 
-			_theme->applyScreenShading(shading);
 			_dialogStack.top()->drawDialog(kDrawLayerBackground);
 
 			_theme->drawToScreen();
@@ -503,6 +530,18 @@ void GuiManager::runLoop() {
 			}
 
 			processEvent(event, activeDialog);
+		}
+
+		// If iconsSet was modified, notify dialogs so that they can be  updated if needed
+		_iconsMutex.lock();
+		bool iconsChanged = _iconsSetChanged;
+		_iconsSetChanged = false;
+		_iconsMutex.unlock();
+		if (iconsChanged) {
+			for (DialogStack::size_type i = 0; i < _dialogStack.size(); ++i) {
+				setTarget(_dialogStack[i]);
+				sendCommand(kIconsSetLoadedCmd, 0);
+			}
 		}
 
 		// Delete GuiObject that have been added to the trash for a delayed deletion

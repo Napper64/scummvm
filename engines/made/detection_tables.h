@@ -43,7 +43,7 @@ static const MadeGameDescription gameDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO0()
+			GUIO1(GAMEOPTION_INTRO_MUSIC_DIGITAL)
 		},
 		GID_RTZ,
 		0,
@@ -61,7 +61,7 @@ static const MadeGameDescription gameDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_CD,
-			GUIO0()
+			GUIO1(GAMEOPTION_INTRO_MUSIC_DIGITAL)
 		},
 		GID_RTZ,
 		0,
@@ -78,7 +78,7 @@ static const MadeGameDescription gameDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_CD,
-			GUIO0()
+			GUIO1(GAMEOPTION_INTRO_MUSIC_DIGITAL)
 		},
 		GID_RTZ,
 		0,
@@ -95,7 +95,7 @@ static const MadeGameDescription gameDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_CD,
-			GUIO0()
+			GUIO1(GAMEOPTION_INTRO_MUSIC_DIGITAL)
 		},
 		GID_RTZ,
 		0,
@@ -112,7 +112,7 @@ static const MadeGameDescription gameDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_CD,
-			GUIO0()
+			GUIO1(GAMEOPTION_INTRO_MUSIC_DIGITAL)
 		},
 		GID_RTZ,
 		0,
@@ -130,7 +130,7 @@ static const MadeGameDescription gameDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_CD,
-			GUIO0()
+			GUIO1(GAMEOPTION_INTRO_MUSIC_DIGITAL)
 		},
 		GID_RTZ,
 		0,
@@ -151,7 +151,7 @@ static const MadeGameDescription gameDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_CD,
-			GUIO0()
+			GUIO1(GAMEOPTION_INTRO_MUSIC_DIGITAL)
 		},
 		GID_RTZ,
 		0,
@@ -169,7 +169,7 @@ static const MadeGameDescription gameDescriptions[] = {
 			Common::DE_DEU,
 			Common::kPlatformDOS,
 			ADGF_CD,
-			GUIO0()
+			GUIO1(GAMEOPTION_INTRO_MUSIC_DIGITAL)
 		},
 		GID_RTZ,
 		0,
@@ -187,7 +187,7 @@ static const MadeGameDescription gameDescriptions[] = {
 			Common::DE_DEU,
 			Common::kPlatformDOS,
 			ADGF_CD,
-			GUIO0()
+			GUIO1(GAMEOPTION_INTRO_MUSIC_DIGITAL)
 		},
 		GID_RTZ,
 		0,
@@ -205,7 +205,7 @@ static const MadeGameDescription gameDescriptions[] = {
 			Common::IT_ITA,
 			Common::kPlatformDOS,
 			ADGF_CD,
-			GUIO0()
+			GUIO1(GAMEOPTION_INTRO_MUSIC_DIGITAL)
 		},
 		GID_RTZ,
 		0,
@@ -223,7 +223,7 @@ static const MadeGameDescription gameDescriptions[] = {
 			Common::IT_ITA,
 			Common::kPlatformDOS,
 			ADGF_CD,
-			GUIO0()
+			GUIO1(GAMEOPTION_INTRO_MUSIC_DIGITAL)
 		},
 		GID_RTZ,
 		0,
@@ -241,7 +241,7 @@ static const MadeGameDescription gameDescriptions[] = {
 			Common::FR_FRA,
 			Common::kPlatformDOS,
 			ADGF_CD,
-			GUIO0()
+			GUIO1(GAMEOPTION_INTRO_MUSIC_DIGITAL)
 		},
 		GID_RTZ,
 		0,
@@ -259,7 +259,7 @@ static const MadeGameDescription gameDescriptions[] = {
 			Common::FR_FRA,
 			Common::kPlatformDOS,
 			ADGF_CD,
-			GUIO0()
+			GUIO1(GAMEOPTION_INTRO_MUSIC_DIGITAL)
 		},
 		GID_RTZ,
 		0,
@@ -282,7 +282,7 @@ static const MadeGameDescription gameDescriptions[] = {
 			Common::KO_KOR,
 			Common::kPlatformDOS,
 			ADGF_CD,
-			GUIO0()
+			GUIO1(GAMEOPTION_INTRO_MUSIC_DIGITAL)
 		},
 		GID_RTZ,
 		0,
@@ -333,7 +333,7 @@ static const MadeGameDescription gameDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_DEMO | ADGF_CD,
-			GUIO0()
+			GUIO1(GAMEOPTION_INTRO_MUSIC_DIGITAL)
 		},
 		GID_RTZ,
 		0,
@@ -351,7 +351,7 @@ static const MadeGameDescription gameDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_DEMO | ADGF_CD,
-			GUIO0()
+			GUIO1(GAMEOPTION_INTRO_MUSIC_DIGITAL)
 		},
 		GID_RTZ,
 		0,
@@ -370,7 +370,7 @@ static const MadeGameDescription gameDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformMacintosh,
 			ADGF_DEMO | ADGF_CD | ADGF_MACRESFORK,
-			GUIO0()
+			GUIO1(GAMEOPTION_INTRO_MUSIC_DIGITAL)
 		},
 		GID_RTZ,
 		0,
@@ -500,6 +500,23 @@ static const MadeGameDescription gameDescriptions[] = {
 		0,
 		GF_FLOPPY,
 		1,
+	},
+
+	{
+		// The Manhole
+		{
+			"manhole",
+			"",
+			AD_ENTRY1s("manhole.dat", "2f14b5d87a862aad25701514dc282475", 119667),
+			Common::JA_JPN,
+			Common::kPlatformFMTowns,
+			ADGF_CD | ADGF_UNSTABLE,
+			GUIO1(GUIO_NOSPEECH)
+		},
+		GID_MANHOLE,
+		0,
+		GF_CD,
+		3,
 	},
 
 	{

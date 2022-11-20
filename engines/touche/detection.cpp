@@ -25,7 +25,7 @@
 #include "touche/touche.h"
 
 static const PlainGameDescriptor toucheGames[] = {
-	{ "touche", "Touche: The Adventures of the Fifth Musketeer" },
+	{ "touche", "Touch\303\251: The Adventures of the Fifth Musketeer" },
 	{ 0, 0 }
 };
 
@@ -141,16 +141,16 @@ public:
 		return detectGameFilebased(allFiles, Touche::fileBasedFallback);
 	}
 
-	const char *getEngineId() const override {
+	const char *getName() const override {
 		return "touche";
 	}
 
-	const char *getName() const override {
-		return "Touche: The Adventures of the Fifth Musketeer";
+	const char *getEngineName() const override {
+		return "Touch\303\251: The Adventures of the Fifth Musketeer";
 	}
 
 	const char *getOriginalCopyright() const override {
-		return "Touche: The Adventures of the Fifth Musketeer (C) Clipper Software";
+		return "Touch\303\251: The Adventures of the Fifth Musketeer (C) Clipper Software";
 	}
 
 	const DebugChannelDef *getDebugChannels() const override {

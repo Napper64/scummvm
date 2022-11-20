@@ -76,8 +76,24 @@ void Sound::playSound(ResourceId resourceId, bool looping, int32 volume, int32 p
 	// Original sets position back to 0
 	_mixer->stopHandle(item->handle);
 
+	Audio::Mixer::SoundType soundType;
+	switch (RESOURCE_PACK(resourceId)) {
+	case kResourcePackShared:
+		soundType = Audio::Mixer::kPlainSoundType;
+		break;
+
+	case kResourcePackSpeech:
+	case kResourcePackSharedSound:
+		soundType = Audio::Mixer::kSpeechSoundType;
+		break;
+
+	default:
+		soundType = Audio::Mixer::kSFXSoundType;
+		break;
+	}
+
 	ResourceEntry *resource = getResource()->get(resourceId);
-	playSoundData(Audio::Mixer::kSFXSoundType, &item->handle, resource->data, resource->size, looping, volume, panning);
+	playSoundData(soundType, &item->handle, resource->data, resource->size, looping, volume, panning);
 }
 
 void Sound::playMusic(ResourceId resourceId, int32 volume) {
@@ -364,7 +380,7 @@ void Sound::convertVolumeFrom(int32 &vol) {
 }
 
 void Sound::convertVolumeTo(int32 &vol) {
-	vol = (int32)(log10(vol / (double)Audio::Mixer::kMaxChannelVolume) - 0.5) * 2000;
+	vol = vol ? (int32)log10((vol - 0.5) / Audio::Mixer::kMaxChannelVolume) * 2000 : -9999;
 }
 
 void Sound::convertPan(int32 &pan) {
@@ -382,11 +398,9 @@ void Sound::convertPan(int32 &pan) {
 
 	int32 p = CLIP<int32>(pan, -10000, 10000);
 	if (p < 0) {
-		pan = (int)(255.0 * pow(10.0, (double)p / 2000.0) + 127.5);
-	} else if (p > 0) {
-		pan = (int)(255.0 * pow(10.0, (double)p / -2000.0) - 127.5);
+		pan =  129 * (1 - pow(10.0, p /  5000.0));
 	} else {
-		pan = 0;
+		pan = -129 * (1 - pow(10.0, p / -5000.0));
 	}
 }
 

@@ -28,7 +28,7 @@
 
 namespace Touche {
 
-static const uint8 _gmToRol[256] = {
+static const uint8 _gmToRol[128] = {
 	0x01, 0x02, 0x03, 0x08, 0x04, 0x05, 0x11, 0x14, 0x66, 0x66, 0x66, 0x62, 0x69, 0x68, 0x67, 0x26,
 	0x09, 0x0A, 0x0B, 0x0E, 0x0F, 0x10, 0x10, 0x10, 0x3C, 0x3D, 0x3D, 0x3D, 0x3D, 0x3E, 0x3F, 0x3F,
 	0x47, 0x41, 0x42, 0x48, 0x45, 0x46, 0x1D, 0x1E, 0x35, 0x36, 0x37, 0x39, 0x33, 0x34, 0x3A, 0x71,
@@ -41,9 +41,6 @@ static const uint8 _gmToRol[256] = {
 
 
 MidiPlayer::MidiPlayer() {
-
-	// FIXME: Necessary?
-	memset(_channelsVolume, 0, sizeof(_channelsVolume));
 
 	MidiDriver::DeviceHandle dev = MidiDriver::detectDevice(MDT_MIDI | MDT_ADLIB | MDT_PREFER_GM);
 	_nativeMT32 = ((MidiDriver::getMusicType(dev) == MT_MT32) || ConfMan.getBool("native_mt32"));
@@ -88,7 +85,7 @@ void MidiPlayer::setVolume(int volume) {
 	// transmit the volume change, even if the current _masterVolume
 	// equals the new master volume. This *could* make a difference in
 	// some situations.
-	// So, we should determine whether Touche requires this behavioral
+	// So, we should determine whether the engine requires this behavioral
 	// difference; and maybe also if other engines could benefit from it
 	// (as hypothetically, it might fix some subtle bugs?)
 	_masterVolume = CLIP(volume, 0, 255);

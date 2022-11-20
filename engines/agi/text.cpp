@@ -711,7 +711,11 @@ void TextMgr::promptKeyPress(uint16 newKey) {
 	switch (_vm->getLanguage()) {
 	case Common::RU_RUS:
 	case Common::HE_ISR:
-		if (newKey >= 0x20)
+		if ((newKey >= 0x20) && (newKey <= 0xff))
+			acceptableInput = true;
+		break;
+	case Common::FR_FRA:
+		if ((newKey >= 0x20) && (newKey != 0x5e) && (newKey <= 0xff))
 			acceptableInput = true;
 		break;
 	default:
@@ -885,7 +889,7 @@ void TextMgr::promptCommandWindow(bool recallLastCommand, uint16 newKey) {
 	if (_systemUI->askForCommand(commandText)) {
 		if (commandText.size()) {
 			// Something actually was entered?
-			strncpy((char *)&_prompt, commandText.c_str(), sizeof(_prompt));
+			Common::strcpy_s((char *)_prompt, sizeof(_prompt), commandText.c_str());
 			promptRememberForAutoComplete(true);
 			memcpy(&_promptPrevious, &_prompt, sizeof(_prompt));
 			// parse text
@@ -1025,7 +1029,11 @@ void TextMgr::stringKeyPress(uint16 newKey) {
 			switch (_vm->getLanguage()) {
 			case Common::RU_RUS:
 			case Common::HE_ISR:
-				if (newKey >= 0x20)
+				if ((newKey >= 0x20) && (newKey <= 0xff))
+					acceptableInput = true;
+				break;
+			case Common::FR_FRA:
+				if ((newKey >= 0x20) && (newKey != 0x5e) && (newKey <= 0xff))
 					acceptableInput = true;
 				break;
 			default:
@@ -1209,7 +1217,7 @@ char *TextMgr::stringPrintf(const char *originalText) {
 				i = strtoul(originalText, nullptr, 10);
 				while (*originalText >= '0' && *originalText <= '9')
 					originalText++;
-				sprintf(z, "%015i", _vm->getVar(i));
+				Common::sprintf_s(z, "%015i", _vm->getVar(i));
 
 				i = 99;
 				if (*originalText == '|') {

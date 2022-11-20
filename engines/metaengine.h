@@ -26,6 +26,7 @@
 #include "common/scummsys.h"
 #include "common/error.h"
 #include "common/array.h"
+#include "common/gui_options.h"
 
 #include "engines/game.h"
 #include "engines/savestate.h"
@@ -141,7 +142,10 @@ public:
 	virtual ~MetaEngineDetection() {}
 
 	/** Get the engine ID. */
-	virtual const char *getEngineId() const = 0;
+	virtual const char *getName() const = 0;
+
+	/** Get the engine name. */
+	virtual const char *getEngineName() const = 0;
 
 	/** Return some copyright information about the original engine. */
 	virtual const char *getOriginalCopyright() const = 0;
@@ -157,25 +161,22 @@ public:
 	 * (possibly empty) list of games supported by the engine that were
 	 * found among the given files.
 	 */
-	virtual DetectedGames detectGames(const Common::FSList &fslist) = 0;
+	virtual DetectedGames detectGames(const Common::FSList &fslist, uint32 skipADFlags = 0, bool skipIncomplete = false) = 0;
 
 	/**
-	 * Return a list of extra GUI options for the specified target.
+	 * The default version of this method will just parse the options string from
+	 * the config manager. However it also allows the meta engine to post process
+	 * result and add/remove other options as needed.
+	 * 
+	 * @param optionsString		Options string that from the config manager.
+	 * @param domain			Domain of the current target.
 	 *
-	 * If no target is specified, all of the available custom GUI options are
-	 * returned for the plugin (used to set default values).
+	 * @return    The fully processed options string that is usable by the GUI.
 	 *
-	 * Currently, this only supports options with checkboxes.
-	 *
-	 * The default implementation returns an empty list.
-	 *
-	 * @param target  Name of a config manager target.
-	 *
-	 * @return A list of extra GUI options for an engine plugin and target.
 	 */
-	virtual const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const {
-		return ExtraGuiOptions();
-	}
+	virtual Common::String parseAndCustomizeGuiOptions(const Common::String &optionsString, const Common::String &domain) const {
+		return parseGameGUIOptions(optionsString);
+	} 
 
 	/**
 	 * Return a list of engine specified debug channels
@@ -187,30 +188,6 @@ public:
 	virtual const DebugChannelDef *getDebugChannels() const {
 		return NULL;
 	}
-
-	/**
-	 * Register the default values for the settings that the engine uses into the
-	 * configuration manager.
-	 *
-	 * @param target  Name of a config manager target.
-	 */
-	void registerDefaultSettings(const Common::String &target) const;
-
-	/**
-	 * Return a GUI widget container for configuring the specified target options.
-	 *
-	 * The returned widget is shown in the Engine tab in the Edit Game dialog.
-	 * Engines can build custom option dialogs, but by default a simple widget
-	 * allowing to configure the extra GUI options is used.
-	 *
-	 * Engines that are not supposed to have an Engine tab in the Edit Game dialog
-	 * can return nullptr.
-	 *
-	 * @param boss     The widget or dialog that the returned widget is a child of.
-	 * @param name     The name that the returned widget must use.
-	 * @param target   Name of a config manager target.
-	 */
-	GUI::OptionsContainerWidget *buildEngineOptionsWidgetStatic(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const;
 };
 
 /**
@@ -241,6 +218,24 @@ protected:
 	 * @return The first empty save slot, or -1 if all are occupied.
 	 */
 	int findEmptySaveSlot(const char *target);
+
+	/**
+	 * Return a list of extra GUI options for the specified target.
+	 *
+	 * If no target is specified, all of the available custom GUI options are
+	 * returned for the plugin (used to set default values).
+	 *
+	 * Currently, this only supports options with checkboxes.
+	 *
+	 * The default implementation returns an empty list.
+	 *
+	 * @param target  Name of a config manager target.
+	 *
+	 * @return A list of extra GUI options for an engine plugin and target.
+	 */
+	virtual const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const {
+		return ExtraGuiOptions();
+	}
 
 public:
 	virtual ~MetaEngine() {}
@@ -385,7 +380,7 @@ public:
 	 *
 	 * @param target  Name of a config manager target.
 	 */
-	virtual void registerDefaultSettings(const Common::String &target) const {}
+	virtual void registerDefaultSettings(const Common::String &target) const;
 
 	/**
 	 * Return a GUI widget container for configuring the specified target options.
@@ -399,9 +394,7 @@ public:
 	 * @param name    The name that the returned widget must use.
 	 * @param target  Name of a config manager target.
 	 */
-	virtual GUI::OptionsContainerWidget *buildEngineOptionsWidgetDynamic(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const {
-		return nullptr;
-	}
+	virtual GUI::OptionsContainerWidget *buildEngineOptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const;
 
 	/**
 	 * MetaEngine feature flags.
@@ -574,10 +567,11 @@ class EngineManager : public Common::Singleton<EngineManager> {
 public:
 	/**
 	 * Given a list of FSNodes in a given directory, detect a set of games contained within.
-	 *
+	 * @ param skipADFlags		Ignore results which are flagged with the ADGF flags specified here (for mass add)
+	 * @ param skipIncomplete	Ignore incomplete file/md5/size matches (for mass add)
 	 * Returns an empty list if none are found.
 	 */
-	DetectionResults detectGames(const Common::FSList &fslist);
+	DetectionResults detectGames(const Common::FSList &fslist, uint32 skipADFlags = 0, bool skipIncomplete = false);
 
 	/** Find a plugin by its engine ID. */
 	const Plugin *findPlugin(const Common::String &engineId) const;

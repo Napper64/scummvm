@@ -27,6 +27,7 @@
 #include "ags/console.h"
 #include "common/scummsys.h"
 #include "common/config-manager.h"
+#include "common/clickteam.h"
 #include "common/debug-channels.h"
 #include "common/events.h"
 #include "common/file.h"
@@ -47,11 +48,13 @@
 #include "ags/engine/debugging/debug_log.h"
 #include "ags/shared/debugging/out.h"
 #include "ags/engine/game/savegame.h"
+#include "ags/engine/game/savegame_components.h"
 #include "ags/engine/main/config.h"
 #include "ags/engine/main/engine.h"
 #include "ags/engine/main/main.h"
 #include "ags/engine/main/quit.h"
 #include "ags/engine/platform/base/ags_platform_driver.h"
+#include "ags/engine/script/cc_instance.h"
 #include "ags/engine/script/script.h"
 #include "ags/engine/ac/route_finder.h"
 #include "ags/shared/core/asset_manager.h"
@@ -75,6 +78,8 @@ AGSEngine::AGSEngine(OSystem *syst, const AGSGameDescription *gameDesc) : Engine
 	_gfxDriver(nullptr), _globals(nullptr), _forceTextAA(false) {
 	g_vm = this;
 
+	AGS3::script_commands_init();
+	AGS3::Engine::SavegameComponents::component_handlers_init();
 	_events = new EventsManager();
 	_globals = new ::AGS3::Globals();
 
@@ -99,6 +104,8 @@ AGSEngine::~AGSEngine() {
 	delete _events;
 	delete _music;
 	delete _globals;
+	AGS3::Engine::SavegameComponents::component_handlers_free();
+	AGS3::script_commands_free();
 }
 
 uint32 AGSEngine::getFeatures() const {
@@ -146,6 +153,12 @@ Common::Error AGSEngine::run() {
 	setDebugger(new AGSConsole(this));
 
 	const char *filename = _gameDescription->desc.filesDescriptions[0].fileName;
+	if (_gameDescription->desc.flags & GAMEFLAG_INSTALLER) {
+		Common::File *f = new Common::File();
+		f->open(filename);
+		SearchMan.add("installer", Common::ClickteamInstaller::open(f, DisposeAfterUse::YES));
+		filename = _gameDescription->_mainNameInsideInstaller;
+	}
 	const char *ARGV[] = { "scummvm.exe", filename };
 	const int ARGC = 2;
 	AGS3::main_init(ARGC, ARGV);

@@ -137,7 +137,8 @@ static void move_track_to_crossfade_channel(int currentChannel, int crossfadeSpe
 // NOTE: this function assumes one of the user channels
 void stop_or_fade_out_channel(int fadeOutChannel, int fadeInChannel, ScriptAudioClip *newSound) {
 	ScriptAudioClip *sourceClip = AudioChannel_GetPlayingClip(&_G(scrAudioChannel)[fadeOutChannel]);
-	if ((sourceClip != nullptr) && (_GP(game).audioClipTypes[sourceClip->type].crossfadeSpeed > 0)) {
+	if ((_GP(play).fast_forward == 0) && // don't crossfade if skipping a cutscene
+		(sourceClip != nullptr) && (_GP(game).audioClipTypes[sourceClip->type].crossfadeSpeed > 0)) {
 		move_track_to_crossfade_channel(fadeOutChannel, _GP(game).audioClipTypes[sourceClip->type].crossfadeSpeed, fadeInChannel, newSound);
 	} else {
 		stop_and_destroy_channel(fadeOutChannel);
@@ -765,8 +766,6 @@ void update_audio_system_on_game_loop() {
 
 	process_scheduled_music_update();
 
-	_G(audio_doing_crossfade) = true;
-
 	audio_update_polled_stuff();
 
 	if (_G(crossFading)) {
@@ -798,8 +797,6 @@ void update_audio_system_on_game_loop() {
 			}
 		}
 	}
-
-	_G(audio_doing_crossfade) = false;
 
 	if (_G(loopcounter) % 5 == 0) {
 		update_ambient_sound_vol();

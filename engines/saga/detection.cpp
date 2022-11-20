@@ -40,13 +40,14 @@ public:
 		static const char *const DIRECTORY_GLOBS[2] = { "music", nullptr };
 		_maxScanDepth = 2;
 		_directoryGlobs = DIRECTORY_GLOBS;
-	}
-
-	const char *getEngineId() const override {
-		return "saga";
+		_flags = kADFlagUseExtraAsHint;
 	}
 
 	const char *getName() const override {
+		return "saga";
+	}
+
+	const char *getEngineName() const override {
 		return "SAGA ["
 
 #if defined(ENABLE_IHNM)

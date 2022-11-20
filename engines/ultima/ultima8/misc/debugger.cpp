@@ -1401,6 +1401,9 @@ bool Debugger::cmdStartSelection(int argc, const char **argv) {
 		return false;
 	}
 
+	// Clear this flag on selection to match original behavior.
+	Ultima8Engine::get_instance()->setCrusaderTeleporting(false);
+
 	ItemSelectionProcess *proc = ItemSelectionProcess::get_instance();
 	if (proc)
 		proc->selectNextItem(false);
@@ -1434,6 +1437,9 @@ bool Debugger::cmdGrabItems(int argc, const char **argv) {
 	if (!_isAvatarControlled()) {
 		return false;
 	}
+
+	// Clear this flag on selection to match original behavior.
+	Ultima8Engine::get_instance()->setCrusaderTeleporting(false);
 
 	ItemSelectionProcess *proc = ItemSelectionProcess::get_instance();
 	if (proc)
@@ -1791,8 +1797,10 @@ bool Debugger::cmdToggleMinimap(int argc, const char **argv) {
 		mmg = new MiniMapGump(4, 4);
 		mmg->InitGump(0);
 		mmg->setRelativePosition(Gump::TOP_LEFT, 4, 4);
+	} else if (mmg->IsHidden()) {
+		mmg->UnhideGump();
 	} else {
-		mmg->Close();
+		mmg->HideGump();
 	}
 
 	return false;

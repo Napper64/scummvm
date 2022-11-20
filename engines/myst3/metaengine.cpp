@@ -27,10 +27,27 @@
 
 #include "common/config-manager.h"
 #include "common/savefile.h"
+#include "common/translation.h"
 
 #include "graphics/scaler.h"
 
 namespace Myst3{
+
+static const ADExtraGuiOptionsMap optionsList[] = {
+	{
+		GAMEOPTION_WIDESCREEN_MOD,
+		{
+			_s("Widescreen mod"),
+			_s("Enable widescreen rendering in fullscreen mode."),
+			"widescreen_mod",
+			false,
+			0,
+			0
+		}
+	},
+
+	AD_EXTRA_GUI_OPTIONS_TERMINATOR
+};
 
 class Myst3MetaEngine : public AdvancedMetaEngine {
 public:
@@ -38,15 +55,18 @@ public:
 		return "myst3";
 	}
 
+	const ADExtraGuiOptionsMap *getAdvancedExtraGuiOptions() const override {
+		return optionsList;
+	}
+
 	bool hasFeature(MetaEngineFeature f) const override {
-		return
-			(f == kSupportsListSaves) ||
-			(f == kSupportsDeleteSave) ||
-			(f == kSupportsLoadingDuringStartup) ||
-			(f == kSavesSupportMetaInfo) ||
-			(f == kSavesSupportThumbnail) ||
-			(f == kSavesSupportCreationDate) ||
-			(f == kSavesSupportPlayTime);
+		return  (f == kSupportsListSaves) ||
+		        (f == kSupportsDeleteSave) ||
+		        (f == kSupportsLoadingDuringStartup) ||
+		        (f == kSavesSupportMetaInfo) ||
+		        (f == kSavesSupportThumbnail) ||
+		        (f == kSavesSupportCreationDate) ||
+		        (f == kSavesSupportPlayTime);
 	}
 
 	SaveStateList listSaves(const char *target) const override {

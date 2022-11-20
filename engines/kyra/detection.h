@@ -38,6 +38,9 @@ enum {
 struct GameFlags {
 	Common::Language lang;
 
+	// Only for MR versions which have 4 languages instead of 3 (Simplified Chinese/Traditional Chinese)
+	Common::Language extraLang;
+
 	// language overwrites of fan translations (only needed for multilingual games)
 	Common::Language fanLang;
 	Common::Language replacedLang;
@@ -53,7 +56,6 @@ struct GameFlags {
 	bool useHiColorMode       : 1;
 	bool useDigSound          : 1;
 	bool useInstallerPackage  : 1;
-	bool hasExtraLanguage     : 1;
 
 	byte gameID;
 };
@@ -67,6 +69,17 @@ struct KYRAGameDescription {
 
 	Kyra::GameFlags flags;
 };
+
+#define GAMEOPTION_KYRA3_AUDIENCE GUIO_GAMEOPTIONS1
+#define GAMEOPTION_KYRA3_SKIP     GUIO_GAMEOPTIONS2
+#define GAMEOPTION_KYRA3_HELIUM   GUIO_GAMEOPTIONS3
+
+#define GAMEOPTION_LOL_SCROLLING  GUIO_GAMEOPTIONS4
+#define GAMEOPTION_LOL_CURSORS    GUIO_GAMEOPTIONS5
+#define GAMEOPTION_LOL_SAVENAMES  GUIO_GAMEOPTIONS8
+
+#define GAMEOPTION_EOB_HPGRAPHS   GUIO_GAMEOPTIONS6
+#define GAMEOPTION_EOB_MOUSESWAP  GUIO_GAMEOPTIONS7
 
 } // End of anonymous namespace
 

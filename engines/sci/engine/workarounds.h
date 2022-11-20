@@ -100,7 +100,6 @@ extern const SciWorkaroundEntry kPalVaryMergeStart_workarounds[];
 extern const SciWorkaroundEntry kPlatform32_workarounds[];
 extern const SciWorkaroundEntry kRandom_workarounds[];
 extern const SciWorkaroundEntry kReadNumber_workarounds[];
-extern const SciWorkaroundEntry kResCheck_workarounds[];
 extern const SciWorkaroundEntry kPaletteUnsetFlag_workarounds[];
 extern const SciWorkaroundEntry kSetCursor_workarounds[];
 extern const SciWorkaroundEntry kArraySetElements_workarounds[];
@@ -125,7 +124,8 @@ enum SciMessageWorkaroundType {
 enum SciMedia {
 	SCI_MEDIA_ALL,
 	SCI_MEDIA_FLOPPY,
-	SCI_MEDIA_CD
+	SCI_MEDIA_CD,
+	SCI_MEDIA_MAC, // mac floppy
 };
 
 struct SciMessageWorkaroundSolution {

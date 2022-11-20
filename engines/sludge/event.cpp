@@ -34,7 +34,6 @@
 
 namespace Sludge {
 
-extern Variable *launchResult;
 extern VariableStack *noStack;
 
 EventManager::EventManager(SludgeEngine *vm) {
@@ -147,23 +146,6 @@ void EventManager::checkInput() {
 }
 
 bool EventManager::handleInput() {
-	static int l = 0;
-
-	if (!_vm->launchMe.empty()) {
-		if (l) {
-			// Still paused because of spawned thingy...
-		} else {
-			l = 1;
-
-			launchResult->setVariable(SVT_INT, 0/*launch(launchMe) > 31*/); //TODO:false value
-			_vm->launchMe.clear();
-			launchResult = nullptr;
-		}
-		return true;
-	} else {
-		l = 0;
-	}
-
 	if (!_vm->_regionMan->getOverRegion())
 		_vm->_regionMan->updateOverRegion();
 
@@ -304,7 +286,7 @@ bool EventManager::handleInput() {
 		default:
 			if (_input.keyPressed >= 256) {
 				char tmp[7] = "ABCDEF";
-				sprintf(tmp, "%i", _input.keyPressed);
+				Common::sprintf_s(tmp, "%i", _input.keyPressed);
 				tempString = tmp;
 				//}
 			} else {

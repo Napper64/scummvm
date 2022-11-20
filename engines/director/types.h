@@ -287,6 +287,10 @@ enum PaletteType {
 	kClutSystemWin = -101
 };
 
+enum {
+	kNumBuiltinTiles = 8
+};
+
 enum DirectorCursor {
 	kCursorMouseDown,
 	kCursorMouseUp
@@ -333,25 +337,26 @@ enum {
 };
 
 enum DatumType {
-	ARRAY,
 	ARGC,
 	ARGCNORET,
+	ARRAY,
 	CASTREF,
 	CHUNKREF,
 	FIELDREF,
 	FLOAT,
+	GLOBALREF,
 	INT,
+	LOCALREF,
+	MENUREF,
 	OBJECT,
 	PARRAY,
 	POINT,
+	PROPREF,
+	RECT,
 	STRING,
 	SYMBOL,
 	VARREF,
-	GLOBALREF,
-	LOCALREF,
-	PROPREF,
 	VOID,
-	RECT
 };
 
 enum VarType {
@@ -370,13 +375,15 @@ struct CastMemberID {
 	CastMemberID() : member(0), castLib(0) {}
 	CastMemberID(int memberID, int castLibID)
 		: member(memberID), castLib(castLibID) {}
-	
+
 	bool operator==(const CastMemberID &c) {
 		return member == c.member && castLib == c.castLib;
 	}
 	bool operator!=(const CastMemberID &c) {
 		return member != c.member || castLib != c.castLib;
 	}
+
+	bool isNull() { return member == 0 && castLib == 0; }
 
 	Common::String asString() const;
 };

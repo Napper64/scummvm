@@ -19,8 +19,6 @@
  *
  */
 
-#include <limits.h>
-
 #include "audio/mididrv.h"
 
 #include "groovie/script.h"
@@ -76,7 +74,7 @@ enum kSpecialVariableTypes {
 
 Script::Script(GroovieEngine *vm, EngineVersion version) :
 	_code(nullptr), _savedCode(nullptr), _stacktop(0), _debugger(nullptr), _vm(vm),
-	_videoFile(nullptr), _videoRef(UINT_MAX), _cellGame(nullptr), _lastCursor(0xff),
+	_videoFile(nullptr), _videoRef(uint32(-1)), _cellGame(nullptr), _lastCursor(0xff),
 #ifdef ENABLE_GROOVIE2
 	_beehive(ConfMan.getBool("easier_ai")), _cake(ConfMan.getBool("easier_ai")), _gallery(ConfMan.getBool("easier_ai")),
 	_mouseTrap(ConfMan.getBool("easier_ai")), _othello(ConfMan.getBool("easier_ai")), _pente(ConfMan.getBool("easier_ai")),
@@ -906,6 +904,10 @@ bool Script::playvideofromref(uint32 fileref, bool loopUntilAudioDone) {
 	// It isn't the current video, open it
 	if (fileref != _videoRef) {
 
+		if (_fastForwarding && !ConfMan.getBool("speedrun_mode")) {
+			resetFastForward();
+		}
+
 		// Debug bitflags
 		debugCN(1, kDebugScript, "Groovie::Script: Play video 0x%04X (bitflags:", fileref);
 		for (int i = 15; i >= 0; i--) {
@@ -918,11 +920,11 @@ bool Script::playvideofromref(uint32 fileref, bool loopUntilAudioDone) {
 
 		// Close the previous video file
 		if (_videoFile) {
-			_videoRef = UINT_MAX;
+			_videoRef = uint32(-1);
 			delete _videoFile;
 		}
 
-		if (fileref == UINT_MAX)
+		if (fileref == uint32(-1))
 			return true;
 
 		// Try to open the new file
@@ -948,6 +950,19 @@ bool Script::playvideofromref(uint32 fileref, bool loopUntilAudioDone) {
 			if (_version == kGroovieCDY && _scriptFile == "26a_graf.grv")
 				_bitflags |= 1;
 			_vm->_videoPlayer->load(_videoFile, _bitflags);
+
+			// Find correct filename
+			ResInfo info;
+			_vm->_resMan->getResInfo(fileref, info);
+
+			// Prepend the GJD name and remove the extension
+			Common::String subtitleName = _vm->_resMan->getGjdName(info);
+			subtitleName = subtitleName.substr(0, subtitleName.size() - 4);
+			subtitleName.toUppercase();
+			// add the filename without the extension, then add the srt extension
+			subtitleName += "-" + info.filename.substr(0, info.filename.size() - 3) + "srt";
+
+			_vm->_videoPlayer->loadSubtitles(subtitleName.c_str());
 		} else {
 			error("Groovie::Script: Couldn't open file");
 			return true;
@@ -972,11 +987,19 @@ bool Script::playvideofromref(uint32 fileref, bool loopUntilAudioDone) {
 
 			_bitflags = 0;
 
+			_vm->_videoPlayer->unloadSubtitles();
+
 			// End the playback
 			return true;
 		}
-		_vm->_videoPlayer->fastForward();
-		_fastForwarding = true;
+		if (_fastForwarding && !ConfMan.getBool("speedrun_mode")) {
+			resetFastForward();
+			if (!_fastForwarding)
+				_vm->_videoPlayer->setOverrideSpeed(false);
+		} else {
+			_vm->_videoPlayer->fastForward();
+			_fastForwarding = true;
+		}
 	} else if (_fastForwarding) {
 		_vm->_videoPlayer->fastForward();
 	}
@@ -1000,7 +1023,7 @@ bool Script::playvideofromref(uint32 fileref, bool loopUntilAudioDone) {
 			// Close the file
 			delete _videoFile;
 			_videoFile = nullptr;
-			_videoRef = UINT_MAX;
+			_videoRef = uint32(-1);
 
 			// Clear the input events while playing the video
 			_eventMouseClicked = 0;
@@ -1025,7 +1048,7 @@ bool Script::playvideofromref(uint32 fileref, bool loopUntilAudioDone) {
 }
 
 bool Script::playBackgroundSound(uint32 fileref, uint32 loops) {
-	if (fileref == UINT_MAX) {
+	if (fileref == uint32(-1)) {
 		return false;
 	}
 
@@ -1184,7 +1207,7 @@ void Script::o_inputloopend() {
 		}
 		_vm->_grvCursorMan->show(true);
 
-		// Go back to the begining of the loop
+		// Go back to the beginning of the loop
 		_currentInstruction = _inputLoopAddress;
 
 		// There's nothing to do until we get some input
@@ -2172,7 +2195,7 @@ void Script::o2_videofromref() {
 	// Skip the 11th Hour intro videos on right mouse click, instead of
 	// fast-forwarding them. This has the same effect as pressing 'p' twice in
 	// the skulls screen after the Groovie logo
-	if (_version == kGroovieT11H && _currentInstruction == 0x0560 && fileref != _videoRef)
+	if (_version == kGroovieT11H && _currentInstruction == 0x0560 && fileref != _videoRef && _scriptFile == "script.grv")
 		_videoSkipAddress = 1417;
 
 	if (_version == kGroovieT11H && fileref != _videoRef && !ConfMan.getBool("originalsaveload")) {

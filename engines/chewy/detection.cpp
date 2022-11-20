@@ -24,16 +24,12 @@
 
 #include "chewy/detection.h"
 
-#include "common/translation.h"
-
 static const PlainGameDescriptor chewyGames[] = {
 	{"chewy", "Chewy: Esc from F5"},
 	{nullptr, nullptr}
 };
 
 namespace Chewy {
-
-#define GAMEOPTION_ORIGINAL_SAVELOAD GUIO_GAMEOPTIONS1
 
 static const ChewyGameDescription gameDescriptions[] = {
 
@@ -98,7 +94,7 @@ static const ChewyGameDescription gameDescriptions[] = {
 			AD_ENTRY1s("txt/atds.tap", "c3be5641e90dd01274309b778cf8146d", 230686),
 			Common::DE_DEU,
 			Common::kPlatformDOS,
-			ADGF_DEMO,
+			ADGF_DEMO | ADGF_UNSUPPORTED,
 			GUIO2(GUIO_NOMIDI, GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
@@ -106,34 +102,20 @@ static const ChewyGameDescription gameDescriptions[] = {
 	{ AD_TABLE_END_MARKER }
 };
 
-static const ADExtraGuiOptionsMap optionsList[] = {
-	{
-		GAMEOPTION_ORIGINAL_SAVELOAD,
-		{
-			_s("Use original save/load screens"),
-			_s("Use the original save/load screens instead of the ScummVM ones"),
-			"original_menus",
-			false,
-			0,
-			0
-		}
-	},
-
-	AD_EXTRA_GUI_OPTIONS_TERMINATOR};
 } // namespace Chewy
 
 class ChewyMetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
-	ChewyMetaEngineDetection() : AdvancedMetaEngineDetection(Chewy::gameDescriptions, sizeof(Chewy::ChewyGameDescription), chewyGames, Chewy::optionsList) {
+	ChewyMetaEngineDetection() : AdvancedMetaEngineDetection(Chewy::gameDescriptions, sizeof(Chewy::ChewyGameDescription), chewyGames) {
 		_maxScanDepth = 2;
 		_flags = kADFlagMatchFullPaths;
 	}
 
-	const char *getEngineId() const override {
+	const char *getName() const override {
 		return "chewy";
 	}
 
-	const char *getName() const override {
+	const char *getEngineName() const override {
 		return "Chewy: Esc from F5";
 	}
 

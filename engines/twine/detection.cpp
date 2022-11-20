@@ -39,6 +39,53 @@ static const DebugChannelDef debugFlagList[] = {
 	DEBUG_CHANNEL_END
 };
 
+#define TWINE_DETECTION_ENTRY(gameid, extra, filesDescriptions, platform, flags) \
+	{ \
+		gameid,            \
+		extra,             \
+		filesDescriptions, \
+		Common::EN_ANY,    \
+		platform,          \
+		flags,             \
+		GUIO1(GUIO_NONE)   \
+	}, \
+	{ \
+		gameid,            \
+		extra,             \
+		filesDescriptions, \
+		Common::FR_FRA,    \
+		platform,          \
+		flags,             \
+		GUIO1(GUIO_NONE)   \
+	}, \
+	{ \
+		gameid,            \
+		extra,             \
+		filesDescriptions, \
+		Common::DE_DEU,    \
+		platform,          \
+		flags,             \
+		GUIO1(GUIO_NONE)   \
+	}, \
+	{ \
+		gameid,            \
+		extra,             \
+		filesDescriptions, \
+		Common::IT_ITA,    \
+		platform,          \
+		flags,             \
+		GUIO1(GUIO_NONE)   \
+	}, \
+	{ \
+		gameid,            \
+		extra,             \
+		filesDescriptions, \
+		Common::ES_ESP,    \
+		platform,          \
+		flags,             \
+		GUIO1(GUIO_NONE)   \
+	}
+
 static const ADGameDescription twineGameDescriptions[] = {
 	// Little Big Adventure - Preview Version (EN, FR)
 	// LBA.EXE
@@ -87,149 +134,17 @@ static const ADGameDescription twineGameDescriptions[] = {
 	// Little Big Adventure - Demo Version (EN, FR, DE, IT, ES)
 	// RELENT.EXE
 	// 14 October 1994 at 10:18
-	{
-		"lba",
-		"Demo Version",
-		AD_ENTRY1s("RELENT.EXE", "c1a887e38283d43f271249ad9f2a73ef", 245961),
-		Common::EN_ANY,
-		Common::kPlatformDOS,
-		ADGF_DEMO,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"Demo Version",
-		AD_ENTRY1s("RELENT.EXE", "c1a887e38283d43f271249ad9f2a73ef", 245961),
-		Common::FR_FRA,
-		Common::kPlatformDOS,
-		ADGF_DEMO,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"Demo Version",
-		AD_ENTRY1s("RELENT.EXE", "c1a887e38283d43f271249ad9f2a73ef", 245961),
-		Common::DE_DEU,
-		Common::kPlatformDOS,
-		ADGF_DEMO,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"Demo Version",
-		AD_ENTRY1s("RELENT.EXE", "c1a887e38283d43f271249ad9f2a73ef", 245961),
-		Common::IT_ITA,
-		Common::kPlatformDOS,
-		ADGF_DEMO,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"Demo Version",
-		AD_ENTRY1s("RELENT.EXE", "c1a887e38283d43f271249ad9f2a73ef", 245961),
-		Common::ES_ESP,
-		Common::kPlatformDOS,
-		ADGF_DEMO,
-		GUIO1(GUIO_NONE)
-	},
+	TWINE_DETECTION_ENTRY("lba", "Demo Version", AD_ENTRY1s("RELENT.EXE", "c1a887e38283d43f271249ad9f2a73ef", 245961), Common::kPlatformDOS, ADGF_DEMO),
 
 	// Little Big Adventure - Original European Version (EN, FR, DE, IT, ES)
 	// LBA.EXE
 	// 14 Oct 1994 at 12:45
-	{
-		"lba",
-		"CD Original European Version",
-		AD_ENTRY1s("LBA.EXE", "c1a887e38283d43f271249ad9f2a73ef", 258513),
-		Common::EN_ANY,
-		Common::kPlatformDOS,
-		ADGF_CD,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"CD Original European Version",
-		AD_ENTRY1s("LBA.EXE", "c1a887e38283d43f271249ad9f2a73ef", 258513),
-		Common::FR_FRA,
-		Common::kPlatformDOS,
-		ADGF_CD,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"CD Original European Version",
-		AD_ENTRY1s("LBA.EXE", "c1a887e38283d43f271249ad9f2a73ef", 258513),
-		Common::DE_DEU,
-		Common::kPlatformDOS,
-		ADGF_CD,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"CD Original European Version",
-		AD_ENTRY1s("LBA.EXE", "c1a887e38283d43f271249ad9f2a73ef", 258513),
-		Common::IT_ITA,
-		Common::kPlatformDOS,
-		ADGF_CD,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"CD Original European Version",
-		AD_ENTRY1s("LBA.EXE", "c1a887e38283d43f271249ad9f2a73ef", 258513),
-		Common::ES_ESP,
-		Common::kPlatformDOS,
-		ADGF_CD,
-		GUIO1(GUIO_NONE)
-	},
+	TWINE_DETECTION_ENTRY("lba", "CD Original European Version", AD_ENTRY1s("LBA.EXE", "c1a887e38283d43f271249ad9f2a73ef", 258513), Common::kPlatformDOS, ADGF_CD),
 
 	// Relentless: Twinsen's Adventure - Original North America Version (EN, FR, DE, IT, ES)
 	// RELENT.EXE
 	// 14 Oct 1994 at 13:22
-	{
-		"lba",
-		"Relentless: Twinsen's Adventure - CD Original North America Version",
-		AD_ENTRY1s("RELENT.EXE", "c1a887e38283d43f271249ad9f2a73ef", 258513),
-		Common::EN_ANY,
-		Common::kPlatformDOS,
-		TwinE::TF_VERSION_USA | ADGF_CD,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"Relentless: Twinsen's Adventure - CD Original North America Version",
-		AD_ENTRY1s("RELENT.EXE", "c1a887e38283d43f271249ad9f2a73ef", 258513),
-		Common::FR_FRA,
-		Common::kPlatformDOS,
-		TwinE::TF_VERSION_USA | ADGF_CD,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"Relentless: Twinsen's Adventure - CD Original North America Version",
-		AD_ENTRY1s("RELENT.EXE", "c1a887e38283d43f271249ad9f2a73ef", 258513),
-		Common::DE_DEU,
-		Common::kPlatformDOS,
-		TwinE::TF_VERSION_USA | ADGF_CD,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"Relentless: Twinsen's Adventure - CD Original North America Version",
-		AD_ENTRY1s("RELENT.EXE", "c1a887e38283d43f271249ad9f2a73ef", 258513),
-		Common::IT_ITA,
-		Common::kPlatformDOS,
-		TwinE::TF_VERSION_USA | ADGF_CD,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"Relentless: Twinsen's Adventure - CD Original North America Version",
-		AD_ENTRY1s("RELENT.EXE", "c1a887e38283d43f271249ad9f2a73ef", 258513),
-		Common::ES_ESP,
-		Common::kPlatformDOS,
-		TwinE::TF_VERSION_USA | ADGF_CD,
-		GUIO1(GUIO_NONE)
-	},
+	TWINE_DETECTION_ENTRY("lba", "Relentless: Twinsen's Adventure - CD Original North America Version", AD_ENTRY1s("RELENT.EXE", "c1a887e38283d43f271249ad9f2a73ef", 258513), Common::kPlatformDOS, TwinE::TF_VERSION_USA | ADGF_CD),
 
 	// Little Big Adventure - Demo Version (FR)
 	// LBA.EXE
@@ -292,196 +207,26 @@ static const ADGameDescription twineGameDescriptions[] = {
 	// Little Big Adventure - DotEmu Version (Steam)
 	// LBA.DOT
 	// 11 October 2011 at 17:30
-	{
-		"lba",
-		"DotEmu Version (Steam)",
-		AD_ENTRY1s("LBA.DOT", "6dc00342c80bc41b4ff5a43c560c7abc", 380666496),
-		Common::EN_ANY,
-		Common::kPlatformDOS,
-		ADGF_NO_FLAGS,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"DotEmu Version (Steam)",
-		AD_ENTRY1s("LBA.DOT", "6dc00342c80bc41b4ff5a43c560c7abc", 380666496),
-		Common::FR_FRA,
-		Common::kPlatformDOS,
-		ADGF_NO_FLAGS,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"DotEmu Version (Steam)",
-		AD_ENTRY1s("LBA.DOT", "6dc00342c80bc41b4ff5a43c560c7abc", 380666496),
-		Common::DE_DEU,
-		Common::kPlatformDOS,
-		ADGF_NO_FLAGS,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"DotEmu Version (Steam)",
-		AD_ENTRY1s("LBA.DOT", "6dc00342c80bc41b4ff5a43c560c7abc", 380666496),
-		Common::IT_ITA,
-		Common::kPlatformDOS,
-		ADGF_NO_FLAGS,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"DotEmu Version (Steam)",
-		AD_ENTRY1s("LBA.DOT", "6dc00342c80bc41b4ff5a43c560c7abc", 380666496),
-		Common::ES_ESP,
-		Common::kPlatformDOS,
-		ADGF_NO_FLAGS,
-		GUIO1(GUIO_NONE)
-	},
+	TWINE_DETECTION_ENTRY("lba", "DotEmu Version (Steam)", AD_ENTRY1s("LBA.DOT", "6dc00342c80bc41b4ff5a43c560c7abc", 380666496), Common::kPlatformDOS, ADGF_NO_FLAGS),
 
 	// Little Big Adventure (CD Spanish)
-	{
-		"lba",
-		"",
-		AD_ENTRY1s("text.hqr", "ae7343552f8fbd17a1fc6cea2197a912", 248654),
-		Common::EN_ANY,
-		Common::kPlatformDOS,
-		ADGF_NO_FLAGS,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"",
-		AD_ENTRY1s("text.hqr", "ae7343552f8fbd17a1fc6cea2197a912", 248654),
-		Common::FR_FRA,
-		Common::kPlatformDOS,
-		ADGF_NO_FLAGS,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"",
-		AD_ENTRY1s("text.hqr", "ae7343552f8fbd17a1fc6cea2197a912", 248654),
-		Common::DE_DEU,
-		Common::kPlatformDOS,
-		ADGF_NO_FLAGS,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"",
-		AD_ENTRY1s("text.hqr", "ae7343552f8fbd17a1fc6cea2197a912", 248654),
-		Common::IT_ITA,
-		Common::kPlatformDOS,
-		ADGF_NO_FLAGS,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"",
-		AD_ENTRY1s("text.hqr", "ae7343552f8fbd17a1fc6cea2197a912", 248654),
-		Common::ES_ESP,
-		Common::kPlatformDOS,
-		ADGF_NO_FLAGS,
-		GUIO1(GUIO_NONE)
-	},
+	TWINE_DETECTION_ENTRY("lba", "", AD_ENTRY1s("text.hqr", "ae7343552f8fbd17a1fc6cea2197a912", 248654), Common::kPlatformDOS, ADGF_NO_FLAGS),
 
 	// Little Big Adventure - DotEmu Enhanced Version (Steam)
 	// LBA.exe
 	// 27 February 2018 at 08:10
-	{
-		"lba",
-		"DotEmu Enhanced Version (Steam)",
-		AD_ENTRY1s("LBA.exe", "1f176b4329fbc7efc8f9f30f97013c5f", 1165728),
-		Common::EN_ANY,
-		Common::kPlatformWindows,
-		TwinE::TF_DOTEMU_ENHANCED,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"DotEmu Enhanced Version (Steam)",
-		AD_ENTRY1s("LBA.exe", "1f176b4329fbc7efc8f9f30f97013c5f", 1165728),
-		Common::FR_FRA,
-		Common::kPlatformWindows,
-		TwinE::TF_DOTEMU_ENHANCED,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"DotEmu Enhanced Version (Steam)",
-		AD_ENTRY1s("LBA.exe", "1f176b4329fbc7efc8f9f30f97013c5f", 1165728),
-		Common::DE_DEU,
-		Common::kPlatformWindows,
-		TwinE::TF_DOTEMU_ENHANCED,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"DotEmu Enhanced Version (Steam)",
-		AD_ENTRY1s("LBA.exe", "1f176b4329fbc7efc8f9f30f97013c5f", 1165728),
-		Common::IT_ITA,
-		Common::kPlatformWindows,
-		TwinE::TF_DOTEMU_ENHANCED,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"DotEmu Enhanced Version (Steam)",
-		AD_ENTRY1s("LBA.exe", "1f176b4329fbc7efc8f9f30f97013c5f", 1165728),
-		Common::ES_ESP,
-		Common::kPlatformWindows,
-		TwinE::TF_DOTEMU_ENHANCED,
-		GUIO1(GUIO_NONE)
-	},
+	TWINE_DETECTION_ENTRY("lba", "DotEmu Enhanced Version (Steam)", AD_ENTRY1s("LBA.exe", "1f176b4329fbc7efc8f9f30f97013c5f", 1165728), Common::kPlatformWindows, TwinE::TF_DOTEMU_ENHANCED),
+
+	// Little Big Adventure - DotEmu Enhanced Version (Android)
+	// liblba.so
+	// 8 Sep 2014 at 15:56
+	TWINE_DETECTION_ENTRY("lba", "DotEmu", AD_ENTRY1s("text.hqr", "a374c93450dd2bb874b7167a63974e8d", 377224), Common::kPlatformAndroid, TwinE::TF_DOTEMU_ENHANCED),
 
 	// Little Big Adventure - GOG Version
 	// LBA.GOG
 	// 11 October 2011 at 17:30
-	{
-		"lba",
-		"GOG Version",
-		AD_ENTRY1s("LBA.GOG", "6dc00342c80bc41b4ff5a43c560c7abc", 380666496),
-		Common::EN_ANY,
-		Common::kPlatformDOS,
-		ADGF_NO_FLAGS,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"GOG Version",
-		AD_ENTRY1s("LBA.GOG", "6dc00342c80bc41b4ff5a43c560c7abc", 380666496),
-		Common::FR_FRA,
-		Common::kPlatformDOS,
-		ADGF_NO_FLAGS,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"GOG Version",
-		AD_ENTRY1s("LBA.GOG", "6dc00342c80bc41b4ff5a43c560c7abc", 380666496),
-		Common::DE_DEU,
-		Common::kPlatformDOS,
-		ADGF_NO_FLAGS,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"GOG Version",
-		AD_ENTRY1s("LBA.GOG", "6dc00342c80bc41b4ff5a43c560c7abc", 380666496),
-		Common::IT_ITA,
-		Common::kPlatformDOS,
-		ADGF_NO_FLAGS,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba",
-		"GOG Version",
-		AD_ENTRY1s("LBA.GOG", "6dc00342c80bc41b4ff5a43c560c7abc", 380666496),
-		Common::ES_ESP,
-		Common::kPlatformDOS,
-		ADGF_NO_FLAGS,
-		GUIO1(GUIO_NONE)
-	},
+	TWINE_DETECTION_ENTRY("lba", "GOG Version", AD_ENTRY1s("LBA.GOG", "6dc00342c80bc41b4ff5a43c560c7abc", 380666496), Common::kPlatformDOS, ADGF_NO_FLAGS),
+
 	{
 		"lba",
 		"",
@@ -509,6 +254,45 @@ static const ADGameDescription twineGameDescriptions[] = {
 		ADGF_NO_FLAGS,
 		GUIO1(GUIO_NONE)
 	},
+
+	// Little Big Adventure - Steam Version
+	// TLBA1C.exe
+	// 31 May 2022 12:58
+	TWINE_DETECTION_ENTRY("lba", "Classic Version (Steam)", AD_ENTRY1s("TLBA1C.exe", "38b038eee2d93a5bc0e0405886161252", 4417024), Common::kPlatformWindows, TwinE::TF_LBA1_CLASSIC),
+
+	// Little Big Adventure - Steam Version
+	// TLBA1C.exe
+	// 10 Jun 2022 14:51
+	TWINE_DETECTION_ENTRY("lba", "Classic Version (Steam)", AD_ENTRY1s("TLBA1C.exe", "e4bab4647eabb998f627ac7628d94790", 4418048), Common::kPlatformWindows, TwinE::TF_LBA1_CLASSIC),
+
+	// Little Big Adventure - Steam Version (3.2.2)
+	// TLBA1C.exe
+	// 1 Jul 2022
+	TWINE_DETECTION_ENTRY("lba", "Classic Version (Steam)", AD_ENTRY1s("TLBA1C.exe", "58a7fba8a556196bb14d4f492017fb2b", 4416000), Common::kPlatformWindows, TwinE::TF_LBA1_CLASSIC),
+
+	// Little Big Adventure - Steam Version (3.2.3)
+	// TLBA1C.exe
+	// 8 Sep 2022
+	TWINE_DETECTION_ENTRY("lba", "Classic Version (Steam)", AD_ENTRY1s("TLBA1C.exe", "01f38555eca4a5dd076a4599359de4eb", 4445696), Common::kPlatformWindows, TwinE::TF_LBA1_CLASSIC),
+
+	// Little Big Adventure - GOG Version 3.2.0 (56122)
+	// TLBA1C.exe
+	// 1st June 2022 02:18
+	TWINE_DETECTION_ENTRY("lba", "GOG Classic Version", AD_ENTRY1s("TLBA1C.exe", "e377d036e997acbf543bc3023ce72be6", 4404224), Common::kPlatformWindows, TwinE::TF_LBA1_CLASSIC),
+
+	// Little Big Adventure - GOG Version 3.2.1 (56604)
+	// TLBA1C.exe
+	// 17 Jun 2022 00:30
+	TWINE_DETECTION_ENTRY("lba", "GOG Classic Version", AD_ENTRY1s("TLBA1C.exe", "e86192e4a491805dc011dda5ca83c608", 4404736), Common::kPlatformWindows, TwinE::TF_LBA1_CLASSIC),
+
+	// Little Big Adventure - GOG Version 3.2.2
+	// TLBA1C.exe
+	// 1 Jul 2022
+	TWINE_DETECTION_ENTRY("lba", "GOG Classic Version", AD_ENTRY1s("TLBA1C.exe", "76b227e87038c17a3376b1c681f15474", 4402688), Common::kPlatformWindows, TwinE::TF_LBA1_CLASSIC),
+
+	// Little Big Adventure - GOG Version 3.2.3.1 (58613)
+	// TLBA1C.exe
+	TWINE_DETECTION_ENTRY("lba", "GOG Classic Version", AD_ENTRY1s("TLBA1C.exe", "252216e83f83dc770fafc7fd787a6da5", 4432896), Common::kPlatformWindows, TwinE::TF_LBA1_CLASSIC),
 
 	// FAN Translations - http://lba.fishos.net/bit/index.html
 
@@ -619,177 +403,22 @@ static const ADGameDescription twineGameDescriptions[] = {
 	// Little Big Adventure 2 - Original European Version (EN, FR, DE, IT, ES)
 	// LBA2.EXE
 	// 4 Sep 2004 at 18:44
-	{
-		"lba2",
-		"CD Original European Version",
-
-		AD_ENTRY1s("LBA2.EXE", "ba915d65b3c7a743a87804f73f29675b", 616448),
-		Common::EN_ANY,
-		Common::kPlatformDOS,
-		ADGF_UNSTABLE,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba2",
-		"CD Original European Version",
-		AD_ENTRY1s("LBA2.EXE", "ba915d65b3c7a743a87804f73f29675b", 616448),
-		Common::FR_FRA,
-		Common::kPlatformDOS,
-		ADGF_UNSTABLE,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba2",
-		"CD Original European Version",
-		AD_ENTRY1s("LBA2.EXE", "ba915d65b3c7a743a87804f73f29675b", 616448),
-		Common::DE_DEU,
-		Common::kPlatformDOS,
-		ADGF_UNSTABLE,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba2",
-		"CD Original European Version",
-		AD_ENTRY1s("LBA2.EXE", "ba915d65b3c7a743a87804f73f29675b", 616448),
-		Common::IT_ITA,
-		Common::kPlatformDOS,
-		ADGF_UNSTABLE,
-		GUIO1(GUIO_NONE)
-	},
-	{
-		"lba2",
-		"CD Original European Version",
-		AD_ENTRY1s("LBA2.EXE", "ba915d65b3c7a743a87804f73f29675b", 616448),
-		Common::ES_ESP,
-		Common::kPlatformDOS,
-		ADGF_UNSTABLE,
-		GUIO1(GUIO_NONE)
-	},
+	TWINE_DETECTION_ENTRY("lba2", "CD Original European Version", AD_ENTRY1s("LBA2.EXE", "ba915d65b3c7a743a87804f73f29675b", 616448), Common::kPlatformDOS, ADGF_UNSTABLE),
 
 	AD_TABLE_END_MARKER
 };
 
-static const ExtraGuiOption OptWallCollision = {
-	_s("Enable wall collisions"),
-	_s("Enable the original wall collision damage"),
-	"wallcollision",
-	false,
-	0,
-	0
-};
-
-// this only changes the menu and doesn't change the autosave behaviour - as scummvm is handling this now
-static const ExtraGuiOption OptDisableSaveMenu = {
-	_s("Disable save menu"),
-	_s("The original only had autosaves. This allows you to save whenever you want."),
-	"useautosaving",
-	false,
-	0,
-	0
-};
-
-static const ExtraGuiOption OptDebug = {
-	_s("Enable debug mode"),
-	_s("Enable the debug mode"),
-	"debug",
-	false,
-	0,
-	0
-};
-
-static const ExtraGuiOption OptUseCD = {
-	_s("Enable audio CD"),
-	_s("Enable the original audio cd track"),
-	"usecd",
-	false,
-	0,
-	0
-};
-
-static const ExtraGuiOption OptSound = {
-	_s("Enable sound"),
-	_s("Enable the sound for the game"),
-	"sound",
-	true,
-	0,
-	0
-};
-
-static const ExtraGuiOption OptVoices = {
-	_s("Enable voices"),
-	_s("Enable the voices for the game"),
-	"voice",
-	true,
-	0,
-	0
-};
-
-static const ExtraGuiOption OptText = {
-	_s("Enable text"),
-	_s("Enable the text for the game"),
-	"displaytext",
-	true,
-	0,
-	0
-};
-
-static const ExtraGuiOption OptMovies = {
-	_s("Enable movies"),
-	_s("Enable the cutscenes for the game"),
-	"movie",
-	true,
-	0,
-	0
-};
-
-static const ExtraGuiOption OptMouse = {
-	_s("Enable mouse"),
-	_s("Enable the mouse for the UI"),
-	"mouse",
-	true,
-	0,
-	0
-};
-
-static const ExtraGuiOption OptUSAVersion = {
-	_s("Use the USA version"),
-	_s("Enable the USA specific version flags"),
-	"version",
-	false,
-	0,
-	0
-};
-
-static const ExtraGuiOption OptHighRes = {
-	_s("Enable high resolution"),
-	_s("Enable a higher resolution for the game"),
-	"usehighres",
-	false,
-	0,
-	0
-};
-
-#ifdef USE_TTS
-static const ExtraGuiOption OptTextToSpeech = {
-	_s("TTS Narrator"),
-	_s("Use TTS to read the descriptions (if TTS is available)"),
-	"tts_narrator",
-	false,
-	0,
-	0
-};
-#endif
-
 class TwinEMetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
 	TwinEMetaEngineDetection() : AdvancedMetaEngineDetection(twineGameDescriptions, sizeof(ADGameDescription), twineGames) {
-	}
-
-	const char *getEngineId() const override {
-		return "twine";
+		_guiOptions = GUIO12(GAMEOPTION_WALL_COLLISION, GAMEOPTION_DISABLE_SAVE_MENU,  GAMEOPTION_DEBUG, GAMEOPTION_AUDIO_CD, GAMEOPTION_SOUND, GAMEOPTION_VOICES, GAMEOPTION_TEXT, GAMEOPTION_MOVIES, GAMEOPTION_MOUSE, GAMEOPTION_USA_VERSION, GAMEOPTION_HIGH_RESOLUTION, GAMEOPTION_TEXT_TO_SPEECH);
 	}
 
 	const char *getName() const override {
+		return "twine";
+	}
+
+	const char *getEngineName() const override {
 		return "Little Big Adventure";
 	}
 
@@ -800,27 +429,6 @@ public:
 	const DebugChannelDef *getDebugChannels() const override {
 		return debugFlagList;
 	}
-
-	const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const override;
 };
-
-const ExtraGuiOptions TwinEMetaEngineDetection::getExtraGuiOptions(const Common::String &target) const {
-	ExtraGuiOptions options;
-	options.push_back(OptWallCollision);
-	options.push_back(OptDisableSaveMenu);
-	options.push_back(OptMouse);
-	options.push_back(OptHighRes);
-	options.push_back(OptSound);
-	options.push_back(OptUseCD);
-	options.push_back(OptMovies);
-	options.push_back(OptUSAVersion);
-	options.push_back(OptVoices);
-	options.push_back(OptText);
-	options.push_back(OptDebug);
-#ifdef USE_TTS
-	options.push_back(OptTextToSpeech);
-#endif
-	return options;
-}
 
 REGISTER_PLUGIN_STATIC(TWINE_DETECTION, PLUGIN_TYPE_ENGINE_DETECTION, TwinEMetaEngineDetection);
