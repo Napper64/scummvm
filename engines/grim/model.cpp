@@ -52,26 +52,28 @@ Model::Model(const Common::String &filename, Common::SeekableReadStream *data, C
 	}
 
 	Math::Vector3d max;
-	if (strcmp(_rootHierNode->_name, "br_head2") == 0 || strcmp(_rootHierNode->_name, "br_head3") == 0) {
+	const char *name = _rootHierNode->_name;
+	if (strcmp(name, "br_head2") == 0 || strcmp(name, "br_head3") == 0) {
 		if (staticNode != nullptr) {
 			Mesh *brHead1 = staticNode->_mesh;
 			int numOfFaces = brHead1->_numFaces;
-			MeshFace *fixedFaces = new MeshFace[numOfFaces];
-			for (int i = 0; i <= 29; i++)
-			{
+			MeshFace fixedFaces[48];
+			for (int i = 0; i < 30; i++) {
 				fixedFaces[i] = brHead1->_faces[i];
 			}
 			Mesh *brHead2_3 = _rootHierNode->_mesh;
-			for (int i = 30; i <= 47; i++)
-			{
+			for (int i = 30; i < 48; i++) {
 				fixedFaces[i] = brHead2_3->_faces[i - 3];
 			}
-			brHead2_3->_faces = fixedFaces;
 			brHead2_3->_numFaces = numOfFaces;
+			delete[] brHead2_3->_faces;
+			brHead2_3->_faces = new MeshFace[numOfFaces];
+			for (int i = 0; i < numOfFaces; i++) {
+				brHead2_3->_faces[i] = fixedFaces[i];
+			}
 		}
-		
-
 	}
+
 	_rootHierNode->update();
 	bool first = true;
 	for (int i = 0; i < _numHierNodes; ++i) {
