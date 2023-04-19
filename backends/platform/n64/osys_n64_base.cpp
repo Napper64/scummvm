@@ -32,7 +32,7 @@
 #include "backends/mutex/null/null-mutex.h"
 #include "backends/saves/default/default-saves.h"
 #include "backends/timer/default/default-timer.h"
-#include "graphics/conversion.h"
+#include "graphics/blit.h"
 
 typedef unsigned long long uint64;
 
@@ -766,8 +766,11 @@ void OSystem_N64::warpMouse(int x, int y) {
 	_dirtyOffscreen = true;
 }
 
-void OSystem_N64::setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format) {
+void OSystem_N64::setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format, const byte *mask) {
 	if (!w || !h) return;
+
+	if (mask)
+		warning("OSystem_N64::setMouseCursor: Masks are not supported");
 
 	_mouseHotspotX = hotspotX;
 	_mouseHotspotY = hotspotY;

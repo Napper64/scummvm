@@ -55,6 +55,7 @@
 
 #include "gui/gui-manager.h"
 #include "gui/error.h"
+#include "gui/message.h"
 
 #include "audio/mididrv.h"
 #include "audio/musicplugin.h"  /* for music manager */
@@ -65,6 +66,7 @@
 #ifdef USE_FREETYPE2
 #include "graphics/fonts/ttf.h"
 #endif
+#include "graphics/scalerplugin.h"
 
 #include "backends/keymapper/action.h"
 #include "backends/keymapper/keymap.h"
@@ -88,6 +90,10 @@
 
 #ifdef USE_UPDATES
 #include "gui/updates-dialog.h"
+#endif
+
+#ifdef __ANDROID__
+#include "backends/fs/android/android-fs-factory.h"
 #endif
 
 static bool launcherDialog() {
@@ -350,12 +356,20 @@ static void setupGraphics(OSystem &system) {
 		system.setScaler(ConfMan.get("scaler").c_str(), ConfMan.getInt("scale_factor"));
 		system.setShader(ConfMan.get("shader"));
 
+#if defined(OPENDINGUX) || defined(MIYOO) || defined(MIYOOMINI)
+		// 0, 0 means "autodetect" but currently only SDL supports
+		// it and really useful only on Opendingux. When more platforms
+		// support it we will switch to it.
+		system.initSize(0, 0);
+#else
 		system.initSize(320, 200);
+#endif
 
 		// Parse graphics configuration, implicit fallback to defaults set with RegisterDefaults()
 		system.setFeatureState(OSystem::kFeatureAspectRatioCorrection, ConfMan.getBool("aspect_ratio"));
 		system.setFeatureState(OSystem::kFeatureFullscreenMode, ConfMan.getBool("fullscreen"));
 		system.setFeatureState(OSystem::kFeatureFilteringMode, ConfMan.getBool("filtering"));
+		system.setFeatureState(OSystem::kFeatureVSync, ConfMan.getBool("vsync"));
 	system.endGFXTransaction();
 
 	system.applyBackendSettings();
@@ -407,11 +421,53 @@ extern "C" int scummvm_main(int argc, const char * const argv[]) {
 	Common::StringMap settings;
 	command = Base::parseCommandLine(settings, argc, argv);
 
+	// Check for backend start settings
+	Common::String executable;
+	if (argc && argv && argv[0]) {
+		const char *s = strrchr(argv[0], '/');
+		if (!s)
+			s = strrchr(argv[0], '\\');
+		executable = s ? (s + 1) : argv[0];
+	}
+	Common::StringArray additionalArgs;
+	system.updateStartSettings(executable, command, settings, additionalArgs);
+
+	if (!additionalArgs.empty()) {
+		// Parse those additional command line arguments.
+		additionalArgs.insert_at(0, executable);
+		uint argumentsSize = additionalArgs.size();
+		char **arguments = (char **)malloc(argumentsSize * sizeof(char *));
+		for (uint i = 0; i < argumentsSize; i++) {
+			arguments[i] = (char *)malloc(additionalArgs[i].size() + 1);
+			Common::strlcpy(arguments[i], additionalArgs[i].c_str(), additionalArgs[i].size() + 1);
+		}
+
+		Common::StringMap additionalSettings;
+		Common::String additionalCommand = Base::parseCommandLine(additionalSettings, argumentsSize, arguments);
+
+		for (uint i = 0; i < argumentsSize; i++)
+			free(arguments[i]);
+		free(arguments);
+
+		// Merge additional settings and command with command line. Command line has priority.
+		if (command.empty())
+			command = additionalCommand;
+		for (Common::StringMap::const_iterator x = additionalSettings.begin(); x != additionalSettings.end(); ++x) {
+			if (!settings.contains(x->_key))
+				settings[x->_key] = x->_value;
+		}
+	}
+
 	// Load the config file (possibly overridden via command line):
+	Common::String initConfigFilename;
+	if (settings.contains("initial-cfg"))
+		initConfigFilename = settings["initial-cfg"];
+
+	bool configLoadStatus;
 	if (settings.contains("config")) {
-		ConfMan.loadConfigFile(settings["config"]);
+		configLoadStatus = ConfMan.loadConfigFile(settings["config"], initConfigFilename);
 	} else {
-		ConfMan.loadDefaultConfigFile();
+		configLoadStatus = ConfMan.loadDefaultConfigFile(initConfigFilename);
 	}
 
 	// Update the config file
@@ -490,6 +546,19 @@ extern "C" int scummvm_main(int argc, const char * const argv[]) {
 	}
 #endif
 
+	// If we received an old style graphics mode parameter via command line
+	// override it to default at this stage, so that the backend init won't
+	// pass it onto updateOldSettings(). If it happened to be a valid new
+	// graphics mode, we'll put it back after initBackend().
+	Common::String gfxModeSetting;
+	if (settings.contains("gfx-mode")) {
+		gfxModeSetting = settings["gfx-mode"];
+		if (ScalerMan.isOldGraphicsSetting(gfxModeSetting)) {
+			settings["gfx-mode"] = "default";
+			ConfMan.set("gfx_mode", settings["gfx-mode"], Common::ConfigManager::kSessionDomain);
+		}
+	}
+
 	// Init the backend. Must take place after all config data (including
 	// the command line params) was read.
 	system.initBackend();
@@ -498,25 +567,35 @@ extern "C" int scummvm_main(int argc, const char * const argv[]) {
 	// we check this here. We can't do it until after the backend is inited,
 	// or there won't be a graphics manager to ask for the supported modes.
 
-	if (settings.contains("gfx-mode")) {
+	if (!gfxModeSetting.empty()) {
 		const OSystem::GraphicsMode *gm = g_system->getSupportedGraphicsModes();
-		Common::String option = settings["gfx-mode"];
 		bool isValid = false;
 
 		while (gm->name && !isValid) {
-			isValid = !scumm_stricmp(gm->name, option.c_str());
+			isValid = !scumm_stricmp(gm->name, gfxModeSetting.c_str());
 			gm++;
 		}
 		if (!isValid) {
-			warning("Unrecognized graphics mode '%s'. Switching to default mode", option.c_str());
-			settings["gfx-mode"] = "default";
+			// We will actually already have switched to default, but couldn't be sure that it was right until now.
+			warning("Unrecognized graphics mode '%s'. Switching to default mode", gfxModeSetting.c_str());
+		} else {
+			settings["gfx-mode"] = gfxModeSetting;
+			system.beginGFXTransaction();
+			system.setGraphicsMode(gfxModeSetting.c_str());
+			system.endGFXTransaction();
 		}
+		ConfMan.set("gfx_mode", gfxModeSetting, Common::ConfigManager::kSessionDomain);
 	}
 	if (settings.contains("disable-display")) {
 		ConfMan.setInt("disable-display", 1, Common::ConfigManager::kTransientDomain);
 	}
 	setupGraphics(system);
 
+	if (!configLoadStatus) {
+		GUI::MessageDialog alert(_("Bad config file format. overwrite?"), _("Yes"), _("Cancel"));
+		if (alert.runModal() != GUI::kMessageOK)
+   			return 0;
+	}
 	// Init the different managers that are used by the engines.
 	// Do it here to prevent fragmentation later
 	system.getAudioCDManager();
@@ -546,6 +625,72 @@ extern "C" int scummvm_main(int argc, const char * const argv[]) {
 	if (!ConfMan.hasKey("updates_check") && g_system->getUpdateManager()) {
 		GUI::UpdatesDialog dlg;
 		dlg.runModal();
+	}
+#endif
+
+#ifdef __ANDROID__
+	// This early popup message for Android, informing the users about important
+	// changes to file access, needs to be *after* language for the GUI has been selected.
+	// Hence, we instantiate GUI Manager here, to take care of this.
+	GUI::GuiManager::instance();
+	if (AndroidFilesystemFactory::instance().hasSAF()
+		&& !ConfMan.hasKey("android_saf_dialog_shown")) {
+
+		bool cancelled = false;
+
+		if (!ConfMan.getGameDomains().empty()) {
+			GUI::MessageDialog alert(_(
+				// I18N: <Add a new folder> must match the translation done in backends/fs/android/android-saf-fs.h
+				"In this new version of ScummVM Android, significant changes were made to "
+				"the file access system to allow support for modern versions of the Android "
+				"Operating System.\n"
+				"If you find that your existing added games or custom paths no longer work, "
+				"please edit those paths and this time use the SAF system to browse to the "
+				"desired locations.\n"
+				"To do that:\n"
+				"\n"
+				"  1. For each game whose data is not found, go to the \"Paths\" tab in "
+				"the \"Game Options\" and change the \"Game path\"\n"
+				"  2. Inside the ScummVM file browser, use \"Go Up\" until you reach "
+				"the \"root\" folder where you will see the \"<Add a new folder>\" option.\n"
+				"  3. Choose that, then browse and select the \"parent\" folder for your "
+				"games subfolders, e.g. \"SD Card > myGames\". Click on \"Use this folder\".\n"
+				"  4. Then, a new folder \"myGames\" will appear on the \"root\" folder "
+				"of the ScummVM browser.\n"
+				"  5. Browse through this folder to your game data.\n"
+				"\n"
+				"Steps 2 and 3 need to be done only once for all of your games."
+				), _("Ok"),
+				// I18N: A button caption to dismiss amessage and read it later
+				_("Read Later"), Graphics::kTextAlignLeft);
+
+			if (alert.runModal() != GUI::kMessageOK)
+				cancelled = true;
+		} else {
+			GUI::MessageDialog alert(_(
+				// I18N: <Add a new folder> must match the translation done in backends/fs/android/android-saf-fs.h
+				"In this new version of ScummVM Android, significant changes were made to "
+				"the file access system to allow support for modern versions of the Android "
+				"Operating System.\n"
+				"Thus, you need to set up SAF in order to be able to add the games.\n"
+				"\n"
+				"  1. Inside the ScummVM file browser, use \"Go Up\" until you reach "
+				"the \"root\" folder where you will see the \"<Add a new folder>\" option.\n"
+				"  2. Choose that, then browse and select the \"parent\" folder for your "
+				"games subfolders, e.g. \"SD Card > myGames\". Click on \"Use this folder\".\n"
+				"  3. Then, a new folder \"myGames\" will appear on the \"root\" folder "
+				"of the ScummVM browser.\n"
+				"  4. Browse through this folder to your game data."
+				), _("Ok"),
+				// I18N: A button caption to dismiss a message and read it later
+				_("Read Later"), Graphics::kTextAlignLeft);
+
+			if (alert.runModal() != GUI::kMessageOK)
+				cancelled = true;
+		}
+
+		if (!cancelled)
+			ConfMan.setBool("android_saf_dialog_shown", true);
 	}
 #endif
 

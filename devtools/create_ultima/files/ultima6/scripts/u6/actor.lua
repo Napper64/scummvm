@@ -587,32 +587,34 @@ function actor_init(actor, alignment)
    --actor weapon
    chance = 2
    for i,v in ipairs(actor_base[23]) do
-      if v >= 36 and v <= 38 then --spear, throwing axe, dagger
-         qty = math.random(6, 12)
-      else
-         qty = 1
-      end
-
-      for j=1,qty do
-         obj = Obj.new(v)
-         obj.status = 57
-         if v == 90 then
-            obj.qty = 1
+      if math.random(1,chance) == 1 then
+         if v >= 36 and v <= 38 then --spear, throwing axe, dagger
+            qty = math.random(6, 12)
          else
-            obj.qty = 0
+            qty = 1
          end
-         Actor.inv_add_obj(actor, obj)
-         Actor.inv_ready_obj(actor, obj)
-         if v == 41 or v == 54 then --bow, magic bow
-            obj = Obj.new(55) --arrow
-            obj.status = 49
-            obj.qty = math.random(12, 24)
+
+         for j=1,qty do
+            obj = Obj.new(v)
+            obj.status = 57
+            if v == 90 then
+               obj.qty = 1
+            else
+               obj.qty = 0
+            end
             Actor.inv_add_obj(actor, obj)
-         elseif v == 42 or v == 50 then --crossbow, triple crossbow
-            obj = Obj.new(56) --bolt
-            obj.status = 49
-            obj.qty = math.random(12, 24)
-            Actor.inv_add_obj(actor, obj)
+            Actor.inv_ready_obj(actor, obj)
+            if v == 41 or v == 54 then --bow, magic bow
+               obj = Obj.new(55) --arrow
+               obj.status = 49
+               obj.qty = math.random(12, 24)
+               Actor.inv_add_obj(actor, obj)
+            elseif v == 42 or v == 50 then --crossbow, triple crossbow
+               obj = Obj.new(56) --bolt
+               obj.status = 49
+               obj.qty = math.random(12, 24)
+               Actor.inv_add_obj(actor, obj)
+            end
          end
       end
 
@@ -1616,13 +1618,25 @@ function combat_range_weapon_1D5F9(attacker, target_x, target_y, target_z, foe, 
    elseif weapon_obj_n == 0x24 or weapon_obj_n == 0x25 or weapon_obj_n == 0x26 then
       --spear, throwing axe, dagger
 
-      if Actor.inv_remove_obj_qty(attacker, weapon_obj_n, 1) == 1 and map_is_water(target_x,target_y,target_z) == false then
-	      local obj = Obj.new(weapon_obj_n);
-	      obj.ok_to_take = true
-	      obj.temporary = true
-		  Obj.moveToMap(obj, target_x, target_y, target_z)
-	  end
-
+      --remove unreadied throwing weapons from inventory first so weapon stays readied
+      local removal_candidate = nil
+      for inv_obj in actor_inventory(attacker) do
+          if inv_obj.obj_n == weapon_obj_n then
+              removal_candidate = inv_obj
+              if removal_candidate.readied ~= true then
+                  break
+              end
+          end
+      end
+      if removal_candidate ~= nil then
+          Actor.inv_remove_obj(attacker, removal_candidate)
+          if map_is_water(target_x,target_y,target_z) == false then
+              local obj = Obj.new(weapon_obj_n);
+              obj.ok_to_take = true
+              obj.temporary = true
+              Obj.moveToMap(obj, target_x, target_y, target_z)
+          end
+      end
    elseif weapon_obj_n == 0x29 or weapon_obj_n == 0x2a or weapon_obj_n == 0x32 or weapon_obj_n == 0x36 then
       --bow, crossbow, triple crossbow, magic bow
       local projectile_obj = nil

@@ -22,10 +22,11 @@
 #include "common/file.h"
 #include "common/fs.h"
 #include "common/keyboard.h"
+#include "common/macresman.h"
 #include "common/memstream.h"
 #include "common/punycode.h"
 #include "common/tokenizer.h"
-#include "common/zlib.h"
+#include "common/compression/zlib.h"
 
 #include "director/types.h"
 #include "graphics/macgui/macwindowmanager.h"
@@ -287,6 +288,90 @@ void DirectorEngine::loadKeyCodes() {
 	}
 }
 
+void DirectorEngine::setMachineType(int machineType) {
+    _machineType = machineType;
+    
+    switch (machineType) {
+    case 1: // Macintosh 512Ke
+    case 2: // Macintosh Plus
+    case 3: // Macintosh SE
+    case 4: // Macintosh II
+    case 5: // Macintosh IIx
+    case 6: // Macintosh IIcx 
+    case 7: // Macintosh SE/30
+    case 8: // Macintosh Portable
+    case 9: // Macintosh IIci
+        _wmWidth = 512;
+        _wmHeight = 384;
+        _colorDepth = 8;
+        break;
+    case 11: // Macintosh IIfx
+        _wmWidth = 1152;
+        _wmHeight = 870;
+        _colorDepth = 1;
+        break;
+    case 15: // Macintosh Classic
+    case 16: // Macintosh IIsi
+    case 17: // Macintosh LC
+    case 20: // Macintosh Quadra 700
+    case 21: // Classic II
+    case 22: // PowerBook 100
+    case 23: // PowerBook 140
+    case 27: // Macintosh LCIII
+    case 28: // Macintosh Centris 650
+    case 30: // PowerBook Duo 230
+    case 31: // PowerBook 180
+    case 32: // PowerBook 160
+    case 33: // Macintosh Quadra 800
+    case 35: // Macintosh LC II
+    case 42: // Macintosh IIvi
+    case 46: // Macintosh IIvx
+    case 47: // Macintosh Color Classic
+    case 48: // PowerBook 165c
+    case 50: // Macintosh Centris 610
+    case 52: // PowerBook 145
+        _wmWidth = 640;
+        _wmHeight = 480;
+        _colorDepth = 8;
+        break;
+    case 45: // Power Macintosh 7100/70
+    case 53: // PowerComputing 8100/100
+        _wmWidth = 832;
+        _wmHeight = 624;
+        _colorDepth = 8;
+        break;
+    case 70: // PowerBook 540C
+        _wmWidth = 640;
+        _wmHeight = 480;
+        _colorDepth = 16;
+        break;
+    case 73: // Power Macintosh 6100/60
+        _wmWidth = 832;
+        _wmHeight = 624;
+        _colorDepth = 16;
+        break;
+    case 18: // Macintosh Quadra 900
+    case 24: // Macintosh Quadra 950
+    case 76: // Macintosh Quadra 840av
+        _wmWidth = 832;
+        _wmHeight = 624;
+        _colorDepth = 32;
+        break;
+    case 19: // PowerBook 170
+    case 25: // PowerBook Duo 210
+        _wmWidth = 640;
+        _wmHeight = 400;
+        _colorDepth = 4;
+        break;
+    case 256: // IBM PC-type machine
+    default:
+        _wmWidth = 640;
+        _wmHeight = 480;
+        _colorDepth = 8;
+        break;
+    }
+}
+
 int castNumToNum(const char *str) {
 	if (strlen(str) != 3)
 		return -1;
@@ -334,9 +419,48 @@ Common::String CastMemberID::asString() const {
 	return res;
 }
 
+int recLevel = 0;
+const char *tabs[] = {	"",
+						"  ",
+						"    ",
+						"      ",
+						"        ",
+						"          ",
+						"            ",
+						"              ",
+						"                ",
+						"                  ",
+						"                    ",
+};
+
+const char *recIndent() {
+	if (recLevel >= ARRAYSIZE(tabs)) {
+		warning("recIndent() too deep: %d", recLevel);
+		return tabs[0];
+	}
+
+	return tabs[recLevel];
+}
+
+bool isAbsolutePath(Common::String &path) {
+	// Starts with Mac directory notation for the game root
+	if (path.hasPrefix("@:"))
+		return true;
+	// Starts with a Windows drive letter
+	if (path.size() >= 3
+			&& Common::isAlpha(path[0])
+			&& path[1] == ':'
+			&& path[2] == '\\')
+		return true;
+	return false;
+}
+
 Common::String convertPath(Common::String &path) {
 	if (path.empty())
 		return path;
+
+	debugN(9, "%s", recIndent());
+	debug(9, "convertPath(%s)", path.c_str());
 
 	if (!path.contains(':') && !path.contains('\\') && !path.contains('@')) {
 		return path;
@@ -396,10 +520,16 @@ bool testPath(Common::String &path, bool directory) {
 	Common::FSNode d = Common::FSNode(*g_director->getGameDataDir());
 	Common::FSNode node;
 
-	// Test if we have it right in the SearchMan
-	if (SearchMan.hasFile(Common::Path(path, g_director->_dirSeparator)))
+	// Test if we have it right in the SearchMan. Also accept MacBinary
+	// for Mac and Pippin
+	if (SearchMan.hasFile(Common::Path(path, g_director->_dirSeparator)) ||
+	    ((g_director->getPlatform() == Common::kPlatformMacintoshII
+	      || g_director->getPlatform() == Common::kPlatformMacintosh
+	      || g_director->getPlatform() == Common::kPlatformPippin) &&
+	     Common::MacResManager::exists(Common::Path(path, g_director->_dirSeparator))))
 		return true;
 
+	debugN(9, "%s", recIndent());
 	debug(9, "testPath: %s  dir: %d", path.c_str(), directory);
 
 	// check for the game data dir
@@ -428,7 +558,7 @@ bool testPath(Common::String &path, bool directory) {
 		bool exists = false;
 		for (Common::FSList::iterator i = fslist.begin(); i != fslist.end(); ++i) {
 			// for each element in the path, choose the first FSNode
-			// with a case-insensitive matcing name
+			// with a case-insensitive matching name
 			if (i->getName().equalsIgnoreCase(token)) {
 				// If this the final path component, check if we're allowed to match with a directory
 				node = Common::FSNode(*i);
@@ -446,10 +576,12 @@ bool testPath(Common::String &path, bool directory) {
 			}
 		}
 		if (!exists) {
+			debugN(9, "%s", recIndent());
 			debug(9, "testPath: Not exists");
 			return false;
 		}
 	}
+	debugN(9, "%s", recIndent());
 	debug(9, "testPath: ***** HAVE MATCH");
 	// write back path with correct case
 	path = newPath;
@@ -461,56 +593,92 @@ Common::String pathMakeRelative(Common::String path, bool recursive, bool addext
 	//Wrap pathMakeRelative to search in extra paths defined by the game
 	Common::String foundPath;
 
+	recLevel = 0;
+
+	debugN(8, "%s", recIndent());
+	debug(8, "pathMakeRelative(\"%s\", recursive: %d, addexts: %d, directory: %d):", path.c_str(), recursive, addexts, directory);
+	bool isAbsolute = isAbsolutePath(path);
+	path = convertPath(path);
+	debugN(9, "%s", recIndent());
+	debug(9, "pathMakeRelative(): converted -> %s", path.c_str());
+
+	// Absolute paths should not be matched against the global search path list
+	if (isAbsolute) {
+		return wrappedPathMakeRelative(path, recursive, addexts, directory, true);
+	}
+
 	Datum searchPath = g_director->getLingo()->_searchPath;
 	if (searchPath.type == ARRAY && searchPath.u.farr->arr.size() > 0) {
 		for (uint i = 0; i < searchPath.u.farr->arr.size(); i++) {
 			Common::String searchIn = searchPath.u.farr->arr[i].asString();
+			// Ensure there's a trailing directory separator
+			Common::String separator = Common::String::format("%c", g_director->_dirSeparator);
+			if (!searchIn.hasSuffix(separator)) {
+				searchIn += separator;
+			}
+			debugN(9, "%s", recIndent());
 			debug(9, "pathMakeRelative(): searchPath: %s", searchIn.c_str());
 
-			foundPath = wrappedPathMakeRelative(searchIn + path, recursive, addexts, directory);
-			if (testPath(foundPath))
+			recLevel++;
+			foundPath = wrappedPathMakeRelative(searchIn + path, recursive, addexts, directory, false);
+			recLevel--;
+
+			if (testPath(foundPath, directory))
 				return foundPath;
 
+			debugN(9, "%s", recIndent());
 			debug(9, "pathMakeRelative(): -- searchPath not found: %s", foundPath.c_str());
 		}
 	}
 
 	for (auto i = g_director->_extraSearchPath.begin(); i != g_director->_extraSearchPath.end(); ++i) {
+		debugN(9, "%s", recIndent());
 		debug(9, "pathMakeRelative(): extraSearchPath: %s", i->c_str());
 
-		foundPath = wrappedPathMakeRelative(*i + path, recursive, addexts, directory);
-		if (testPath(foundPath))
+		recLevel++;
+		foundPath = wrappedPathMakeRelative(*i + path, recursive, addexts, directory, false);
+		recLevel--;
+
+		if (testPath(foundPath, directory))
 			return foundPath;
 
+		debugN(9, "%s", recIndent());
 		debug(9, "pathMakeRelative(): -- extraSearchPath not found: %s", foundPath.c_str());
 	}
-
-	return wrappedPathMakeRelative(path, recursive, addexts, directory);
+	return wrappedPathMakeRelative(path, recursive, addexts, directory, false);
 }
 
 
 // if we are finding the file path, then this func will return exactly the executable file path
 // if we are finding the directory path, then we will get the path relative to the game data dir.
 // e.g. if we have game data dir as SSwarlock, then "A:SSwarlock" -> "", "A:SSwarlock:Nav" -> "Nav"
-Common::String wrappedPathMakeRelative(Common::String path, bool recursive, bool addexts, bool directory) {
+Common::String wrappedPathMakeRelative(Common::String path, bool recursive, bool addexts, bool directory, bool absolute) {
 
 	Common::String initialPath(path);
 
+	debugN(9, "%s", recIndent());
 	debug(9, "wrappedPathMakeRelative(): s0 %s -> %s", path.c_str(), initialPath.c_str());
 
 	if (recursive) // first level
 		initialPath = convertPath(initialPath);
 
+	debugN(9, "%s", recIndent());
 	debug(9, "wrappedPathMakeRelative(): s1 %s -> %s", path.c_str(), initialPath.c_str());
 
-	initialPath = Common::normalizePath(g_director->getCurrentPath() + initialPath, g_director->_dirSeparator);
+	if (absolute) {
+		initialPath = Common::normalizePath(initialPath, g_director->_dirSeparator);
+	} else {
+		initialPath = Common::normalizePath(g_director->getCurrentPath() + initialPath, g_director->_dirSeparator);
+	}
 	Common::String convPath = initialPath;
 
+	debugN(9, "%s", recIndent());
 	debug(9, "wrappedPathMakeRelative(): s2 %s", convPath.c_str());
 
 	if (testPath(initialPath, directory))
 		return initialPath;
 
+	debugN(9, "%s", recIndent());
 	debug(9, "wrappedPathMakeRelative(): s2.1 -- not found %s", initialPath.c_str());
 
 	// Now try to search the file
@@ -520,15 +688,18 @@ Common::String wrappedPathMakeRelative(Common::String path, bool recursive, bool
 		int pos = convPath.find(g_director->_dirSeparator);
 		convPath = Common::String(&convPath.c_str()[pos + 1]);
 
+		debugN(9, "%s", recIndent());
 		debug(9, "wrappedPathMakeRelative(): s3 try %s", convPath.c_str());
 
 		if (!testPath(convPath, directory)) {
-			// If we were supplied with parh with subdirectories,
+			// If we were supplied a path with subdirectories,
 			// attempt to combine it with the current movie path at every iteration
 			Common::String locPath = Common::normalizePath(g_director->getCurrentPath() + convPath, g_director->_dirSeparator);
+			debugN(9, "%s", recIndent());
 			debug(9, "wrappedPathMakeRelative(): s3.1 try %s", locPath.c_str());
 
 			if (!testPath(locPath, directory)) {
+				debugN(9, "%s", recIndent());
 				debug(9, "wrappedPathMakeRelative(): s3.1 -- not found %s", locPath.c_str());
 				continue;
 			}
@@ -545,11 +716,13 @@ Common::String wrappedPathMakeRelative(Common::String path, bool recursive, bool
 		// Try stripping all of the characters not allowed in FAT
 		convPath = stripMacPath(initialPath.c_str());
 
+		debugN(9, "%s", recIndent());
 		debug(9, "wrappedPathMakeRelative(): s4 %s", convPath.c_str());
 
 		if (testPath(initialPath, directory))
 			return initialPath;
 
+		debugN(9, "%s", recIndent());
 		debug(9, "wrappedPathMakeRelative(): s4.1 -- not found %s", initialPath.c_str());
 
 		// Now try to search the file
@@ -557,13 +730,16 @@ Common::String wrappedPathMakeRelative(Common::String path, bool recursive, bool
 			int pos = convPath.find(g_director->_dirSeparator);
 			convPath = Common::String(&convPath.c_str()[pos + 1]);
 
+			debugN(9, "%s", recIndent());
 			debug(9, "wrappedPathMakeRelative(): s5 try %s", convPath.c_str());
 
 			if (!testPath(convPath, directory)) {
+				debugN(9, "%s", recIndent());
 				debug(9, "wrappedPathMakeRelative(): s5 -- not found %s", convPath.c_str());
 				continue;
 			}
 
+			debugN(9, "%s", recIndent());
 			debug(9, "wrappedPathMakeRelative(): s5 converted %s -> %s", path.c_str(), convPath.c_str());
 
 			opened = true;
@@ -604,12 +780,17 @@ Common::String wrappedPathMakeRelative(Common::String path, bool recursive, bool
 				Common::String ext = component.substr(component.size() - 4);
 				Common::String newpath = convPath + convertMacFilename(nameWithoutExt.c_str()) + ext;
 
+				debugN(9, "%s", recIndent());
 				debug(9, "wrappedPathMakeRelative(): s6 %s -> try %s", initialPath.c_str(), newpath.c_str());
+
+				recLevel++;
 				Common::String res = wrappedPathMakeRelative(newpath, false, false);
+				recLevel--;
 
 				if (testPath(res))
 					return res;
 
+				debugN(9, "%s", recIndent());
 				debug(9, "wrappedPathMakeRelative(): s6 -- not found %s", res.c_str());
 			}
 		}
@@ -646,6 +827,7 @@ Common::String testExtensions(Common::String component, Common::String initialPa
 	for (int i = 0; exts[i]; ++i) {
 		Common::String newpath = convPath + component.c_str() + exts[i];
 
+		debugN(9, "%s", recIndent());
 		debug(9, "testExtensions(): sT %s -> try %s, comp: %s", initialPath.c_str(), newpath.c_str(), component.c_str());
 		Common::String res = wrappedPathMakeRelative(newpath, false, false);
 
@@ -655,6 +837,7 @@ Common::String testExtensions(Common::String component, Common::String initialPa
 	for (int i = 0; exts[i]; ++i) {
 		Common::String newpath = convPath + convertMacFilename(component.c_str()) + exts[i];
 
+		debugN(9, "%s", recIndent());
 		debug(9, "testExtensions(): sT %s -> try %s, comp: %s", initialPath.c_str(), newpath.c_str(), component.c_str());
 		Common::String res = wrappedPathMakeRelative(newpath, false, false);
 
@@ -924,8 +1107,6 @@ Common::SeekableReadStreamEndian *readZlibData(Common::SeekableReadStream &strea
 }
 
 uint16 humanVersion(uint16 ver) {
-	if (ver >= kFileVer1201)
-		return 1201;
 	if (ver >= kFileVer1200)
 		return 1200;
 	if (ver >= kFileVer1150)
@@ -962,7 +1143,7 @@ Common::Platform platformFromID(uint16 id) {
 	case 2:
 		return Common::kPlatformWindows;
 	default:
-		warning("platformFromID: Unknown platform ID %d", id);
+		warning("BUILDBOT: platformFromID: Unknown platform ID %d", id);
 		break;
 	}
 	return Common::kPlatformUnknown;
@@ -1008,6 +1189,188 @@ Common::u32char_type_t numToChar(int num) {
 	return str.lastChar();
 }
 
+Common::String encodePathForDump(const Common::String &path) {
+	return Common::Path(path, g_director->_dirSeparator).punycodeEncode().toString();
+}
+
+Common::String utf8ToPrintable(const Common::String &str) {
+	return Common::toPrintable(Common::U32String(str));
+}
+
+Common::String decodePlatformEncoding(Common::String input) {
+	return input.decode(g_director->getPlatformEncoding());
+}
+
+Common::String formatStringForDump(const Common::String &str) {
+	Common::String format = str;
+	for (int i = 0; i < (int)format.size(); i++) {
+		if (format[i] == '\r')
+			format.replace(i, 1, "\n");
+	}
+	return format;
+}
+
+/////////////////////////////////////////////////////////////
+// String comparison order tables
+//
+// Director is using weird order of comparison for strings
+// It is declared as case-insensitive, ignoring diacritics,
+// but the reality is more complex.
+//
+// The tables below contain the actual weight of the letter in
+// the given position
+
+//
+// Director 2.0-4.0 Mac, MacRoman encoding
+//
+// ................................
+//   !"«»“”#$%&'‘’()*+,-./012345678
+// 9:;<=>?@AÁÀÂÄÃÅaáàâäãåÆæBbCÇcçDd
+// EÉÈÊËeéèêëFfﬁﬂGgHhIÍÌÎÏı.íìîïJjK
+// kLlMmNÑnñOÓÒÔÖΩØoóòôöõøŒœPpQqRrS
+// sßTtUÚÙÛÜuúùûüVvWwXxYyÿŸZz[\]^_`
+// {|}~.†°¢£§•¶®©™´¨≠∞±≤≥¥µ∂∑∏π∫ªºΩ
+// ¿¡¬√ƒ≈Δ…–—÷◊⁄¤‹›‡·‚„‰��¯˘˙˚¸˝˛.
+
+const byte orderTableD2mac[256] = {
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+	0x20, 0x22, 0x23, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36,
+	0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46,
+	0x47, 0x48, 0x58, 0x5a, 0x5e, 0x60, 0x6a, 0x6e, 0x70, 0x72, 0x7d, 0x7f, 0x81, 0x83, 0x85, 0x89,
+	0x99, 0x9b, 0x9d, 0x9f, 0xa2, 0xa4, 0xae, 0xb0, 0xb2, 0xb4, 0xb8, 0xba, 0xbb, 0xbc, 0xbd, 0xbe,
+	0xbf, 0x4f, 0x59, 0x5c, 0x5f, 0x65, 0x6b, 0x6f, 0x71, 0x77, 0x7e, 0x80, 0x82, 0x84, 0x87, 0x90,
+	0x9a, 0x9c, 0x9e, 0xa0, 0xa3, 0xa9, 0xaf, 0xb1, 0xb3, 0xb5, 0xb9, 0xc0, 0xc1, 0xc2, 0xc3, 0xc4,
+	0x4c, 0x4e, 0x5b, 0x61, 0x86, 0x8d, 0xa8, 0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x5d, 0x66, 0x67,
+	0x68, 0x69, 0x79, 0x7a, 0x7b, 0x7c, 0x88, 0x91, 0x92, 0x93, 0x94, 0x95, 0xaa, 0xab, 0xac, 0xad,
+	0xc5, 0xc6, 0xc7, 0xc8, 0xc9, 0xca, 0xcb, 0xa1, 0xcc, 0xcd, 0xce, 0xcf, 0xd0, 0xd1, 0x56, 0x8f,
+	0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0xd7, 0xd8, 0xd9, 0xda, 0xdb, 0xdc, 0xdd, 0xde, 0xdf, 0x57, 0x96,
+	0xe0, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5, 0xe6, 0x24, 0x25, 0xe7, 0x21, 0x4a, 0x4d, 0x8e, 0x97, 0x98,
+	0xe8, 0xe9, 0x26, 0x27, 0x2d, 0x2e, 0xea, 0xeb, 0xb6, 0xb7, 0xec, 0xed, 0xee, 0xef, 0x6c, 0x6d,
+	0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0x4b, 0x63, 0x49, 0x64, 0x62, 0x73, 0x75, 0x76, 0x74, 0x8a, 0x8c,
+	0xf5, 0x8b, 0xa5, 0xa7, 0xa6, 0x77, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff,
+};
+
+//
+// Director 4.0 Mac, MacJapanese encoding
+//
+// �...............................
+// ................................
+// ............................ !"#
+// $%&'()*+,-./0123456789:;<=>?@AaB
+// bCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqR
+// rSsTtUuVvWwXxYyZz[\]^_`{|}~.����
+// ��������������������������������
+// ������Ӭԭծ������ܦݠ���������.
+
+
+const byte orderTableD4Jmac[256] = {
+	0x3c, 0x3d, 0x3e, 0x3f, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b,
+	0x4c, 0x4d, 0x4e, 0x4f, 0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x5b,
+	0x5c, 0x5d, 0x5e, 0x5f, 0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x6b,
+	0x6c, 0x6d, 0x6e, 0x6f, 0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7a, 0x7b,
+	0x7c, 0x7d, 0x7f, 0x81, 0x83, 0x85, 0x87, 0x89, 0x8b, 0x8d, 0x8f, 0x91, 0x93, 0x95, 0x97, 0x99,
+	0x9b, 0x9d, 0x9f, 0xa1, 0xa3, 0xa5, 0xa7, 0xa9, 0xab, 0xad, 0xaf, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5,
+	0xb6, 0x7e, 0x80, 0x82, 0x84, 0x86, 0x88, 0x8a, 0x8c, 0x8e, 0x90, 0x92, 0x94, 0x96, 0x98, 0x9a,
+	0x9c, 0x9e, 0xa0, 0xa2, 0xa4, 0xa6, 0xa8, 0xaa, 0xac, 0xae, 0xb0, 0xb7, 0xb8, 0xb9, 0xba, 0xbb,
+	0xbc, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xf3, 0xbe, 0xc0, 0xc2, 0xc4, 0xc6, 0xe7, 0xe9, 0xeb, 0xd4,
+	0xbd, 0xbf, 0xc1, 0xc3, 0xc5, 0xc7, 0xc8, 0xc9, 0xca, 0xcb, 0xcc, 0xcd, 0xce, 0xcf, 0xd0, 0xd1,
+	0xd2, 0xd3, 0xd5, 0xd6, 0xd7, 0xd8, 0xd9, 0xda, 0xdb, 0xdc, 0xdd, 0xde, 0xdf, 0xe0, 0xe1, 0xe2,
+	0xe3, 0xe4, 0xe5, 0xe6, 0xe8, 0xea, 0xec, 0xed, 0xee, 0xef, 0xf0, 0xf1, 0xf2, 0xf4, 0xfb, 0xfc,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfd, 0xfe, 0xff,
+};
+
+//
+// Director 4.0-5.0 Win, cp1250 encoding
+//
+// ................................
+//   !"«»#$%&'‘’()*+,-./0123456789:
+// ;<=>?@AÁŔÂÄĂĹĆaáŕâäăĺćBbCÇcçDĐdđ
+// EÉČĘËeéčęëFfGgHhIÍĚÎĎiíěîďJjKkLl
+// MmNŃnńOÓŇÔÖŐŘŚoóňôöőřśPpQqRrSŠsš
+// ßTtUÚŮŰÜuúůűüVvWwXxYÝźyý.Zz[\]^_
+// `{|}~.€�‚�„…†‡�‰‹ŤŽŹ�“”•–—�™›ťžˇ
+// ˘Ł¤Ą¦§¨©Ş¬®Ż°±˛ł´µ¶·¸ąşĽ˝ľż×Ţţ÷
+
+const byte orderTableD4win[256] = {
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+	0x20, 0x22, 0x23, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, 0x34,
+	0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40, 0x41, 0x42, 0x43, 0x44,
+	0x45, 0x46, 0x56, 0x58, 0x5c, 0x60, 0x6a, 0x6c, 0x6e, 0x70, 0x7a, 0x7c, 0x7e, 0x80, 0x82, 0x86,
+	0x96, 0x98, 0x9a, 0x9c, 0xa1, 0xa3, 0xad, 0xaf, 0xb1, 0xb3, 0xb9, 0xbb, 0xbc, 0xbd, 0xbe, 0xbf,
+	0xc0, 0x4e, 0x57, 0x5a, 0x5e, 0x65, 0x6b, 0x6d, 0x6f, 0x75, 0x7b, 0x7d, 0x7f, 0x81, 0x84, 0x8e,
+	0x97, 0x99, 0x9b, 0x9e, 0xa2, 0xa8, 0xae, 0xb0, 0xb2, 0xb6, 0xba, 0xc1, 0xc2, 0xc3, 0xc4, 0xc5,
+	0xc6, 0xc7, 0xc8, 0xc9, 0xca, 0xcb, 0xcc, 0xcd, 0xce, 0xcf, 0x9d, 0xd0, 0x8d, 0xd1, 0xd2, 0xd3,
+	0xd4, 0x2b, 0x2c, 0xd5, 0xd6, 0xd7, 0xd8, 0xd9, 0xda, 0xdb, 0x9f, 0xdc, 0x95, 0xdd, 0xde, 0xb5,
+	0x21, 0xdf, 0xe0, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5, 0xe6, 0xe7, 0xe8, 0x24, 0xe9, 0xea, 0xeb, 0xec,
+	0xed, 0xee, 0xef, 0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0x25, 0xf8, 0xf9, 0xfa, 0xfb,
+	0x48, 0x47, 0x49, 0x4b, 0x4a, 0x4c, 0x4d, 0x59, 0x62, 0x61, 0x63, 0x64, 0x72, 0x71, 0x73, 0x74,
+	0x5d, 0x83, 0x88, 0x87, 0x89, 0x8b, 0x8a, 0xfc, 0x8c, 0xa5, 0xa4, 0xa6, 0xa7, 0xb4, 0xfd, 0xa0,
+	0x50, 0x4f, 0x51, 0x53, 0x52, 0x54, 0x55, 0x5b, 0x67, 0x66, 0x68, 0x69, 0x77, 0x76, 0x78, 0x79,
+	0x5f, 0x85, 0x90, 0x8f, 0x91, 0x93, 0x92, 0xff, 0x94, 0xaa, 0xa9, 0xab, 0xac, 0xb7, 0xfe, 0xb8,
+};
+
+
+//
+// Director 6.0 Win, cp1250 encoding
+//
+// ............................�ŤŹ�
+// ť'-–—  .....!"#$%&()*,./:;?@[\]
+// ^�_`{|}~ˇ¦¨Ż´¸ż�‘’‚“”„‹›+<=>±«»×
+// ÷˘Ł¤Ą§©¬®°µ¶·†‡•…‰€0Ľ˝ľ1ą2˛3ł456
+// 789aAŞáÁŕŔâÂäÄăĂĺĹćĆbBcCçÇdDđĐeE
+// éÉčČęĘëËfF�gGhHiIíÍěĚîÎďĎjJkKlLm
+// MnNńŃoOşóÓňŇôÔöÖőŐřŘśŚpPqQrRsSšŠ
+// ßtTţŢ™uUúÚůŮűŰüÜvVwWxXyYýÝ.źzZžŽ
+
+const byte orderTableD6win[256] = {
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x09, 0x0a,
+	0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a,
+	0x26, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x21, 0x33, 0x34, 0x35, 0x58, 0x36, 0x22, 0x37, 0x38,
+	0x73, 0x77, 0x79, 0x7b, 0x7d, 0x7e, 0x7f, 0x80, 0x81, 0x82, 0x39, 0x3a, 0x59, 0x5a, 0x5b, 0x3b,
+	0x3c, 0x84, 0x95, 0x97, 0x9b, 0x9f, 0xa9, 0xac, 0xae, 0xb0, 0xba, 0xbc, 0xbe, 0xc0, 0xc2, 0xc6,
+	0xd7, 0xd9, 0xdb, 0xdd, 0xe2, 0xe7, 0xf1, 0xf3, 0xf5, 0xf7, 0xfd, 0x3d, 0x3e, 0x3f, 0x40, 0x42,
+	0x43, 0x83, 0x94, 0x96, 0x9a, 0x9e, 0xa8, 0xab, 0xad, 0xaf, 0xb9, 0xbb, 0xbd, 0xbf, 0xc1, 0xc5,
+	0xd6, 0xd8, 0xda, 0xdc, 0xe1, 0xe6, 0xf0, 0xf2, 0xf4, 0xf6, 0xfc, 0x44, 0x45, 0x46, 0x47, 0x1b,
+	0x72, 0x1c, 0x52, 0xaa, 0x55, 0x70, 0x6d, 0x6e, 0x41, 0x71, 0xdf, 0x56, 0xd5, 0x1d, 0xff, 0x1e,
+	0x1f, 0x50, 0x51, 0x53, 0x54, 0x6f, 0x24, 0x25, 0x4f, 0xe5, 0xde, 0x57, 0xd4, 0x20, 0xfe, 0xfb,
+	0x27, 0x48, 0x61, 0x62, 0x63, 0x64, 0x49, 0x65, 0x4a, 0x66, 0x85, 0x5d, 0x67, 0x23, 0x68, 0x4b,
+	0x69, 0x5c, 0x7a, 0x7c, 0x4c, 0x6a, 0x6b, 0x6c, 0x4d, 0x78, 0xc7, 0x5e, 0x74, 0x75, 0x76, 0x4e,
+	0x89, 0x87, 0x8b, 0x8f, 0x8d, 0x91, 0x93, 0x99, 0xa3, 0xa1, 0xa5, 0xa7, 0xb4, 0xb2, 0xb6, 0xb8,
+	0x9d, 0xc4, 0xcb, 0xc9, 0xcd, 0xd1, 0xcf, 0x5f, 0xd3, 0xeb, 0xe9, 0xed, 0xef, 0xf9, 0xe4, 0xe0,
+	0x88, 0x86, 0x8a, 0x8e, 0x8c, 0x90, 0x92, 0x98, 0xa2, 0xa0, 0xa4, 0xa6, 0xb3, 0xb1, 0xb5, 0xb7,
+	0x9c, 0xc3, 0xca, 0xc8, 0xcc, 0xd0, 0xce, 0x60, 0xd2, 0xea, 0xe8, 0xec, 0xee, 0xf8, 0xe3, 0xfa,
+};
+
+static int getCharOrder(Common::u32char_type_t ch) {
+	int num = charToNum(ch);
+
+	if (num > 255)
+		return num;
+
+	Common::Platform pl = g_director->getPlatform();
+	Common::Language lang = g_director->getLanguage();
+	int version = g_director->getVersion();
+
+	if (pl == Common::kPlatformMacintosh && lang != Common::JA_JPN && version < 500)
+		return orderTableD2mac[num];
+
+	if (pl == Common::kPlatformMacintosh && lang == Common::JA_JPN && version < 500)
+		return orderTableD4Jmac[num];
+
+	if (pl == Common::kPlatformWindows && lang != Common::JA_JPN && version < 600)
+		return orderTableD4win[num];
+
+	if (pl == Common::kPlatformWindows && lang != Common::JA_JPN && version < 700)
+		return orderTableD6win[num];
+
+	return num;
+}
+
 int compareStrings(const Common::String &s1, const Common::String &s2) {
 	Common::U32String u32S1 = s1.decode(Common::kUtf8);
 	Common::U32String u32S2 = s2.decode(Common::kUtf8);
@@ -1016,67 +1379,19 @@ int compareStrings(const Common::String &s1, const Common::String &s2) {
 
 	uint32 c1, c2;
 	do {
-		c1 = charToNum(*p1);
-		c2 = charToNum(*p2);
+		c1 = getCharOrder(*p1);
+		c2 = getCharOrder(*p2);
 		p1++;
 		p2++;
 	} while (c1 == c2 && c1);
 	return c1 - c2;
 }
 
-Common::String encodePathForDump(const Common::String &path) {
-	return punycode_encodepath(Common::Path(path, g_director->_dirSeparator)).toString();
-}
+void DirectorEngine::delayMillis(uint32 delay) {
+	if (debugChannelSet(-1, kDebugFast))
+		return;
 
-Common::String utf8ToPrintable(const Common::String &str) {
-	return Common::toPrintable(Common::U32String(str));
-}
-
-Common::String castTypeToString(const CastType &type) {
-	Common::String res;
-	switch (type) {
-	case kCastBitmap:
-		res = "bitmap";
-		break;
-	case kCastPalette:
-		res = "palette";
-		break;
-	case kCastButton:
-		res = "button";
-		break;
-	case kCastPicture:
-		res = "picture";
-		break;
-	case kCastDigitalVideo:
-		res = "digitalVideo";
-		break;
-	case kCastLingoScript:
-		res = "script";
-		break;
-	case kCastShape:
-		res = "shape";
-		break;
-	case kCastFilmLoop:
-		res = "filmLoop";
-		break;
-	case kCastSound:
-		res = "sound";
-		break;
-	case kCastMovie:
-		res = "movie";
-		break;
-	case kCastText:
-		res = "text";
-		break;
-	default:
-		res = "empty";
-		break;
-	}
-	return res;
-}
-
-Common::String decodePlatformEncoding(Common::String input) {
-	return input.decode(g_director->getPlatformEncoding());
+	_system->delayMillis(delay);
 }
 
 } // End of namespace Director

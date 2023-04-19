@@ -1,7 +1,100 @@
 Umfangreichere Informationen über die Änderungen des aktuellen Codes findest Du unter:
         https://github.com/scummvm/scummvm/commits/
 
-#### 2.7.0 (DD.MM.YYYY)
+#### 2.8.0 (XXXX-XX-XX)
+
+ Neue Spiele:
+   - Unterstützung für die macOS-Versionen von Syberia und Syberia II hinzugefügt.
+   - Unterstützung für The Vampire Diaries und Nancy Drew: Secrets Can Kill hinzugefügt.
+
+ Neue Plattformen:
+   - Vollständig erneute Portierung für libretro hinzugefügt.
+   - Unterstützung für Atari hinzugefügt.
+
+ Allgemein:
+   - libvpx wurde als neue, optionale Abhängigkeit hinzugefügt. 
+   - libmikmod wurde als neue, optionale Abhängigkeit hinzugefügt.
+
+ Asylum:
+   - Unterstützung für die chinesische Version von Sanitarium hinzugefügt.
+
+ Dragons:
+   - Die Copyright-Hinweise und das Hauptmenü werden nun korrekt übersetzt.
+
+ GrimE:
+   - Unterstützung für die chinesische Version von Grim Fandango hinzugefügt.
+   - Unterstützung für die von Fargus, ENPY und 7Wolf erstellte russische Version
+     von Grim Fandango hinzugefügt.
+
+ Kyra:
+   - Unterstützung für die französische Amiga-Version von Kyra1 und die tschechische DOS-Fan-Übersetzung hinzugefügt.
+   - Spielsteuerung und Menüdarstellung für alle Plattformen verbessert.
+
+ SCUMM:
+   - Unterstützung für die entpackten RuSCUMM-Patches für russische Übersetzungen hinzugefügt.
+
+ Sherlock:
+   - Unterstützung für die chinesische Version von Serrated Scalpel hinzugefügt.
+
+ Sword2:
+   - Unterstützung für die chinesische Übersetzung hinzugefügt.
+
+ Ultima:
+   - Reaktionsgeschwindigkeit von Ultima VI verbessert.
+   - Absturz beim Laden von Spielständen in Ultima VI behoben, der auftritt, wenn Dialoge geöffnet sind.
+   - Sortierung der erzeugten Items in Ultima VI korrigiert.
+   - Automatische Ausrüstung von Wurf-Waffen in Ultima VI korrigiert.
+   - Absturz in Ultima VI beim Öffnen der neuen Zauberbuch-Oberfläche behoben.
+   - Fehlerhafte Farbdarstellung bei Charakteren und der Benutzeroberfläche in Ultima VI korrigiert.
+   - Absturz in Ultima VI behoben, der auftritt, wenn Wände betrachtet werden.
+   - Verschiedene Fehler korrigiert, die zu Abstürzen geführt haben.
+   - Die Genauigkeit des Verhaltens von Gegnern und Projektilen wurde verbessert.
+
+ Voyeur:
+   - Unterstützung für die deutsche Fan-Übersetzung hinzugefügt.
+
+ Xeen:
+   - Die Engine "xeen" wurde für Might & Magic zu "mm" umbenannt.
+
+
+#### 2.7.1 (2023-XX-XX)
+
+ Allgemein:
+  - Die Wiedergabe-Geschwindigkeit von Theora-Videos wurde korrigiert.
+  - Log-Betrachter für die scummvm.log-Datei hinzugefügt.
+  - Das Debug-Level kann nun in der ScummVM-GUI angepasst werden.
+
+ AGI:
+   - In den Spiel-Optionen kann jetzt wieder ein beliebiger Render-Modus ausgewählt werden.
+
+ HDB:
+   - Fehler behoben, der verhindert, dass der rote Umschlag mit der Tastatur aufgehoben werden kann.
+
+ SAGA2:
+   - Fehler behoben, der zu einem Absturz bei der Nutzung einiger Zaubersprüche führt.
+
+ Sword1:
+   - Die tschechischen und polnischen Versionen mit DXA-Zwischensequenzen werden nun korrekt erkannt.
+
+ Sword2:
+   - Unterstützung für die GOG.com-Version hinzugefügt.
+   - Unterstützung für eine alternative polnische Version hinzugefügt.
+
+ Touche:
+   - Unterstützung für von old-games.ru erstellte russische Übersetzung hinzugefügt.
+
+ iOS-Portierung:
+   - Die Auswahl des Standard-Themes funktioniert jetzt auch auf modernen Geräten korrekt.
+   - Verbesserte Unterstützung für Autostart-Konfigurationen.
+
+ macOS-Portierung:
+   - Verbesserte Unterstützung für Autostart-Konfigurationen.
+
+ RISC OS-Portierung:
+   - Absturz unter RISC OS 5 bei der Nutzung von Spielen, die viel RAM benötigen, behoben.
+
+
+#### 2.7.0 "The Real Slim Shader" (26.02.2023)
 
  Neue Spiele:
    - Unterstützung für Soldier Boyz hinzugefügt.
@@ -11,12 +104,36 @@ Umfangreichere Informationen über die Änderungen des aktuellen Codes findest D
    - Unterstützung für Obsidian hinzugefügt.
    - Unterstützung für Added support for Pink Panther: Passport to Peril hinzugefügt.
    - Unterstützung für Pink Panther: Hokus Pokus Pink hinzugefügt.
+   - Unterstützung für Adibou 2 (Adi Junior) "Environment", "Lesen/Rechnen 4 & 5" und "Lesen/Rechnen 6 & 7" hinzugefügt.
+   - Unterstützung für Driller/Space Station Oblivion (DOS/EGA/CGA, Amiga, Atari ST, ZX Spectrum und Amstrad CPC-Versionen) hinzugefügt.
+   - Unterstützung für Halls of the Dead: Faery Tale Adventure II hinzugefügt.
+   - Unterstützung für Chop Suey, Eastern Mind, und 16 weitere Director 3- und Director 4-Titel hinzugefügt.
+
+ Neue Plattformen:
+   - Unterstützung für RetroMini RS90 mit OpenDingux Beta-Firmware hinzugefügt.
+   - Unterstützung für die erste Generation von Miyoo (New BittBoy, Pocket Go und PowKiddy Q90-V90-Q20)
+     mit der TriForceX MiyooCFW-Firmware hinzugefügt.
+   - Unterstützung für Miyoo mini hinzugefügt.
+   - Unterstützung für KolibriOS hinzugefügt.
 
  Allgemein:
    - Anzahl an falsch-positiven Einträgen reduziert, wenn das Gerät nach Spielen durchsucht wird.
    - Code der Roland MT-32-Emulation auf Munt mt32emu 2.7.0 aktualisiert.
    - Unterstützung für shader-basierte Skalierungen hinzugefügt.
    - Unterstützung für Mono-Ausgabe hinzugefügt (über die Kommandozeilen-Option --output-channels=CHANNELS)
+   - Verbesserte Cursor-Skalierung im OpenGL-Modus.
+   - Absturz beim Zugriff auf Verzeichnisse, die Dateien mit "\1" im Dateinamen enthalten, behoben.
+   - Dem Zufallsgenerator kann nun ein bestimmter Start-Wert über die GUI oder Kommandozeile übergeben werden.
+   - Unterstützung für einen Modus zur automatischen Erkennung zu ScummVM hinzugefügt.
+     Dazu wird die ScummVM-Programmdatei in 'scummvm-auto' umbenannt oder eine leere Datei mit dem
+     Dateinamen 'scummvm-autorun' im ScummVM-Programmverzeichnis abgelegt.
+   - Unterstützung für zusätzliche Kommandozeilenparameter, die automatisch genutzt werden, hinzugefügt.
+     Die Anweisungen werden zeilenweise in einer Datei namens 'scummvm-autorun' abgelegt.
+   - Unterstützung für eine Konfigurationsdatei mit Anweisungen hinzugefügt, die dann gelten,
+     wenn keine reguläre Konfigurationsdatei existiert. Die Datei wird über --initial-cfg=DATEI oder
+     -i übergeben.
+   - Die Unterstützung für Spiel-Dateien, die eine Dateigröße von mehr als 2GB erreichen, wurde auf
+     weiteren Plattformen hinzugefügt.
 
  AGI:
    - Unterstützung der französischen Übersetzungen verbessert.
@@ -25,16 +142,37 @@ Umfangreichere Informationen über die Änderungen des aktuellen Codes findest D
    - Option hinzugefügt, mit der die Ausblende-Effekte bei einem Raum-Wechsel in Simon 1 und 2
      deaktiviert werden können.
 
+ AGS:
+   - Unterstützung für die originalen Installationsdateien von Maniac Mansion Deluxe und The New Adventures of Zak McKracken hinzugefügt.
+
+ Director:
+   - Unterstützung für die Pippin-Version von L-Zone hinzugefügt.
+   - Absturz beim Zugriff auf Dateien mit einem Slash im Dateinamen behoben.
+
+ Dreamweb:
+   - Das Spiel kann nun direkt von den originalen Installations-Disketten gespielt werden.
+
+ Hadesch:
+   - Unterstützung für eine weitere Version von 1997 hinzugefügt.
+
  Kyra:
    - Unterstützung für die koreanische Version von Legend of Kyrandia 1 hinzugefügt.
+   - Unterstützung für die Macintosh-Version von Kyra1, die auf mehreren Disketten verteilt wurde, hinzugefügt.
    - Unterstützung für die hebräische Version von Legend of Kyrandia 3 hinzugefügt.
-   - Unterstützung für die chinesische Version von Legend of Kyrandia 3 hinzugefügt.
 
  MADS:
    - Unterstützung für das Datei-Layout des Installationsprogramms der Disketten-Version von Rex Nebular hinzugefügt.Added support for original floppy installer file layout for Rex Nebular.
 
  Neverhood:
    - Unterstützung für die japanische Version von Neverhood hinzugefügt.
+   - Unterstützung für die Übersetzungen von -=CHE@TER=- & Rigel hinzugefügt.
+
+ Plumbers:
+   - Absturz in der Windows-Version behoben.
+
+ Private:
+   - Die Macintosh-Version kann nun direkt von der Installations-CD gespielt werden.
+   - Unterstützung für die japanische Macintosh-Version hinzugefügt.
 
  Queen:
    - Eine zusätzliche Option erlaubt die Verwendung einer verbesserten Schriftart für die hebräische Version.
@@ -42,6 +180,14 @@ Umfangreichere Informationen über die Änderungen des aktuellen Codes findest D
  SAGA:
    - Unterstützung für die chinesische Version von Inherit the Earth hinzugefügt.
    - Unterstützung für die chinesische Version von I Have no Mouth and I Must Scream hinzugefügt.
+   - Unterstützung für die koreanische Version von I Have no Mouth and I Must Scream hinzugefügt.
+   - Inherit the Earth kann nun direkt mit den Dateien des Disketten-Installationsprogramms gespielt werden.
+   - Unterstützung für die Amiga-Versionen (AGA/ECS, Retail/Demo, Englisch/Deutsch) von Inherit the Earth hinzugefügt.
+
+ SCI:
+   - Verbesserte Text-Darstellung in den Macintosh-Versionen der Spiele.
+   - Unterstützung für Casio MT-540, CT-460 und CSM-1-MIDI-Geräte für alle
+     SCI0-Spiele hinzugefügt, welche die genannten Geräte unterstützen.
 
  SCUMM:
    - Unterstützung von CGA-, CGA Composite-, CGA schwarz/weiß- und Herkules-Grafikmodi
@@ -55,11 +201,10 @@ Umfangreichere Informationen über die Änderungen des aktuellen Codes findest D
      sowie für Indiana Jones 4 hinzugefügt.
    - Mögliche Sackgasse in der Ultimate Talkie Edition von Monkey Island 2 korrigiert.
      Diese ist immer dann aufgetreten, wenn der Spieler am Ende von Part II
-     das Modell des Leuchtturms nicht aufhebt, bevor Captain Dread Guybrush
+     einen benötigten Gegenstand nicht aufhebt, bevor Captain Dread Guybrush
      zurück zu Scabb Island bringt.
    - Einige Fehler in den Originalversionen der Spiele sowie Logik- und Continuity-Fehler
      korrigiert (nur, wenn die Option "Verwende spiel-spezifische Verbesserungen" aktiv ist).
-   - Unterstützung für die originale Benutzeroberfläche der LucasArts-Spiele in Version v4-v8 hinzugefügt.
    - Verbesserte Dekodierung einiger westeuropäischen Zeichenketten, wenn diese über
      die ScummVM-Oberfläche dargestellt werden - beispielsweise, wenn ein Spiel pausiert wird.
    - Der Kopf des Navigators zeigte in der ursprünglichen Version von Monkey Island 1 (ohne
@@ -77,6 +222,35 @@ Umfangreichere Informationen über die Änderungen des aktuellen Codes findest D
      in den anderen Sprachen).
    - Verbesserte Unterstützung der hebräischen Versionen der Spiele von Humongous Entertainment.
    - Unterstützung für Roland MT-32 in Sam & Max korrigiert.
+   - Unterstützung für die originale Benutzeroberfläche und die Speicher-Menüs
+     von LucasArts-Spielen hinzugefügt (DOS, Windows, Amiga, Macintosh,
+     FM-Towns, Atari ST, Sega CD, NES- und Commodore 64-Versionen).
+     Aktiviere ebenfalls die Option "Beim Verlassen um Bestätigung bitten" für
+     eine noch authentischere Spielerfahrung!
+   - Einige kleinere Timing-Probleme in der SMUSH-Video-Engine korrigiert, die hauptsächlich
+     Full Throttle betreffen.
+   - Audiomodus mit niedriger Latenz für Full Throttle, The Dig und The Curse of Monkey Island
+     hinzugefügt. Dieser Modus kann die Audio-Performance gerade auf mobilen Geräten verbessern,
+     ist allerdings auch etwas weniger genau als die ursprüngliche Wiedergabe.
+   - Die CD-Audiowiedergabe wird in den CD-Versionen von Monkey Island 1 und Loom
+     nach dem Laden eines Spielstands nun korrekt fortgesetzt.
+
+ Sherlock:
+   - Unterstützung für die chinesische Version von Rose Tattoo hinzugefügt.
+
+ Sky:
+   - Unterstützung für die chinesische Version von Beneath a Steel Sky hinzugefügt.
+
+ Sword1:
+   - Unterstützung für die russische Übersetzung von Novy Disk hinzugefügt.
+   - Ein Fehler beim Start der Windows-Demo-Versionen wurde korrigiert.
+   - Die Spiele-Erkennung nutzt nun MD5-Checksummen. Teile uns deine nicht erkannten Versionen mit!
+
+ Sword2:
+   - Die Spiele-Erkennung nutzt nun MD5-Checksummen. Teile uns deine nicht erkannten Versionen mit!
+
+ Tinsel:
+   - Die Farbe der Untertitel in Discworld II wird nun auch auf Big-Endian-Ports korrekt dargestellt.
 
  Toon:
    - Die Spiel-Menüs verhalten sich nun wie im Original.
@@ -90,6 +264,46 @@ Umfangreichere Informationen über die Änderungen des aktuellen Codes findest D
    - Hintergründe werden nun korrekt dargestellt, wenn Zwischenszenen im Fernseher angesehen werden.
    - Der Bildschirm wird nun nicht mehr zentriert, wenn ein Inventar-Item aktiviert wird.
    - Wenn man W drückt, um mit Leuten zu sprechen, springt man nicht mehr automatisch.
+
+ Ultima8:
+   - Die Minimap kann nun gespeichert und in ihrer Größe verändert werden.
+   - Der Curor verhält sich nun originalgetreuer.
+   - Der Schieberegler für die Item-Anzahl verhält sich nun originalgetreuer.
+
+ Xeen:
+   - Fehlerkorrekturen für mehrere Abstürze in Clouds of Xeen.
+   - Shops werden nun erst nach der Verabschiedung verlassen.
+   - Die Karte wird nun nicht mehr neu geladen, wenn die Erstellung eines Charakters abgeschlossen ist.
+   - Die Logik, nach der die Wolken in Swords of Xeen fallen, wurde korrigiert.
+   - Fehlerkorrektur für das GateMaster-Monster in der Underworld-Map.
+
+ 3DS-Portierung:
+   - Der Relocation-Parser wurde um Unterstützung für PREL31, welches von neuen Compilern verwendet wird, erweitert.
+   - Weitere Optionen zur automatischen Konfiguration in ./configure hinzugefügt.
+
+ Android-Portierung:
+   - Unterstützung für das Added Storage Access Framework hinzugefügt.
+   - Verbesserte Unterstützung für Game-Controller.
+
+ iOS-Portierung:
+   - Unterstützung für Zeigegeräte hinzugefügt.
+   - Verbesserte Unterstützung des Touchpad-Modus.
+   - Unterstützung für Spiele hinzugefügt, die ein Pixel-Format von 32 Bit verwenden.
+
+ Nintendo DS-Portierung:
+   - Splash-Screen auf dem oberen Bildschirm hinzugefügt, wenn der Launcher aktiv ist.
+
+ OpenDingux-Portierung:
+   - Unterstützung für dynamische Plugins hinzugefügt.
+
+ PS Vita-Portierung:
+   - Unterstützung für dynamische Plugins hinzugefügt.
+
+ PSP-Portierung:
+   - Verbesserte Unterstützung von Spielen, die ein Pixel-Format von 32 Bit verwenden.
+
+ RISC OS-Portierung:
+   - Unterstützung für die 26-bit-Versionen von RISC OS hinzugefügt.
 
 #### 2.6.1 "Incremental Escapism" (31.10.2022)
 

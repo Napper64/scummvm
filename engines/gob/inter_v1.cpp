@@ -496,6 +496,10 @@ void Inter_v1::o1_initMult() {
 
 			_vm->_mult->_objects[i].pAnimData->isStatic = 1;
 			_vm->_mult->_objects[i].tick = 0;
+			_vm->_mult->_objects[i].animName[0] = '\0';
+			_vm->_mult->_objects[i].videoSlot = 0;
+			_vm->_mult->_objects[i].animVariables = nullptr;
+			_vm->_mult->_objects[i].ownAnimVariables = false;
 			_vm->_mult->_objects[i].lastLeft = -1;
 			_vm->_mult->_objects[i].lastRight = -1;
 			_vm->_mult->_objects[i].lastTop = -1;
@@ -602,8 +606,10 @@ void Inter_v1::o1_getObjAnimSize() {
 					animData.animation, 0, *(_vm->_mult->_objects[objIndex].pPosX),
 					*(_vm->_mult->_objects[objIndex].pPosY), 0);
 
-		_vm->_scenery->_toRedrawLeft = MAX<int16>(_vm->_scenery->_toRedrawLeft, 0);
-		_vm->_scenery->_toRedrawTop  = MAX<int16>(_vm->_scenery->_toRedrawTop , 0);
+		if (_vm->getGameType() != kGameTypeAdibou1) {
+			_vm->_scenery->_toRedrawLeft = MAX<int16>(_vm->_scenery->_toRedrawLeft, 0);
+			_vm->_scenery->_toRedrawTop  = MAX<int16>(_vm->_scenery->_toRedrawTop , 0);
+		}
 	}
 
 	WRITE_VAR_OFFSET(varLeft  , _vm->_scenery->_toRedrawLeft);
@@ -696,6 +702,13 @@ void Inter_v1::o1_callSub(OpFuncParams &params) {
 	// Skipping the copy protection screen in Gobliins 2
 	if (!_vm->_copyProtection && (_vm->getGameType() == kGameTypeGob2) && (offset == 1746) &&
 	    _vm->isCurrentTot("intro0.tot")) {
+		debugC(2, kDebugGameFlow, "Skipping copy protection screen");
+		return;
+	}
+
+	// Skipping the copy protection screen in Adibou 1
+	if (!_vm->_copyProtection && (_vm->getGameType() == kGameTypeAdibou1) && (offset == 1746) &&
+		_vm->isCurrentTot("base.tot")) {
 		debugC(2, kDebugGameFlow, "Skipping copy protection screen");
 		return;
 	}
@@ -837,7 +850,31 @@ void Inter_v1::o1_if(OpFuncParams &params) {
 		WRITE_VAR(285, 0);
 	}
 
+	int pos = _vm->_game->_script->pos();
 	boolRes = _vm->_game->_script->evalBool();
+
+	// Skipping copy protection screen of Adibou 1 applications
+	if (!_vm->_copyProtection &&
+		_vm->getGameType() == kGameTypeAdibou1 &&
+		(pos == 162 ||
+		 pos == 165 ||
+		 pos == 170 ||
+		 pos == 173 ||
+		 pos == 167 ||
+		 pos == 182 ||
+		 pos == 185 ||
+		 pos == 188) &&
+		(_vm->isCurrentTot("C51INTRO.tot") ||
+		 _vm->isCurrentTot("C61INTRO.tot") ||
+		 _vm->isCurrentTot("L51INTRO.tot") ||
+		 _vm->isCurrentTot("L61INTRO.tot"))) {
+		if (pos == 162 || pos == 165 || pos == 170 || pos == 173)
+			boolRes = false; // First, bypass the copy protection screen
+		else
+			boolRes = true; // Then bypass the check of the copy protection test result
+		debugC(2, kDebugGameFlow, "Skipping copy protection screen");
+	}
+
 	if (boolRes) {
 		if ((params.counter == params.cmdCount) && (params.retFlag == 2)) {
 			params.doReturn = true;
@@ -1146,6 +1183,19 @@ void Inter_v1::o1_palLoad(OpFuncParams &params) {
 		memset((char *)_vm->_draw->_vgaPalette, 0, 768);
 		break;
 
+	case 55:
+		// TODO case 55 implementation
+		warning("STUB: o1_palLoad case 55 not implemented");
+		_vm->_game->_script->skip(2);
+		_vm->_draw->_applyPal = false;
+		return;
+
+	case 56:
+		// TODO case 56 implementation
+		warning("STUB: o1_palLoad case 56 not implemented");
+		_vm->_game->_script->skip(2);
+		break;
+
 	case 61:
 		index1 =  _vm->_game->_script->readByte();
 		index2 = (_vm->_game->_script->readByte() - index1 + 1) * 3;
@@ -1165,6 +1215,15 @@ void Inter_v1::o1_palLoad(OpFuncParams &params) {
 			_vm->_draw->_vgaPalette[0].blue  = 0;
 		}
 
+		if (_vm->getGameType() == kGameTypeAdibou2) {
+			_vm->_draw->_vgaPalette[0].red = 0;
+			_vm->_draw->_vgaPalette[0].green = 0;
+			_vm->_draw->_vgaPalette[0].blue = 0;
+			_vm->_draw->_vgaPalette[255].red = 63;
+			_vm->_draw->_vgaPalette[255].green = 63;
+			_vm->_draw->_vgaPalette[255].blue = 63;
+		}
+
 		if (_vm->_draw->_applyPal) {
 			_vm->_draw->_applyPal = false;
 			_vm->_video->setFullPalette(_vm->_global->_pPaletteDesc);
@@ -1177,6 +1236,14 @@ void Inter_v1::o1_palLoad(OpFuncParams &params) {
 	}
 
 	if (!_vm->_draw->_applyPal) {
+		if (_vm->getGameType() == kGameTypeAdibou2) {
+			if (_vm->_global->_pPaletteDesc)
+				_vm->_video->setFullPalette(_vm->_global->_pPaletteDesc);
+			else
+				_vm->_util->clearPalette();
+			return;
+		}
+
 		_vm->_global->_pPaletteDesc->unused2 = _vm->_draw->_unusedPalette2;
 		_vm->_global->_pPaletteDesc->unused1 = _vm->_draw->_unusedPalette1;
 
@@ -1218,9 +1285,6 @@ void Inter_v1::o1_keyFunc(OpFuncParams &params) {
 	int16 key;
 
 	switch (cmd) {
-	case -1:
-		break;
-
 	case 0:
 		_vm->_draw->_showCursor &= ~2;
 		_vm->_util->longDelay(1);
@@ -1230,9 +1294,27 @@ void Inter_v1::o1_keyFunc(OpFuncParams &params) {
 		_vm->_util->clearKeyBuf();
 		break;
 
+	case -1:
+		if (_vm->getGameType() != kGameTypeAdibou2)
+			break;
+		// fall through
 	case 1:
-		if (_vm->getGameType() != kGameTypeFascination)
+		if (_vm->getGameType() != kGameTypeFascination && _vm->getGameType() != kGameTypeAdibou2)
 			_vm->_util->forceMouseUp(true);
+
+		// FIXME This is a hack to fix an issue with "text" tool in Adibou2 paint game.
+		// keyFunc() is called twice in a loop before testing its return value.
+		// If the first keyFunc call catches the key event, the second call will reset
+		// the key buffer, and the loop continues.
+		// Strangely in the original game it seems that the event is always caught by the
+		// second keyFunc.
+		if (_vm->getGameType() == kGameTypeAdibou2
+			&&
+			(_vm->_game->_script->pos() == 18750 || _vm->_game->_script->pos() == 18955)
+			&&
+			_vm->isCurrentTot("palette.tot"))
+			break;
+
 		key = _vm->_game->checkKeys(&_vm->_global->_inter_mouseX,
 				&_vm->_global->_inter_mouseY, &_vm->_game->_mouseButtons, 0);
 		storeKey(key);
@@ -1774,7 +1856,7 @@ void Inter_v1::o1_manageDataFile(OpFuncParams &params) {
 	Common::String file = _vm->_game->_script->evalString();
 
 	if (!file.empty()) {
-		_vm->_dataIO->openArchive(file, true);
+		_vm->_dataIO->openArchive(Common::Path(file, '\\').toString('/'), true);
 	} else {
 		_vm->_dataIO->closeArchive(true);
 

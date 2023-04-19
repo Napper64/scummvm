@@ -31,7 +31,7 @@
 // which gets messed up by our override mechanism; this could
 // be avoided by either changing the Android SDK to use the equally
 // legal and valid
-//   __attribute__ ((format(printf, 3, 4)))
+//   __attribute__ ((format(__printf__, 3, 4)))
 // or by refining our printf override to use a varadic macro
 // (which then wouldn't be portable, though).
 // Anyway, for now we just disable the printf override globally
@@ -40,8 +40,8 @@
 
 #include <android/input.h>
 
-#include "backends/graphics/android/android-graphics.h"
 #include "backends/platform/android/android.h"
+#include "backends/graphics/android/android-graphics.h"
 #include "backends/platform/android/jni-android.h"
 
 // floating point. use sparingly
@@ -51,6 +51,19 @@ static inline T scalef(T in, float numerator, float denominator) {
 }
 
 static const int kQueuedInputEventDelay = 50;
+
+// analog joystick axis id (for internal use) - Should match the logic in ScummVMEventsModern.java
+enum {
+	// auxilliary movement axis bitflags
+	JE_JOY_AXIS_X_bf        = 0x01, // (0x01 << 0)
+	JE_JOY_AXIS_Y_bf        = 0x02, // (0x01 << 1)
+	JE_JOY_AXIS_HAT_X_bf    = 0x04, // (0x01 << 2)
+	JE_JOY_AXIS_HAT_Y_bf    = 0x08, // (0x01 << 3)
+	JE_JOY_AXIS_Z_bf        = 0x10, // (0x01 << 4)
+	JE_JOY_AXIS_RZ_bf       = 0x20, // (0x01 << 5)
+	JE_JOY_AXIS_LTRIGGER_bf = 0x40, // (0x01 << 6)
+	JE_JOY_AXIS_RTRIGGER_bf = 0x80  // (0x01 << 7)
+};
 
 // event type
 enum {
@@ -76,6 +89,9 @@ enum {
 	JE_BMB_UP = 19,
 	JE_FMB_DOWN = 20,
 	JE_FMB_UP = 21,
+	JE_MOUSE_WHEEL_UP = 22,
+	JE_MOUSE_WHEEL_DOWN = 23,
+	JE_TV_REMOTE = 24,
 	JE_QUIT = 0x1000,
 	JE_MENU = 0x1001
 };
@@ -543,6 +559,8 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 		return;
 
 	case JE_DPAD:
+		// For now, this behavior, emulating mouse movement and left mouse clicking here for DPAD button presses,
+		// is no longer used.
 		switch (arg2) {
 		case AKEYCODE_DPAD_UP:
 		// fall through
@@ -551,6 +569,7 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 		case AKEYCODE_DPAD_LEFT:
 		// fall through
 		case AKEYCODE_DPAD_RIGHT:
+			// Treat as mouse movement
 			if (arg1 != AKEY_EVENT_ACTION_DOWN)
 				return;
 
@@ -586,6 +605,7 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 			return;
 
 		case AKEYCODE_DPAD_CENTER:
+			// Treat as mouse click (left click)
 			switch (arg1) {
 			case AKEY_EVENT_ACTION_DOWN:
 				e.type = Common::EVENT_LBUTTONDOWN;
@@ -606,6 +626,49 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 
 			return;
 		}
+
+	case JE_TV_REMOTE:
+		switch (arg1) {
+		case AKEY_EVENT_ACTION_DOWN:
+			e.type = Common::EVENT_KEYDOWN;
+			break;
+
+		case AKEY_EVENT_ACTION_UP:
+			e.type = Common::EVENT_KEYUP;
+			break;
+
+		default:
+			LOGE("unhandled jaction on key: %d", arg1);
+			return;
+		}
+
+		switch (arg2) {
+		case AKEYCODE_MEDIA_FAST_FORWARD:
+		// fall through
+		case AKEYCODE_MEDIA_REWIND:
+		// fall through
+		case AKEYCODE_MEDIA_PLAY_PAUSE:
+			// Treat as keyboard presses, since they have equivalent hardware keyboard keys
+			e.kbd.keycode = jkeymap[arg2];
+			if (arg5 > 0) {
+				e.kbdRepeat = true;
+			}
+			break;
+
+		 // Unfortunately CHANNEL_UP or CHANNEL_DOWN do not trigger for the Fire TV Stick remote (3rd gen)
+		 // despite the documentation (https://developer.amazon.com/docs/fire-tv/remote-input.html)
+		 // so there's no way as of yet to test for them.
+		 // TODO Maybe enable them anyway? Should we create hardware input keys for them in the main code?
+//		 case AKEYCODE_CHANNEL_UP:
+//		 // fall through
+//		 case AKEYCODE_CHANNEL_DOWN:
+//			break;
+
+		}
+
+		pushEvent(e);
+
+		return;
 
 	case JE_DOWN:
 //		LOGD("JE_DOWN");
@@ -1103,13 +1166,35 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 
 		return;
 
+	case JE_MOUSE_WHEEL_UP:
+		// Rolling wheel upwards
+		e.type = Common::EVENT_WHEELUP;
+		e.mouse.x = arg1;
+		e.mouse.y = arg2;
+//		e.mouse = dynamic_cast<AndroidCommonGraphics *>(_graphicsManager)->getMousePosition();
+
+		pushEvent(e);
+
+		return;
+
+	case JE_MOUSE_WHEEL_DOWN:
+		// Rolling wheel downwards
+		e.type = Common::EVENT_WHEELDOWN;
+		e.mouse.x = arg1;
+		e.mouse.y = arg2;
+//		e.mouse = dynamic_cast<AndroidCommonGraphics *>(_graphicsManager)->getMousePosition();
+
+		pushEvent(e);
+
+		return;
+
 	case JE_GAMEPAD:
 		switch (arg1) {
 		case AKEY_EVENT_ACTION_DOWN:
-			e.type = Common::EVENT_KEYDOWN;
+			e.type = Common::EVENT_JOYBUTTON_DOWN;
 			break;
 		case AKEY_EVENT_ACTION_UP:
-			e.type = Common::EVENT_KEYUP;
+			e.type = Common::EVENT_JOYBUTTON_UP;
 			break;
 		default:
 			LOGE("unhandled jaction on gamepad key: %d", arg1);
@@ -1117,32 +1202,80 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 		}
 
 		switch (arg2) {
+		case AKEYCODE_BUTTON_START:
+			e.joystick.button = Common::JOYSTICK_BUTTON_START;
+			break;
+
+		case AKEYCODE_BUTTON_SELECT:
+			e.joystick.button = Common::JOYSTICK_BUTTON_BACK;
+			break;
+
+		case AKEYCODE_BUTTON_MODE:
+			e.joystick.button = Common::JOYSTICK_BUTTON_GUIDE;
+			break;
+
 		case AKEYCODE_BUTTON_A:
+			e.joystick.button = Common::JOYSTICK_BUTTON_A;
+			break;
+
 		case AKEYCODE_BUTTON_B:
-			switch (arg1) {
-			case AKEY_EVENT_ACTION_DOWN:
-				e.type = (arg2 == AKEYCODE_BUTTON_A?
-					  Common::EVENT_LBUTTONDOWN :
-					  Common::EVENT_RBUTTONDOWN);
-				break;
-			case AKEY_EVENT_ACTION_UP:
-				e.type = (arg2 == AKEYCODE_BUTTON_A?
-					  Common::EVENT_LBUTTONUP :
-					  Common::EVENT_RBUTTONUP);
-				break;
-			}
-
-			e.mouse = dynamic_cast<AndroidCommonGraphics *>(_graphicsManager)->getMousePosition();
-
+			e.joystick.button = Common::JOYSTICK_BUTTON_B;
 			break;
 
 		case AKEYCODE_BUTTON_X:
-			e.kbd.keycode = Common::KEYCODE_ESCAPE;
-			e.kbd.ascii = Common::ASCII_ESCAPE;
+			e.joystick.button = Common::JOYSTICK_BUTTON_X;
 			break;
 
 		case AKEYCODE_BUTTON_Y:
-			e.type = Common::EVENT_MAINMENU;
+			e.joystick.button = Common::JOYSTICK_BUTTON_Y;
+			break;
+
+		case AKEYCODE_BUTTON_L1:
+			e.joystick.button = Common::JOYSTICK_BUTTON_LEFT_SHOULDER;
+			break;
+
+		case AKEYCODE_BUTTON_R1:
+			e.joystick.button = Common::JOYSTICK_BUTTON_RIGHT_SHOULDER;
+			break;
+//		// NOTE As of yet JOYSTICK_BUTTON_LEFT_TRIGGER, JOYSTICK_BUTTON_RIGHT_TRIGGER are missing as "buttons" from the hardware-input source code
+//		// There are controllers like PS5's DualSense that trigger these buttons presses, albeit for wrong buttons (Create and Menu gamepad buttons)
+//		// which could be due to Android OS not fully supporting them.
+//		// PS3's DS3 also triggers these button presses but also generates a movement event so perhaps we can capture them that way
+//		// (as generic joystick movement, "JOYSTICK_AXIS_LEFT_TRIGGER", "JOYSTICK_AXIS_RIGHT_TRIGGER" hardware-input).
+//		case AKEYCODE_BUTTON_L2:
+//			e.joystick.button = Common::JOYSTICK_BUTTON_LEFT_TRIGGER;
+//			break;
+//
+//		case AKEYCODE_BUTTON_R2:
+//			e.joystick.button = Common::JOYSTICK_BUTTON_RIGHT_TRIGGER;
+//			break;
+//
+		case AKEYCODE_BUTTON_THUMBL:
+			e.joystick.button = Common::JOYSTICK_BUTTON_LEFT_STICK;
+			break;
+
+		case AKEYCODE_BUTTON_THUMBR:
+			e.joystick.button = Common::JOYSTICK_BUTTON_RIGHT_STICK;
+			break;
+
+		case AKEYCODE_DPAD_UP:
+			e.joystick.button = Common::JOYSTICK_BUTTON_DPAD_UP;
+			break;
+
+		case AKEYCODE_DPAD_DOWN:
+			e.joystick.button = Common::JOYSTICK_BUTTON_DPAD_DOWN;
+			break;
+
+		case AKEYCODE_DPAD_LEFT:
+			e.joystick.button = Common::JOYSTICK_BUTTON_DPAD_LEFT;
+			break;
+
+		case AKEYCODE_DPAD_RIGHT:
+			e.joystick.button = Common::JOYSTICK_BUTTON_DPAD_RIGHT;
+			break;
+
+		case AKEYCODE_DPAD_CENTER:
+			e.joystick.button = Common::JOYSTICK_BUTTON_DPAD_CENTER;
 			break;
 
 		default:
@@ -1159,20 +1292,71 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 		switch (arg1) {
 		// AMOTION_EVENT_ACTION_MOVE is 2 in NDK (https://developer.android.com/ndk/reference/group/input)
 		case AMOTION_EVENT_ACTION_MOVE:
-			e.mouse = dynamic_cast<AndroidCommonGraphics *>(_graphicsManager)->getMousePosition();
-			e.type = Common::EVENT_MOUSEMOVE;
+			e.type = Common::EVENT_JOYAXIS_MOTION;
 
-			// already multiplied by 100
-			e.mouse.x += arg2 * _joystick_scale / _eventScaleX;
-			e.mouse.y += arg3 * _joystick_scale / _eventScaleY;
+			switch (arg4) {
+			case JE_JOY_AXIS_X_bf:
+				e.joystick.axis = Common::JOYSTICK_AXIS_LEFT_STICK_X;
+				e.joystick.position = CLIP<int32>(arg2, Common::JOYAXIS_MIN, Common::JOYAXIS_MAX);
+				pushEvent(e);
+				break;
 
+			case JE_JOY_AXIS_Y_bf:
+				e.joystick.axis = Common::JOYSTICK_AXIS_LEFT_STICK_Y;
+				e.joystick.position = CLIP<int32>(arg2, Common::JOYAXIS_MIN, Common::JOYAXIS_MAX);
+				pushEvent(e);
+				break;
+
+			case JE_JOY_AXIS_HAT_X_bf:
+				e.joystick.axis = Common::JOYSTICK_AXIS_HAT_X;
+				e.joystick.position = CLIP<int32>(arg2, Common::JOYAXIS_MIN, Common::JOYAXIS_MAX);
+				pushEvent(e);
+				break;
+
+			case JE_JOY_AXIS_HAT_Y_bf:
+				e.joystick.axis = Common::JOYSTICK_AXIS_HAT_Y;
+				e.joystick.position = CLIP<int32>(arg2, Common::JOYAXIS_MIN, Common::JOYAXIS_MAX);
+				pushEvent(e);
+				break;
+
+			case JE_JOY_AXIS_Z_bf:
+				e.joystick.axis = Common::JOYSTICK_AXIS_RIGHT_STICK_X;
+				e.joystick.position = CLIP<int32>(arg2, Common::JOYAXIS_MIN, Common::JOYAXIS_MAX);
+				pushEvent(e);
+				break;
+
+			case JE_JOY_AXIS_RZ_bf:
+				e.joystick.axis = Common::JOYSTICK_AXIS_RIGHT_STICK_Y;
+				e.joystick.position = CLIP<int32>(arg2, Common::JOYAXIS_MIN, Common::JOYAXIS_MAX);
+				pushEvent(e);
+				break;
+
+			case JE_JOY_AXIS_LTRIGGER_bf:
+				e.joystick.axis = Common::JOYSTICK_AXIS_LEFT_TRIGGER;
+				e.joystick.position = CLIP<int32>(arg2, 0, Common::JOYAXIS_MAX);
+				pushEvent(e);
+				break;
+
+			case JE_JOY_AXIS_RTRIGGER_bf:
+				e.joystick.axis = Common::JOYSTICK_AXIS_RIGHT_TRIGGER;
+				e.joystick.position = CLIP<int32>(arg2, 0, Common::JOYAXIS_MAX);
+				pushEvent(e);
+				break;
+
+			default:
+				// unsupported axis case
+				break;
+			}
 			break;
+
 		case AKEY_EVENT_ACTION_DOWN:
-			e.type = Common::EVENT_KEYDOWN;
+			e.type = Common::EVENT_JOYBUTTON_DOWN;
 			break;
+
 		case AKEY_EVENT_ACTION_UP:
-			e.type = Common::EVENT_KEYUP;
+			e.type = Common::EVENT_JOYBUTTON_UP;
 			break;
+
 		default:
 			LOGE("unhandled jaction on joystick: %d", arg1);
 			return;
@@ -1181,40 +1365,28 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 		if (arg1 != AMOTION_EVENT_ACTION_MOVE) {
 			switch (arg2) {
 			case AKEYCODE_BUTTON_1:
+				e.joystick.button = Common::JOYSTICK_BUTTON_A;
+				break;
+
 			case AKEYCODE_BUTTON_2:
-				switch (arg1) {
-				case AKEY_EVENT_ACTION_DOWN:
-					e.type = (arg2 == AKEYCODE_BUTTON_1?
-						  Common::EVENT_LBUTTONDOWN :
-						  Common::EVENT_RBUTTONDOWN);
-					break;
-				case AKEY_EVENT_ACTION_UP:
-					e.type = (arg2 == AKEYCODE_BUTTON_1?
-						  Common::EVENT_LBUTTONUP :
-						  Common::EVENT_RBUTTONUP);
-					break;
-				}
-
-				e.mouse = dynamic_cast<AndroidCommonGraphics *>(_graphicsManager)->getMousePosition();
-
+				e.joystick.button = Common::JOYSTICK_BUTTON_B;
 				break;
 
 			case AKEYCODE_BUTTON_3:
-				e.kbd.keycode = Common::KEYCODE_ESCAPE;
-				e.kbd.ascii = Common::ASCII_ESCAPE;
+				e.joystick.button = Common::JOYSTICK_BUTTON_X;
 				break;
 
 			case AKEYCODE_BUTTON_4:
-				e.type = Common::EVENT_MAINMENU;
+				e.joystick.button = Common::JOYSTICK_BUTTON_Y;
 				break;
 
 			default:
 				LOGW("unmapped gamepad key: %d", arg2);
 				return;
 			}
-		}
 
-		pushEvent(e);
+			pushEvent(e);
+		}
 
 		return;
 

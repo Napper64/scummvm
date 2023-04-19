@@ -28,7 +28,6 @@ MODULE_OBJS := \
 	timer/default/default-timer.o
 
 ifdef USE_CLOUD
-
 ifdef USE_LIBCURL
 MODULE_OBJS += \
 	cloud/basestorage.o \
@@ -77,7 +76,9 @@ MODULE_OBJS += \
 	networking/curl/postrequest.o \
 	networking/curl/request.o \
 	networking/curl/session.o \
-	networking/curl/sessionrequest.o
+	networking/curl/sessionrequest.o \
+	networking/curl/socket.o \
+	networking/curl/url.o
 endif
 
 ifdef USE_SDL_NET
@@ -97,6 +98,38 @@ MODULE_OBJS += \
 	networking/sdl_net/localwebserver.o \
 	networking/sdl_net/reader.o \
 	networking/sdl_net/uploadfileclienthandler.o
+endif
+
+ifdef USE_CLOUD
+ifdef USE_LIBCURL
+ifdef USE_SDL_NET
+MODULE_OBJS += \
+	networking/sdl_net/handlers/connectcloudhandler.o
+endif
+endif
+endif
+
+# ENet networking source files.
+ifdef USE_ENET
+MODULE_OBJS += \
+	networking/enet/source/callbacks.o \
+	networking/enet/source/compress.o \
+	networking/enet/source/host.o \
+	networking/enet/source/list.o \
+	networking/enet/source/packet.o \
+	networking/enet/source/peer.o \
+	networking/enet/source/protocol.o
+ifdef WIN32
+MODULE_OBJS += \
+	networking/enet/source/win32.o
+else
+MODULE_OBJS += \
+	networking/enet/source/unix.o
+endif
+MODULE_OBJS += \
+	networking/enet/enet.o \
+	networking/enet/host.o \
+	networking/enet/socket.o
 endif
 
 ifdef USE_ELF_LOADER
@@ -146,8 +179,13 @@ MODULE_OBJS += \
 	graphics/surfacesdl/surfacesdl-graphics.o \
 	mixer/sdl/sdl-mixer.o \
 	mutex/sdl/sdl-mutex.o \
-	plugins/sdl/sdl-provider.o \
 	timer/sdl/sdl-timer.o
+
+ifndef RISCOS
+ifndef KOLIBRIOS
+MODULE_OBJS += plugins/sdl/sdl-provider.o
+endif
+endif
 
 # SDL 2 removed audio CD support
 ifndef USE_SDL2
@@ -172,6 +210,15 @@ ifdef USE_DISCORD
 MODULE_OBJS += \
 	presence/discord/discord.o
 endif
+endif
+
+ifdef KOLIBRIOS
+MODULE_OBJS += \
+	fs/kolibrios/kolibrios-fs.o \
+	fs/kolibrios/kolibrios-fs-factory.o \
+	fs/posix/posix-iostream.o \
+	plugins/kolibrios/kolibrios-provider.o \
+	saves/kolibrios/kolibrios-saves.o
 endif
 
 ifdef POSIX
@@ -244,6 +291,9 @@ endif
 
 ifeq ($(BACKEND),android)
 MODULE_OBJS += \
+	fs/android/android-fs-factory.o \
+	fs/android/android-posix-fs.o \
+	fs/android/android-saf-fs.o \
 	graphics/android/android-graphics.o \
 	graphics3d/android/android-graphics3d.o \
 	graphics3d/android/texture.o \
@@ -273,6 +323,7 @@ endif
 ifdef RISCOS
 MODULE_OBJS += \
 	events/riscossdl/riscossdl-events.o \
+	graphics/riscossdl/riscossdl-graphics.o \
 	fs/riscos/riscos-fs.o \
 	fs/riscos/riscos-fs-factory.o \
 	midi/riscos.o \
@@ -301,6 +352,16 @@ endif
 ifeq ($(BACKEND),3ds)
 MODULE_OBJS += \
 	plugins/3ds/3ds-provider.o
+endif
+
+ifeq ($(BACKEND),atari)
+MODULE_OBJS += \
+	events/atari/atari-events.o \
+	graphics/atari/atari_c2p-asm.o \
+	graphics/atari/atari-graphics.o \
+	graphics/atari/atari-graphics-asm.o \
+	graphics/atari/videl-resolutions.o \
+	mixer/atari/atari-mixer.o
 endif
 
 ifeq ($(BACKEND),ds)
@@ -350,13 +411,16 @@ MODULE_OBJS += \
 	mixer/null/null-mixer.o
 endif
 
-ifeq ($(BACKEND),opendingux)
+ifdef MIYOO
+ifeq ($(MIYOO_TARGET), miyoomini)
 MODULE_OBJS += \
-	fs/posix/posix-fs.o \
-	fs/posix/posix-fs-factory.o \
-	fs/posix/posix-iostream.o \
-	fs/posix-drives/posix-drives-fs.o \
-	fs/posix-drives/posix-drives-fs-factory.o
+	graphics/miyoo/miyoomini-graphics.o
+endif
+endif
+
+ifdef OPENDINGUX
+MODULE_OBJS += \
+	graphics/opendingux/opendingux-graphics.o
 endif
 
 ifeq ($(BACKEND),openpandora)

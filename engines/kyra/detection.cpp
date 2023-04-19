@@ -19,7 +19,6 @@
  *
  */
 
-#include "common/translation.h"
 #include "engines/advancedDetector.h"
 #include "base/plugins.h"
 
@@ -47,6 +46,7 @@ static const DebugChannelDef debugFlagList[] = {
 const char *const directoryGlobs[] = {
 	"malcolm",
 	"data", // LOL GOG release
+	"runtime",
 	nullptr
 };
 

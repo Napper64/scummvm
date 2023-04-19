@@ -347,6 +347,8 @@ static const uint16 sig_uninitread_sq1_1[] = {
 // Workarounds for uninitialized reads for parameters
 //    gameID,           room,script,lvl,          object-name, method-name,       local-call-signature, index-range,  workaround
 const SciWorkaroundEntry uninitializedReadForParamWorkarounds[] = {
+	{ GID_ALL,            -1,   990, -1,            "Restore", "doit",                         nullptr,     1,     1,{ WORKAROUND_FAKE,   0 } }, // When opening original restore dialog in SCI16 games
+	{ GID_ALL,            -1, 64990, -1,            "Restore", "doit",                         nullptr,     1,     1,{ WORKAROUND_FAKE,   0 } }, // When opening original restore dialog in SCI32 games
 	{ GID_GK1,            -1,    12, -1,          "GKIconbar", "showInvItem",                  nullptr,     1,     1,{ WORKAROUND_FAKE,   1 } }, // When showing the icon bar containing an inventory item
 	{ GID_HOYLE5,         -1,    15, -1,               "Hand", "add",                          nullptr,     1,     1,{ WORKAROUND_FAKE,   0 } }, // When the game adds cards to your hand in any mini-game
 	{ GID_HOYLE5,        700,   730,  0,              nullptr, "runningSuit",                  nullptr,     2,     2,{ WORKAROUND_FAKE,   0 } }, // when an opponent is playing in Bridge
@@ -364,6 +366,7 @@ const SciWorkaroundEntry uninitializedReadForParamWorkarounds[] = {
 // Workarounds for uninitialized reads for temporary variables
 //    gameID,           room,script,lvl,          object-name, method-name,       local-call-signature, index-range,  workaround
 const SciWorkaroundEntry uninitializedReadWorkarounds[] = {
+	{ GID_ALL,            -1,   990,  0,            "Restore", "doit",                         nullptr,   364,   364, { WORKAROUND_FAKE,   0 } }, // When pressing Restore button in original restore dialog when list is empty
 	{ GID_CAMELOT,        40,    40,  0,               "Rm40", "handleEvent",                  nullptr,     0,     0, { WORKAROUND_FAKE,   0 } }, // when looking at the ground at the pool of Siloam - bug #6401
 	{ GID_CASTLEBRAIN,   280,   280,  0,         "programmer", "dispatchEvent",                nullptr,     0,     0, { WORKAROUND_FAKE, 0xf } }, // pressing 'q' on the computer screen in the robot room, and closing the help dialog that pops up (bug #5143). Moves the cursor to the view with the ID returned (in this case, the robot hand)
 	{ GID_CASTLEBRAIN,   320,   325,  0,               "word", "dispatchEvent",                nullptr,    14,    15, { WORKAROUND_FAKE,   0 } }, // holding down enter key during the word search puzzle, temp 14 and 15 - bug #9783
@@ -376,7 +379,7 @@ const SciWorkaroundEntry uninitializedReadWorkarounds[] = {
 	{ GID_CNICK_LAURABOW,100,   100,  0,              nullptr, "<noname144>",                  nullptr,     1,     1, { WORKAROUND_FAKE,   0 } }, // while playing domino - bug #6429 (same as the dominoHand2 workaround for Hoyle 3)
 	{ GID_CNICK_LAURABOW,100,   110,  0,              nullptr, "doit",                         nullptr,    -1,    -1, { WORKAROUND_FAKE,   0 } }, // when changing the "Dominoes per hand" setting - bug #6430
 	{ GID_CNICK_LSL,     250,   250,  0,           "increase", "handleEvent",                  nullptr,     2,     2, { WORKAROUND_FAKE,   0 } }, // when increasing own bet for blackjack - bug #10184
-	{ GID_CNICK_LONGBOW,   0,     0,  0,          "RH Budget", "init",                         nullptr,     1,     1, { WORKAROUND_FAKE,   0 } }, // when starting the game
+	{ GID_CNICK_LONGBOW,   0,     0,  0,          "RH Budget", "init",                         nullptr,     0,     1, { WORKAROUND_FAKE,   0 } }, // when starting the game
 	{ GID_ECOQUEST,       -1,    -1,  0,              nullptr, "doVerb",                       nullptr,     0,     0, { WORKAROUND_FAKE,   0 } }, // almost clicking anywhere triggers this in almost all rooms
 	{ GID_ECOQUEST2,      -1,    50,  0,         "talkButton", "cue",                          nullptr,     0,     0, { WORKAROUND_FAKE,   0 } }, // clicking Ecorder talk button before clicking power button
 	{ GID_FANMADE,       516,   979,  0,                   "", "export 0",                     nullptr,    20,    20, { WORKAROUND_FAKE,   0 } }, // Happens in Grotesteing after the logos
@@ -527,7 +530,6 @@ const SciWorkaroundEntry uninitializedReadWorkarounds[] = {
 	{ GID_QFG2,           -1,    71,  0,        "theInvSheet", "doit",                         nullptr,     1,     1, { WORKAROUND_FAKE,   0 } }, // accessing the inventory
 	{ GID_QFG2,           -1,    79,  0,        "TryToMoveTo", "onTarget",                     nullptr,     0,     0, { WORKAROUND_FAKE,   0 } }, // when throwing pot at air elemental, happens when client coordinates are the same as airElemental coordinates. happened to me right after room change - bug #6859
 	{ GID_QFG2,           -1,   701, -1,              "Alley", "at",                           nullptr,     0,     0, { WORKAROUND_FAKE,   0 } }, // when walking inside the alleys in the town - bug #5019 & #5106
-	{ GID_QFG2,           -1,   990,  0,            "Restore", "doit",                         nullptr,   364,   364, { WORKAROUND_FAKE,   0 } }, // when pressing enter in restore dialog w/o any saved games present
 	{ GID_QFG2,          260,   260,  0,             "abdulS", "changeState",    sig_uninitread_qfg2_1,    -1,    -1, { WORKAROUND_FAKE,   0 } }, // During the thief's first mission (in the house), just before Abdul is about to enter the house (where you have to hide in the wardrobe), bug #5153, temps 1 and 2
 	{ GID_QFG2,          260,   260,  0,            "jabbarS", "changeState",    sig_uninitread_qfg2_1,    -1,    -1, { WORKAROUND_FAKE,   0 } }, // During the thief's first mission (in the house), just before Jabbar is about to enter the house (where you have to hide in the wardrobe), bug #5164, temps 1 and 2
 	{ GID_QFG2,          500,   500,  0,   "lightNextCandleS", "changeState",                  nullptr,    -1,    -1, { WORKAROUND_FAKE,   0 } }, // Inside the last room, while Ad Avis performs the ritual to summon the genie - bug #5566
@@ -1137,6 +1139,12 @@ const SciWorkaroundEntry kUnLoad_workarounds[] = {
 };
 
 //    gameID,           room,script,lvl,          object-name, method-name,  local-call-signature, index-range,   workaround
+const SciWorkaroundEntry kWait_workarounds[] = {
+	{ GID_SQ1,             1,     1,  0,              "demo1", "changeState",             nullptr,     0,     0, { WORKAROUND_IGNORE, 0 } }, // DEMO: calls kWait with no parameters
+	SCI_WORKAROUNDENTRY_TERMINATOR
+};
+
+//    gameID,           room,script,lvl,          object-name, method-name,  local-call-signature, index-range,   workaround
 const SciWorkaroundEntry kScrollWindowAdd_workarounds[] = {
 	{ GID_PHANTASMAGORIA, 45, 64907,  0,   "ScrollableWindow", "addString",               nullptr,     0,     0, { WORKAROUND_STILLCALL, 0 } }, // ScrollWindow interface passes the last two parameters twice
 	SCI_WORKAROUNDENTRY_TERMINATOR
@@ -1170,7 +1178,7 @@ SciWorkaroundSolution trackOriginAndFindWorkaround(int index, const SciWorkaroun
 				bool objectNameMatches = (workaround->objectName == nullptr) ||
 										 (workaround->objectName == searchObjectName);
 
-				if (workaround->gameId == gameId
+				if (((workaround->gameId == GID_ALL) || (workaround->gameId == gameId))
 						&& ((workaround->scriptNr == -1) || (workaround->scriptNr == curScriptNr))
 						&& ((workaround->roomNr == -1) || (workaround->roomNr == curRoomNumber))
 						&& ((workaround->inheritanceLevel == -1) || (workaround->inheritanceLevel == inheritanceLevel))
@@ -1333,6 +1341,8 @@ static const SciMessageWorkaroundEntry messageWorkarounds[] = {
 	{ GID_LAURABOW2,     SCI_MEDIA_FLOPPY, K_LANG_GERMAN,   -1, 1892,   1,   6,   3,  1, { MSG_WORKAROUND_EXTRACT, 1892,   1,   6,   3,  1, 25,   0, 249, nullptr } },
 	// Asking Ramses about snake oil in German version. Same as above: excessive trailing newlines.
 	{ GID_LAURABOW2,     SCI_MEDIA_FLOPPY, K_LANG_GERMAN,   -1, 1891,   1,   6,  41,  1, { MSG_WORKAROUND_EXTRACT, 1891,   1,   6,  41,  1, 27,   0, 146, nullptr } },
+	// Using the game's debugger and clicking "Museum", wrong resource number for "T. Rex Room"
+	{ GID_LAURABOW2,     SCI_MEDIA_ALL,    K_LANG_NONE,     29,    0,   2,   0,   0, 16, { MSG_WORKAROUND_REMAP,     10,   2,   0,   0, 16, 97,   0,   0, nullptr } },
 	// Using the hand icon on Keith in the Blue Room (missing message) - bug #6253
 	{ GID_PQ1,           SCI_MEDIA_ALL,    K_LANG_NONE,     -1,   38,  10,   4,   8,  1, { MSG_WORKAROUND_REMAP,     38,  10,   4,   9,  1,  0,   0,   0, nullptr } },
 	// Using the eye icon on Keith in the Blue Room (no message and wrong talker) - bug #6253

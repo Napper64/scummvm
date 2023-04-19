@@ -110,6 +110,11 @@ void File_WriteRawChar(sc_File *fil, int towrite) {
 	FileWriteRawChar(fil->handle, towrite);
 }
 
+void File_WriteRawInt(sc_File *fil, int towrite) {
+	Stream *out = get_valid_file_stream_from_handle(fil->handle, "FileWriteRawInt");
+	out->WriteInt32(towrite);
+}
+
 void File_WriteRawLine(sc_File *fil, const char *towrite) {
 	FileWriteRawLine(fil->handle, towrite);
 }
@@ -408,10 +413,15 @@ bool ResolveScriptPath(const String &orig_sc_path, bool read_only, ResolvedPath 
 		if (child_path.CompareLeftNoCase(gameTarget) != 0)
 			child_path = String::FromFormat("%s-%s", gameTarget.GetCStr(), child_path.GetCStr());
 	}
+#else
+	// Create a proper ResolvedPath with FSLocation separating base location
+	// (which the engine is not allowed to create) and sub-dirs (created by the engine).
+	parent_dir = parent_dir.Concat(Path::GetDirectoryPath(child_path));
+	child_path = Path::GetFilename(child_path);
 #endif
 
-	// don't allow write operations for relative paths outside game dir
 	ResolvedPath test_rp = ResolvedPath(parent_dir, child_path, alt_path);
+	// don't allow write operations for relative paths outside game dir
 	if (!read_only) {
 		if (!Path::IsSameOrSubDir(test_rp.Loc.FullDir, test_rp.FullPath)) {
 			debug_script_warn("Attempt to access file '%s' denied (outside of game directory)", sc_path.GetCStr());
@@ -650,6 +660,10 @@ RuntimeScriptValue Sc_File_WriteRawChar(void *self, const RuntimeScriptValue *pa
 	API_OBJCALL_VOID_PINT(sc_File, File_WriteRawChar);
 }
 
+RuntimeScriptValue Sc_File_WriteRawInt(void *self, const RuntimeScriptValue *params, int32_t param_count) {
+	API_OBJCALL_VOID_PINT(sc_File, File_WriteRawInt);
+}
+
 // void (sc_File *fil, const char *towrite)
 RuntimeScriptValue Sc_File_WriteRawLine(void *self, const RuntimeScriptValue *params, int32_t param_count) {
 	API_OBJCALL_VOID_POBJ(sc_File, File_WriteRawLine, const char);
@@ -693,6 +707,7 @@ void RegisterFileAPI() {
 	ccAddExternalObjectFunction("File::ReadStringBack^0", Sc_File_ReadStringBack);
 	ccAddExternalObjectFunction("File::WriteInt^1", Sc_File_WriteInt);
 	ccAddExternalObjectFunction("File::WriteRawChar^1", Sc_File_WriteRawChar);
+	ccAddExternalObjectFunction("File::WriteRawInt^1", Sc_File_WriteRawInt);
 	ccAddExternalObjectFunction("File::WriteRawLine^1", Sc_File_WriteRawLine);
 	ccAddExternalObjectFunction("File::WriteString^1", Sc_File_WriteString);
 	ccAddExternalObjectFunction("File::Seek^2", Sc_File_Seek);

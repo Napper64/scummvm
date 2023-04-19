@@ -20,6 +20,7 @@
  */
 
 #include "common/language.h"
+#include "common/platform.h"
 #include "director/director.h"
 #include "director/debugger.h"
 #include "director/cast.h"
@@ -37,7 +38,7 @@
 
 namespace Director {
 
-#define PROMPT "lingo"
+#define PROMPT "lingo) "
 
 Debugger *g_debugger;
 
@@ -46,6 +47,7 @@ Debugger::Debugger(): GUI::Debugger() {
 	registerCmd("help", WRAP_METHOD(Debugger, cmdHelp));
 
 	registerCmd("version", WRAP_METHOD(Debugger, cmdVersion));
+	registerCmd("info", WRAP_METHOD(Debugger, cmdInfo));
 	registerCmd("movie", WRAP_METHOD(Debugger, cmdMovie));
 	registerCmd("m", WRAP_METHOD(Debugger, cmdMovie));
 	registerCmd("frame", WRAP_METHOD(Debugger, cmdFrame));
@@ -72,6 +74,8 @@ Debugger::Debugger(): GUI::Debugger() {
 	registerCmd("da", WRAP_METHOD(Debugger, cmdDisasm));
 	registerCmd("var", WRAP_METHOD(Debugger, cmdVar));
 	registerCmd("v", WRAP_METHOD(Debugger, cmdVar));
+	registerCmd("markers", WRAP_METHOD(Debugger, cmdMarkers));
+	registerCmd("mk", WRAP_METHOD(Debugger, cmdMarkers));
 	registerCmd("step", WRAP_METHOD(Debugger, cmdStep));
 	registerCmd("s", WRAP_METHOD(Debugger, cmdStep));
 	registerCmd("next", WRAP_METHOD(Debugger, cmdNext));
@@ -91,10 +95,14 @@ Debugger::Debugger(): GUI::Debugger() {
 	registerCmd("be", WRAP_METHOD(Debugger, cmdBpEntity));
 	registerCmd("bpvar", WRAP_METHOD(Debugger, cmdBpVar));
 	registerCmd("bv", WRAP_METHOD(Debugger, cmdBpVar));
+	registerCmd("bpevent", WRAP_METHOD(Debugger, cmdBpEvent));
+	registerCmd("bn", WRAP_METHOD(Debugger, cmdBpEvent));
 	registerCmd("bpdel", WRAP_METHOD(Debugger, cmdBpDel));
 	registerCmd("bpenable", WRAP_METHOD(Debugger, cmdBpEnable));
 	registerCmd("bpdisable", WRAP_METHOD(Debugger, cmdBpDisable));
 	registerCmd("bplist", WRAP_METHOD(Debugger, cmdBpList));
+
+	registerCmd("draw", WRAP_METHOD(Debugger, cmdDraw));
 
 	_nextFrame = false;
 	_nextFrameCounter = 0;
@@ -116,6 +124,7 @@ Debugger::Debugger(): GUI::Debugger() {
 	_bpCheckVarWrite = false;
 	_bpCheckEntityRead = false;
 	_bpCheckEntityWrite = false;
+	_bpCheckEvent = false;
 }
 
 Debugger::~Debugger() {
@@ -136,8 +145,8 @@ bool Debugger::cmdHelp(int argc, const char **argv) {
 	debugPrintf("--------\n");
 	debugPrintf("Player:\n");
 	debugPrintf(" version - Shows the Director version\n");
+	debugPrintf(" info - Shows information about the current movie\n");
 	debugPrintf(" movie / m [moviePath] - Get or sets the current movie\n");
-	//debugPrintf(" movieinfo / mi - Show information for the current movie\n");
 	debugPrintf(" frame / f [frameNum] - Gets or sets the current score frame\n");
 	debugPrintf(" channels / chan [frameNum] - Shows channel information for a score frame\n");
 	debugPrintf(" cast [castNum] - Shows the cast list or castNum for the current movie\n");
@@ -154,6 +163,7 @@ bool Debugger::cmdHelp(int argc, const char **argv) {
 	debugPrintf(" scriptframe / sf - Prints the current script frame\n");
 	debugPrintf(" funcs - Lists all of the functions available in the current script frame\n");
 	debugPrintf(" var / v - Lists all of the variables available in the current script frame\n");
+	debugPrintf(" markers / mk - Lists all of the frame markers in the current score\n");
 	debugPrintf(" step / s [n] - Steps forward one or more operations\n");
 	debugPrintf(" next / n [n] - Steps forward one or more operations, skips over calls\n");
 	debugPrintf(" finish / fin - Steps until the current stack frame returns\n");
@@ -175,10 +185,14 @@ bool Debugger::cmdHelp(int argc, const char **argv) {
 	debugPrintf(" bpentity / be [entityName:fieldName] [r/w/rw] - Create a breakpoint on a Lingo \"the\" field being accessed in a specific way");
 	debugPrintf(" bpvar / bv [varName] - Create a breakpoint on a Lingo variable being read or modified");
 	debugPrintf(" bpvar / bv [varName] [r/w/rw] - Create a breakpoint on a Lingo variable being accessed in a specific way");
+	debugPrintf(" bpevent / bn [eventName] - Create a breakpoint on a Lingo event");
 	debugPrintf(" bpdel [n] - Deletes a specific breakpoint\n");
 	debugPrintf(" bpenable [n] - Enables a specific breakpoint\n");
 	debugPrintf(" bpdisable [n] - Disables a specific breakpoint\n");
 	debugPrintf(" bplist - Lists all breakpoints\n");
+	debugPrintf("\n");
+	debugPrintf("GFX:\n");
+	debugPrintf(" draw [cast|frame|off] - Draws debug outlines for cast or frame number\n");
 	return true;
 }
 
@@ -192,6 +206,32 @@ bool Debugger::cmdVersion(int argc, const char **argv) {
 	debugPrintf("Executable name: %s\n", g_director->getEXEName().c_str());
 	debugPrintf("Startup file name: %s\n", g_director->_gameDescription->desc.filesDescriptions[0].fileName);
 	debugPrintf("Startup file MD5: %s\n", g_director->_gameDescription->desc.filesDescriptions[0].md5);
+	debugPrintf("\n");
+	return true;
+}
+
+bool Debugger::cmdInfo(int argc, const char **argv) {
+	Movie *movie = g_director->getCurrentMovie();
+	Score *score = movie->getScore();
+	Archive *archive = movie->getArchive();
+	Cast *cast = movie->getCast();
+	debugPrintf("Movie path: %s\n", archive->getPathName().c_str());
+	debugPrintf("Movie file size: %d\n", archive->getFileSize());
+	debugPrintf("Movie archive format: %s\n", archive->formatArchiveInfo().c_str());
+	debugPrintf("Movie platform: %s (%s)\n", Common::getPlatformCode(movie->_platform), Common::getPlatformDescription(movie->_platform));
+	debugPrintf("Movie format version: 0x%x\n", movie->_version);
+
+	debugPrintf("Created by: %s\n", movie->_createdBy.c_str());
+	debugPrintf("Modified by: %s\n", movie->_changedBy.c_str());
+	debugPrintf("Original directory: %s\n", movie->_origDirectory.c_str());
+	debugPrintf("Stage size: %dx%d\n", movie->_movieRect.width(), movie->_movieRect.height());
+	debugPrintf("Default palette ID: %d\n", cast->_defaultPalette);
+	debugPrintf("Default stage color: %d\n", cast->_stageColor);
+	debugPrintf("Copy protected: %d\n", cast->_isProtected);
+	debugPrintf("Remap palettes when needed flag: %d\n", movie->_remapPalettesWhenNeeded);
+	debugPrintf("Allow outdated Lingo flag: %d\n", movie->_allowOutdatedLingo);
+	debugPrintf("Frame count: %d\n", score->_frames.size());
+	debugPrintf("Cast member count: %d\n", cast->getCastSize());
 	debugPrintf("\n");
 	return true;
 }
@@ -312,7 +352,7 @@ bool Debugger::cmdRepl(int argc, const char **argv) {
 	debugPrintf("Switching to Lingo REPL mode, type 'lingo off' to return to the debug console.\n");
 	registerDefaultCmd(WRAP_DEFAULTCOMMAND(Debugger, lingoCommandProcessor));
 	_lingoReplMode = true;
-	debugPrintf(PROMPT);
+	setPrompt(PROMPT);
 	return true;
 }
 
@@ -334,7 +374,7 @@ bool Debugger::cmdFuncs(int argc, const char **argv) {
 	Lingo *lingo = g_director->getLingo();
 	Movie *movie = g_director->getCurrentMovie();
 	Score *score = movie->getScore();
-	ScriptContext *csc = lingo->_currentScriptContext;
+	ScriptContext *csc = lingo->_state->context;
 	if (csc) {
 		debugPrintf("Functions attached to frame %d:\n", score->getCurrentFrame());
 		debugPrintf("  %d:", csc->_id);
@@ -365,7 +405,7 @@ bool Debugger::cmdFuncs(int argc, const char **argv) {
 
 bool Debugger::cmdBacktrace(int argc, const char **argv) {
 	Lingo *lingo = g_director->getLingo();
-	debugPrintf("%s\n", lingo->formatCallStack(lingo->_pc).c_str());
+	debugPrintf("%s\n", lingo->formatCallStack(lingo->_state->pc).c_str());
 	return true;
 }
 
@@ -375,7 +415,7 @@ bool Debugger::cmdDisasm(int argc, const char **argv) {
 		if (!strcmp(argv[1], "all")) {
 			Movie *movie = g_director->getCurrentMovie();
 			Score *score = movie->getScore();
-			ScriptContext *csc = lingo->_currentScriptContext;
+			ScriptContext *csc = lingo->_state->context;
 			if (csc) {
 				debugPrintf("Functions attached to frame %d:\n", score->getCurrentFrame());
 				for (auto &it : csc->_functionHandlers) {
@@ -459,7 +499,7 @@ bool Debugger::cmdDisasm(int argc, const char **argv) {
 		}
 
 	} else {
-		Common::Array<CFrame *> &callstack = g_director->getCurrentWindow()->_callstack;
+		Common::Array<CFrame *> &callstack = g_lingo->_state->callstack;
 		if (callstack.size() == 0) {
 			debugPrintf("Lingo is not executing, nothing to disassemble.\n");
 			return true;
@@ -476,6 +516,19 @@ bool Debugger::cmdDisasm(int argc, const char **argv) {
 bool Debugger::cmdVar(int argc, const char **argv) {
 	Lingo *lingo = g_director->getLingo();
 	debugPrintf("%s\n", lingo->formatAllVars().c_str());
+	return true;
+}
+
+bool Debugger::cmdMarkers(int argc, const char **argv) {
+	Score *score = g_director->getCurrentMovie()->getScore();
+	if (score->_labels && score->_labels->size()) {
+		debugPrintf("Score markers:\n");
+		for (auto &it : *score->_labels) {
+			debugPrintf("\"%s\" -> %d", it->name.c_str(), it->number);
+		}
+	} else {
+		debugPrintf("No score markers found.\n");
+	}
 	return true;
 }
 
@@ -511,7 +564,7 @@ bool Debugger::cmdBpSet(int argc, const char **argv) {
 	bp.id = _bpNextId;
 	bp.type = kBreakpointFunction;
 	if (argc == 1) {
-		Common::Array<CFrame *> &callstack = g_director->getCurrentWindow()->_callstack;
+		Common::Array<CFrame *> &callstack = g_lingo->_state->callstack;
 		if (callstack.size() == 0) {
 			debugPrintf("Lingo is not executing, no current function to add breakpoint to.\n");
 			return true;
@@ -527,14 +580,14 @@ bool Debugger::cmdBpSet(int argc, const char **argv) {
 		}
 		bp.scriptId = frame->sp.ctx->_id;
 		bp.funcName = *frame->sp.name;
-		bp.funcOffset = g_lingo->_pc;
+		bp.funcOffset = g_lingo->_state->pc;
 	} else if (argc == 2 || argc == 3) {
 		Common::String target(argv[1]);
 		uint splitPoint = target.findFirstOf(":");
 		if (splitPoint == Common::String::npos) {
 			if (argc == 2 && atoi(argv[1]) > 0) {
 				// first and only argument is a number, use as an offset for the current function
-				Common::Array<CFrame *> &callstack = g_director->getCurrentWindow()->_callstack;
+				Common::Array<CFrame *> &callstack = g_lingo->_state->callstack;
 				if (callstack.size() == 0) {
 					debugPrintf("Lingo is not executing, no current function to add breakpoint to.\n");
 					return true;
@@ -667,6 +720,35 @@ bool Debugger::cmdBpVar(int argc, const char **argv) {
 	return true;
 }
 
+bool Debugger::cmdBpEvent(int argc, const char **argv) {
+	if (argc == 2) {
+		Breakpoint bp;
+		bp.type = kBreakpointEvent;
+		for (auto &it : g_lingo->_eventHandlerTypeIds) {
+			if (it._key.equalsIgnoreCase(argv[1])) {
+				bp.eventId = (LEvent)it._value;
+				break;
+			}
+		}
+		if (bp.eventId == kEventNone) {
+			debugPrintf("Event %s not found.\n", argv[1]);
+			return true;
+		}
+		bp.id = _bpNextId;
+		_bpNextId++;
+		_breakpoints.push_back(bp);
+		bpUpdateState();
+		debugPrintf("Added %s\n", bp.format().c_str());
+	} else {
+		debugPrintf("Must specify an event name. Choices are:\n");
+		for (auto &it : g_lingo->_eventHandlerTypeIds) {
+			debugPrintf("%s ", it._key.c_str());
+		}
+		debugPrintf("\n");
+	}
+	return true;
+}
+
 bool Debugger::cmdBpFrame(int argc, const char **argv) {
 	Movie *movie = g_director->getCurrentMovie();
 	if (argc == 2 || argc == 3) {
@@ -766,6 +848,38 @@ bool Debugger::cmdBpList(int argc, const char **argv) {
 	return true;
 }
 
+bool Debugger::cmdDraw(int argc, const char **argv) {
+	if (argc > 1) {
+		for (int i = 1; i < argc; i++) {
+			if (!scumm_stricmp(argv[i], "off")) {
+				g_director->_debugDraw = 0;
+			} else if (!scumm_stricmp(argv[i], "cast")) {
+				g_director->_debugDraw |= kDebugDrawCast;
+			} else if (!scumm_stricmp(argv[i], "frame")) {
+				g_director->_debugDraw |= kDebugDrawFrame;
+			} else {
+				debugPrintf("Valid parameters are 'cast', 'frame' or 'off'.\n");
+				return true;
+			}
+		}
+	}
+
+	debugPrintf("Draw: ");
+	if (g_director->_debugDraw & kDebugDrawCast)
+		debugPrintf("cast ");
+
+	if (g_director->_debugDraw & kDebugDrawFrame)
+		debugPrintf("frame ");
+
+	if (!g_director->_debugDraw)
+		debugPrintf("off ");
+
+	debugPrintf("\n");
+
+	return true;
+}
+
+
 void Debugger::bpUpdateState() {
 	_bpCheckFunc = false;
 	_bpCheckMoviePath = false;
@@ -779,8 +893,9 @@ void Debugger::bpUpdateState() {
 	_bpCheckVarWrite = false;
 	_bpCheckEntityRead = false;
 	_bpCheckEntityWrite = false;
+	_bpCheckEvent = false;
 	Movie *movie = g_director->getCurrentMovie();
-	Common::Array<CFrame *> &callstack = g_director->getCurrentWindow()->_callstack;
+	Common::Array<CFrame *> &callstack = g_lingo->_state->callstack;
 	for (auto &it : _breakpoints) {
 		if (!it.enabled)
 			continue;
@@ -818,6 +933,8 @@ void Debugger::bpUpdateState() {
 		} else if (it.type == kBreakpointEntity) {
 			_bpCheckEntityRead |= it.varRead;
 			_bpCheckEntityWrite |= it.varWrite;
+		} else if (it.type == kBreakpointEvent) {
+			_bpCheckEvent = true;
 		}
 	}
 }
@@ -829,7 +946,7 @@ void Debugger::bpTest(bool forceCheck) {
 
 	// Check if there's a funcName/offset or frame/movie match
 	bool stop = forceCheck;
-	uint funcOffset = g_lingo->_pc;
+	uint funcOffset = g_lingo->_state->pc;
 	Score *score = g_director->getCurrentMovie()->getScore();
 	uint frameOffset = score->getCurrentFrame();
 	if (_bpCheckFunc) {
@@ -869,9 +986,12 @@ bool Debugger::lingoCommandProcessor(const char *inputOrig) {
 	if (!strcmp(inputOrig, "lingo off")) {
 		registerDefaultCmd(nullptr);
 		_lingoReplMode = false;
+		resetPrompt();
 		return true;
 	}
-	return lingoEval(inputOrig);
+	bool ret = lingoEval(inputOrig);
+
+	return ret;
 }
 
 bool Debugger::lingoEval(const char *inputOrig) {
@@ -879,19 +999,20 @@ bool Debugger::lingoEval(const char *inputOrig) {
 	inputSan.trim();
 	if (inputSan.empty())
 		return true;
-	Common::String expr = Common::String::format("return %s", inputSan.c_str());
+
 	// Compile the code to an anonymous function and call it
-	ScriptContext *sc = g_lingo->_compiler->compileAnonymous(expr);
+	ScriptContext *sc = g_lingo->_compiler->compileAnonymous(inputSan);
 	if (!sc) {
-		debugPrintf("Failed to parse expression!\n%s", _lingoReplMode ? PROMPT : "");
+		debugPrintf("Failed to parse expression!\n");
 		return true;
 	}
 	Symbol sym = sc->_eventHandlers[kEventGeneric];
 	_lingoEval = true;
 	LC::call(sym, 0, true);
-	_finish = true;
-	_finishCounter = 1;
-	return cmdExit(0, nullptr);
+	g_lingo->execute();
+
+	debugPrintf("\n");
+	return true;
 }
 
 void Debugger::stepHook() {
@@ -911,7 +1032,7 @@ void Debugger::stepHook() {
 		if (_lingoEval) {
 			_lingoEval = false;
 			Datum result = g_lingo->pop();
-			debugPrintf("%s\n\n%s", result.asString(true).c_str(), _lingoReplMode ? PROMPT : "");
+			debugPrintf("%s\n\n", result.asString(true).c_str());
 		} else {
 			cmdScriptFrame(0, nullptr);
 		}
@@ -941,6 +1062,21 @@ void Debugger::movieHook() {
 		cmdMovie(0, nullptr);
 		attach();
 		g_system->updateScreen();
+	}
+}
+
+void Debugger::eventHook(LEvent eventId) {
+	if (_bpCheckEvent) {
+		for (auto &it : _breakpoints) {
+			if (it.type == kBreakpointEvent && eventId == it.eventId) {
+				debugPrintf("Hit a breakpoint:\n");
+				debugPrintf("%s\n", it.format().c_str());
+				cmdScriptFrame(0, nullptr);
+				attach();
+				g_system->updateScreen();
+				break;
+			}
+		}
 	}
 }
 

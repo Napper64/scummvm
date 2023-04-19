@@ -43,7 +43,6 @@
 
 #include "common/punycode.h"
 #include "common/debug.h"
-#include "common/tokenizer.h"
 #include "common/util.h"
 
 namespace Common {
@@ -133,6 +132,9 @@ String punycode_encode(const U32String &src) {
 	size_t h = 0, si;
 	String dst = "xn--";
 
+	if (!srclen)
+		return src;
+
 	for (si = 0; si < srclen; si++) {
 		if (src[si] < 128) {
 			dst += src[si];
@@ -173,7 +175,7 @@ String punycode_encode(const U32String &src) {
 
 		if ((m - n) > (SMAX - delta) / (h + 1)) {
 			// OVERFLOW
-			warning("punycode_encode: overflow1");
+			warning("punycode_encode: overflow1 for string (%s)", src.encode().c_str());
 			return src;
 		}
 
@@ -184,7 +186,7 @@ String punycode_encode(const U32String &src) {
 			if (src[si] < n) {
 				if (++delta == 0) {
 					// OVERFLOW
-					warning("punycode_encode: overflow2");
+					warning("punycode_encode: overflow2 for string (%s)", src.encode().c_str());
 					return src;
 				}
 			} else if (src[si] == n) {
@@ -205,6 +207,9 @@ bool punycode_hasprefix(const String &src) {
 }
 
 bool punycode_needEncode(const String &src) {
+	if (!src.size())
+		return false;
+
 	for (uint si = 0; si < src.size(); si++) {
 		if (src[si] & 0x80 || src[si] < 0x20 || strchr(SPECIAL_SYMBOLS, src[si])) {
 			return true;
@@ -274,7 +279,7 @@ U32String punycode_decode(const String &src1) {
 			di = src.findLastOf('-');
 
 			if (di == String::npos) {
-				warning("punycode_decode: malformed string");
+				warning("punycode_decode: malformed string for string (%s)", src1.c_str());
 				return src1;
 			}
 		} else {
@@ -302,20 +307,20 @@ U32String punycode_decode(const String &src1) {
 
 		for (size_t w = 1, k = BASE; true; k += BASE) {
 			if (si >= (int)src.size()) {
-				warning("punycode_decode: incorrect digit");
+				warning("punycode_decode: incorrect digit for string (%s)", src1.c_str());
 				return src1;
 			}
 
 			size_t digit = decode_digit(src[si++]);
 
 			if (digit == SMAX) {
-				warning("punycode_decode: incorrect digit");
+				warning("punycode_decode: incorrect digit2 for string (%s)", src1.c_str());
 				return src1;
 			}
 
 			if (digit > (SMAX - i) / w) {
 				// OVERFLOW
-				warning("punycode_decode: overflow1");
+				warning("punycode_decode: overflow1 for string (%s)", src1.c_str());
 				return src1;
 			}
 
@@ -336,7 +341,7 @@ U32String punycode_decode(const String &src1) {
 
 			if (w > SMAX / (BASE - t)) {
 				// OVERFLOW
-				warning("punycode_decode: overflow2");
+				warning("punycode_decode: overflow2 for string (%s)", src1.c_str());
 				return src1;
 			}
 
@@ -347,7 +352,7 @@ U32String punycode_decode(const String &src1) {
 
 		if (i / (di + 1) > SMAX - n) {
 			// OVERFLOW
-				warning("punycode_decode: overflow3");
+				warning("punycode_decode: overflow3 for string (%s)", src1.c_str());
 			return src1;
 		}
 
@@ -410,37 +415,6 @@ U32String punycode_decodefilename(const String &src1) {
 	}
 
 	return dst;
-}
-
-Path punycode_decodepath(const Path &src) {
-	StringTokenizer tok(src.rawString(), Common::String(DIR_SEPARATOR));
-	String res;
-
-	while (!tok.empty()) {
-		res += punycode_decodefilename(tok.nextToken());
-		if (!tok.empty())
-			res += DIR_SEPARATOR;
-	}
-
-	return Path(res, DIR_SEPARATOR);
-}
-
-Path punycode_encodepath(const Path &src) {
-	StringTokenizer tok(src.rawString(), Common::String(DIR_SEPARATOR));
-	String res;
-
-	while (!tok.empty()) {
-		String part = tok.nextToken();
-		if (punycode_needEncode(part))
-			res += punycode_encodefilename(part);
-		else
-			res += part;
-
-		if (!tok.empty())
-			res += DIR_SEPARATOR;
-	}
-
-	return Path(res, DIR_SEPARATOR);
 }
 
 } // end of namespace Common

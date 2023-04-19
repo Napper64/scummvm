@@ -49,17 +49,18 @@ namespace Sword2 {
 
 Common::Platform Sword2Engine::_platform;
 
-Sword2Engine::Sword2Engine(OSystem *syst, const Sword2GameDescription *gameDesc) : Engine(syst), _rnd("sword2") {
+Sword2Engine::Sword2Engine(OSystem *syst, const ADGameDescription *gameDesc) : Engine(syst), _rnd("sword2") {
 	// Add default file directories
 	const Common::FSNode gameDataDir(ConfMan.get("path"));
 	SearchMan.addSubDirectoryMatching(gameDataDir, "clusters");
 	SearchMan.addSubDirectoryMatching(gameDataDir, "sword2");
 	SearchMan.addSubDirectoryMatching(gameDataDir, "video");
 	SearchMan.addSubDirectoryMatching(gameDataDir, "smacks");
+	SearchMan.addSubDirectoryMatching(gameDataDir, "extras"); // GOG.com
 	SearchMan.addSubDirectoryMatching(gameDataDir, "streams"); // PSX video
 
-	_features = gameDesc->features;
-	Sword2Engine::_platform = gameDesc->desc.platform;
+	_features = gameDesc->flags;
+	Sword2Engine::_platform = gameDesc->platform;
 
 	_bootParam = ConfMan.getInt("boot_param");
 	_saveSlot = ConfMan.getInt("save_slot");
@@ -203,6 +204,8 @@ Common::Error Sword2Engine::run() {
 	_fontRenderer = new FontRenderer(this);
 	_sound = new Sound(this);
 	_mouse = new Mouse(this);
+	
+	_fontRenderer->loadTranslations();
 
 	registerDefaultSettings();
 	readSettings();
@@ -216,7 +219,7 @@ Common::Error Sword2Engine::run() {
 	setupPersistentResources();
 	initializeFontResourceFlags();
 
-	if (_features & GF_DEMO)
+	if (_features & ADGF_DEMO)
 		_logic->writeVar(DEMO, 1);
 	else
 		_logic->writeVar(DEMO, 0);

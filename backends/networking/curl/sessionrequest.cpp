@@ -27,7 +27,7 @@
 #include "backends/networking/curl/sessionrequest.h"
 #include "common/debug.h"
 #include "common/file.h"
-#include "common/json.h"
+#include "common/formats/json.h"
 
 namespace Networking {
 
@@ -58,6 +58,7 @@ void SessionRequest::openLocalFile(Common::String localFile) {
 		ErrorResponse error(this, false, true, "SessionRequestFile: unable to open file to download into", -1);
 		finishError(error);
 		delete _localFile;
+		_localFile = nullptr;
 		return;
 	}
 

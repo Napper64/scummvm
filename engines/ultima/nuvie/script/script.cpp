@@ -2933,7 +2933,7 @@ static int nscript_map_remove_obj(lua_State *L) {
 Can you put an actor at a given map location
 @function map_can_put
 @tparam MapCoord|x,y,z location
-@treturn boolean true if actor an be placed at location otherwise false
+@treturn boolean true if actor can be placed at location otherwise false
 @within map
  */
 static int nscript_map_can_put_actor(lua_State *L) {
@@ -2953,7 +2953,7 @@ static int nscript_map_can_put_actor(lua_State *L) {
 Can you put an object at a given map location
 @function map_can_put_obj
 @tparam MapCoord|x,y,z location
-@treturn bool true if an object an be placed at location otherwise false
+@treturn bool true if an object can be placed at location otherwise false
 @within map
  */
 static int nscript_map_can_put_obj(lua_State *L) {
@@ -3168,7 +3168,7 @@ static int nscript_map_line_hit_check(lua_State *L) {
 	uint8 level = (uint8) luaL_checkinteger(L, 5);
 
 	//FIXME world wrapping for MD
-	if (map->lineTest(x, y, x1, y1, level, LT_HitMissileBoundary, result)) {
+	if (map->lineTest(x, y, x1, y1, level, LT_HitMissileBoundary, result, 0, NULL, true)) {
 		lua_pushinteger(L, result.hit_x);
 		lua_pushinteger(L, result.hit_y);
 	} else {

@@ -19,33 +19,41 @@
  *
  */
 
-/* Memory is a Mac only XObject.
+/*************************************
+ *
+ * USED IN:
+ * Chop Suey (win)
+ *
+ *************************************/
+
+/*
+ * Memory is a Mac only XObject.
  *
  * Implemented as a no-op, since ScummVM doesn't need to handle memory clears.
  *
  *
-	-- Memory XObject
-	-- December 18th, 1992
-	-- Written by Scott Kildall
-	-- 1992 by Macromedia, Inc
-	-- All rights reserved
-	--
-	I mNew
-	X mClear
-	X mCompact
-	X mPurge
-	I mAvailBytes
-	I mAvailBlock
-	I mStackSpace
-	I mGetVM
-	I mGetAddressing
-	I mGetCache
-	XI mSetCache
-	I mGetPhysicalRAM
-	I mGetMMU
-	I mGetLogicalPage
-	I mGetLogicalRAM
-	I mGetLowMemory
+ * -- Memory XObject
+ * -- December 18th, 1992
+ * -- Written by Scott Kildall
+ * -- 1992 by Macromedia, Inc
+ * -- All rights reserved
+ * --
+ * I mNew
+ * X mClear
+ * X mCompact
+ * X mPurge
+ * I mAvailBytes
+ * I mAvailBlock
+ * I mStackSpace
+ * I mGetVM
+ * I mGetAddressing
+ * I mGetCache
+ * XI mSetCache
+ * I mGetPhysicalRAM
+ * I mGetMMU
+ * I mGetLogicalPage
+ * I mGetLogicalRAM
+ * I mGetLowMemory
  */
 
 #include "director/director.h"
@@ -67,6 +75,7 @@ static MethodProto xlibMethods[] = {
 	{ "new",					MemoryXObj::m_new,			0,	0,	300 },	// D3
 	{ "Clear",					MemoryXObj::m_clear,		0,	0,	300 },	// D3
 	{ "Purge",					MemoryXObj::m_purge,		0,	0,	400 },	// D4
+	{ "GetVM",					MemoryXObj::m_getVM,		0,  0,  300 },  // D3
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
@@ -91,13 +100,17 @@ MemoryXObject::MemoryXObject(ObjectType ObjectType) :Object<MemoryXObject>("Memo
 }
 
 void MemoryXObj::m_new(int nargs) {
-	g_lingo->push(g_lingo->_currentMe);
+	g_lingo->push(g_lingo->_state->me);
 }
 
 void MemoryXObj::m_clear(int nargs) {
 }
 
 void MemoryXObj::m_purge(int nargs) {
+}
+
+void MemoryXObj::m_getVM(int nargs) {
+	g_lingo->push(Datum(0)); // At least Chop Suey Win requires 0 bytes Virtual Memory for running
 }
 
 } // End of namespace Director

@@ -57,6 +57,8 @@ void Script::freeScript(const bool keepLocalsSegment) {
 	_synonyms.clear();
 	_numSynonyms = 0;
 
+	_codeOffset = 0;
+
 	_localsOffset = 0;
 	if (!keepLocalsSegment) {
 		_localsSegment = 0;
@@ -89,6 +91,7 @@ void Script::load(int script_nr, ResourceManager *resMan, ScriptPatcher *scriptP
 	_nr = script_nr;
 	uint32 scriptSize = script->size();
 	uint32 bufSize = scriptSize;
+	Resource *heap = nullptr;
 
 	if (getSciVersion() == SCI_VERSION_0_EARLY) {
 		bufSize += script->getUint16LEAt(0) * 2;
@@ -99,7 +102,10 @@ void Script::load(int script_nr, ResourceManager *resMan, ScriptPatcher *scriptP
 		// combined size of the stack and the heap must be 64KB. So far this has
 		// worked for SCI11, SCI2 and SCI21 games. SCI3 games use a different
 		// script format, and they can exceed the 64KB boundary using relocation.
-		Resource *heap = resMan->findResource(ResourceId(kResourceTypeHeap, script_nr), false);
+		heap = resMan->findResource(ResourceId(kResourceTypeHeap, script_nr), false);
+		if (heap == nullptr) {
+			error("Heap %d not found", script_nr);
+		}
 		bufSize += heap->size();
 
 		// Ensure that the start of the heap resource can be word-aligned.
@@ -136,10 +142,7 @@ void Script::load(int script_nr, ResourceManager *resMan, ScriptPatcher *scriptP
 	// size
 	_script = _buf->subspan(0, scriptSize, script->name());
 
-	if (getSciVersion() >= SCI_VERSION_1_1 && getSciVersion() <= SCI_VERSION_2_1_LATE) {
-		Resource *heap = resMan->findResource(ResourceId(kResourceTypeHeap, _nr), false);
-		assert(heap);
-
+	if (heap != nullptr) {
 		SciSpan<byte> outHeap = outBuffer.subspan(scriptSize, heap->size(), heap->name(), 0);
 		heap->copyDataTo(outHeap);
 		_heap = outHeap;
@@ -841,6 +844,21 @@ void Script::relocateSci3(const SegmentId segmentId) {
 
 void Script::incrementLockers() {
 	assert(!_markedAsDeleted);
+	if (_lockers == 0xffffffff) {
+		// FIXME
+		// The locker on system scripts, most notably script 999, increases throughout
+		// the game and can eventually overflow, causing script 999 to be unloaded
+		// and crash. We have been provided QFG1 SCI0 save games where this occurred
+		// within hours of play over the course of three days. Debugging shows that
+		// this value increases rapidly, for example: on every `class Event` opcode
+		// during input polling, or when our kAnimate code calls `doit` on objects.
+		// Until this is fixed properly, log these overflow attempts and lower the
+		// counter so that the warnings continue without flooding the log.
+		// At the point where a resource usage counter reaches the billions, its value
+		// no longer has meaning, so the important thing for now is that it not crash.
+		warning("script %d locker maximum reached, resetting", _nr);
+		_lockers = 0x80000000;
+	}
 	_lockers++;
 }
 
@@ -849,11 +867,11 @@ void Script::decrementLockers() {
 		_lockers--;
 }
 
-int Script::getLockers() const {
+uint Script::getLockers() const {
 	return _lockers;
 }
 
-void Script::setLockers(int lockers) {
+void Script::setLockers(uint lockers) {
 	assert(lockers == 0 || !_markedAsDeleted);
 	_lockers = lockers;
 }
@@ -1207,10 +1225,10 @@ void Script::initializeObjectsSci3(SegManager *segMan, SegmentId segmentId, bool
 void Script::initializeObjects(SegManager *segMan, SegmentId segmentId, bool applyScriptPatches) {
 	if (getSciVersion() <= SCI_VERSION_1_LATE)
 		initializeObjectsSci0(segMan, segmentId, applyScriptPatches);
-	else if (getSciVersion() >= SCI_VERSION_1_1 && getSciVersion() <= SCI_VERSION_2_1_LATE)
+	else if (getSciVersion() <= SCI_VERSION_2_1_LATE)
 		initializeObjectsSci11(segMan, segmentId, applyScriptPatches);
 #ifdef ENABLE_SCI32
-	else if (getSciVersion() == SCI_VERSION_3)
+	else
 		initializeObjectsSci3(segMan, segmentId, applyScriptPatches);
 #endif
 }

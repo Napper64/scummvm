@@ -36,7 +36,7 @@ class Scrollbar;
 
 class Textbox : public Nancy::RenderObject {
 public:
-	Textbox(RenderObject &redrawFrom);
+	Textbox();
 	virtual ~Textbox();
 
 	void init() override;
@@ -48,7 +48,7 @@ public:
 	void clear();
 
 	void addTextLine(const Common::String &text);
-	void onScrollbarPositionChanged(float data);
+	void overrideFontID(const uint fontID) { _fontIDOverride = fontID; };
 
 	static void assembleTextLine(char *rawCaption, Common::String &output, uint size);
 
@@ -62,21 +62,22 @@ private:
 	};
 
 	Graphics::ManagedSurface _fullSurface;
+	Graphics::ManagedSurface _textHighlightSurface;
+
+	RenderObject _highlightRObj;
 
 	Scrollbar *_scrollbar;
 
 	Common::Array<Common::String> _textLines;
 	Common::Array<Common::Rect> _hotspots;
 
-	uint16 _firstLineOffset;
-	uint16 _lineHeight;
-	uint16 _borderWidth;
-	uint16 _maxWidthDifference;
 	uint16 _numLines;
-	uint16 _fontID;
+	bool _lastResponseisMultiline;
 
 	bool _needsTextRedraw;
 	float _scrollbarPos;
+
+	int _fontIDOverride;
 
 	static const char _CCBeginToken[];
 	static const char _CCEndToken[];

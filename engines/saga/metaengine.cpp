@@ -61,7 +61,13 @@ Common::Platform SagaEngine::getPlatform() const { return _gameDescription->desc
 int SagaEngine::getGameNumber() const { return _gameNumber; }
 int SagaEngine::getStartSceneNumber() const { return _gameDescription->startSceneNumber; }
 
-const ADGameFileDescription *SagaEngine::getFilesDescriptions() const { return _gameDescription->desc.filesDescriptions; }
+const ADGameFileDescription *SagaEngine::getFilesDescriptions() const {
+    return getFeatures() & GF_INSTALLER ? _gameDescription->filesInArchive : _gameDescription->desc.filesDescriptions;
+}
+
+const ADGameFileDescription *SagaEngine::getArchivesDescriptions() const {
+  return getFeatures() & GF_INSTALLER ? _gameDescription->desc.filesDescriptions : nullptr;
+}
 
 } // End of namespace Saga
 
@@ -251,6 +257,15 @@ const GameDisplayInfo &SagaEngine::getDisplayInfo() {
 		case GID_ITE:
 			if (getLanguage() == Common::ZH_TWN)
 				return ITE_DisplayInfo_ZH;
+			if (isECS()) {
+				static GameDisplayInfo ITE_DisplayInfo_ECS;
+				if (!ITE_DisplayInfo_ECS.width) {
+					ITE_DisplayInfo_ECS = ITE_DisplayInfo;
+					ITE_DisplayInfo_ECS.statusTextColor = kITEECSBottomColorGreen;
+					ITE_DisplayInfo_ECS.statusBGColor = kITEECSColorBlack;
+				}
+				return ITE_DisplayInfo_ECS;
+			}
 			return ITE_DisplayInfo;
 #ifdef ENABLE_IHNM
 		case GID_IHNM:

@@ -77,21 +77,21 @@ private:
 	/**
 	 * Local palette for 8-bit images.
 	 */
-	uint32 _palette[256];
+	byte _palette[256 * 3];
 	bool _paletteSet;
 protected:
 	/**
 	 * Inner method for blitting.
 	 */
 	void blitFromInner(const Surface &src, const Common::Rect &srcRect,
-		const Common::Rect &destRect, const uint32 *srcPalette);
+		const Common::Rect &destRect, const byte *srcPalette);
 
 	/**
 	 * Inner method for copying another surface into this one at a given destination position.
 	 */
 	void transBlitFromInner(const Surface &src, const Common::Rect &srcRect,
 		const Common::Rect &destRect, uint32 transColor, bool flipped, uint32 overrideColor,
-		uint32 srcAlpha, const uint32 *srcPalette, const uint32 *dstPalette, const Surface *mask, bool maskOnly);
+		uint32 srcAlpha, const byte *srcPalette, const byte *dstPalette, const Surface *mask, bool maskOnly);
 public:
 	/**
 	 * Clip the given source bounds so the passed destBounds will be entirely on-screen.
@@ -499,10 +499,10 @@ public:
 	/**
 	 * Does a blitFrom ignoring any transparency settings
 	 */
-	void rawBlitFrom(const Surface &src, const Common::Rect &srcRect,
-			const Common::Point &destPos, const uint32 *palette) {
-		blitFromInner(src, srcRect, Common::Rect(destPos.x, destPos.y,
-			destPos.x + srcRect.width(), destPos.y + srcRect.height()), palette);
+	void rawBlitFrom(const ManagedSurface &src, const Common::Rect &srcRect,
+			const Common::Point &destPos) {
+		blitFromInner(src._innerSurface, srcRect, Common::Rect(destPos.x, destPos.y, destPos.x + srcRect.width(),
+			destPos.y + srcRect.height()), src._paletteSet ? src._palette : nullptr);
 	}
 
 	/**
@@ -669,21 +669,21 @@ public:
 	}
 
 	/**
-	 * Get the palette array.
+	 * Return true if a palette has been set.
 	 */
-	const uint32 *getPalette() const {
-		return _palette;
+	bool hasPalette() const {
+		return _paletteSet;
 	}
+
+	/**
+	 * Grab the palette using RGB tuples.
+	 */
+	void grabPalette(byte *colors, uint start, uint num) const;
 
 	/**
 	 * Set the palette using RGB tuples.
 	 */
 	void setPalette(const byte *colors, uint start, uint num);
-
-	/**
-	 * Set the palette using RGBA values.
-	 */
-	void setPalette(const uint32 *colors, uint start, uint num);
 };
 /** @} */
 } // End of namespace Graphics

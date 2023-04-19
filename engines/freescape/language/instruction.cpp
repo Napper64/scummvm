@@ -27,6 +27,29 @@
 
 namespace Freescape {
 
+FCLInstructionVector *duplicateCondition(FCLInstructionVector *condition) {
+	if (!condition)
+		return nullptr;
+
+	FCLInstructionVector *copy = new FCLInstructionVector();
+	for (uint i = 0; i < condition->size(); i++) {
+		copy->push_back((*condition)[i].duplicate());
+	}
+	return copy;
+}
+
+FCLInstruction FCLInstruction::duplicate() {
+	FCLInstruction copy(_type);
+	copy.setSource(_source);
+	copy.setDestination(_destination);
+	copy.setAdditional(_additional);
+
+	copy._thenInstructions = duplicateCondition(_thenInstructions);
+	copy._elseInstructions = duplicateCondition(_elseInstructions);
+
+	return copy;
+}
+
 FCLInstruction::FCLInstruction(Token::Type type_) {
 	_source = 0;
 	_destination = 0;
@@ -69,12 +92,19 @@ Token::Type FCLInstruction::getType() {
 void FreescapeEngine::executeObjectConditions(GeometricObject *obj, bool shot, bool collided) {
 	assert(obj != nullptr);
 	if (!obj->_conditionSource.empty()) {
-		debugC(1, kFreescapeDebugCode, "Executing with collision flag: %s", obj->_conditionSource.c_str());
-		executeCode(obj->_condition, shot, collided);
+		_firstSound = true;
+		_objExecutingCodeSize = obj->getSize();
+		if (collided)
+			debugC(1, kFreescapeDebugCode, "Executing with collision flag: %s", obj->_conditionSource.c_str());
+		else if (shot)
+			debugC(1, kFreescapeDebugCode, "Executing with shot flag: %s", obj->_conditionSource.c_str());
+		else
+			error("Neither shot or collided flag is set!");
+		executeCode(obj->_condition, shot, collided, false); // TODO: check this last parameter
 	}
 }
 
-void FreescapeEngine::executeLocalGlobalConditions(bool shot, bool collided) {
+void FreescapeEngine::executeLocalGlobalConditions(bool shot, bool collided, bool timer) {
 	if (isCastle())
 		return;
 	debugC(1, kFreescapeDebugCode, "Executing room conditions");
@@ -83,35 +113,43 @@ void FreescapeEngine::executeLocalGlobalConditions(bool shot, bool collided) {
 
 	for (uint i = 0; i < conditions.size(); i++) {
 		debugC(1, kFreescapeDebugCode, "%s", conditionSources[i].c_str());
-		executeCode(conditions[i], shot, collided);
+		executeCode(conditions[i], shot, collided, timer);
 	}
 
 	debugC(1, kFreescapeDebugCode, "Executing global conditions (%d)", _conditions.size());
 	for (uint i = 0; i < _conditions.size(); i++) {
 		debugC(1, kFreescapeDebugCode, "%s", _conditionSources[i].c_str());
-		executeCode(_conditions[i], shot, collided);
+		executeCode(_conditions[i], shot, collided, timer);
 	}
 }
 
-void FreescapeEngine::executeCode(FCLInstructionVector &code, bool shot, bool collided) {
+void FreescapeEngine::executeCode(FCLInstructionVector &code, bool shot, bool collided, bool timer) {
 	assert(!(shot && collided));
 	int ip = 0;
 	int codeSize = code.size();
 	while (ip <= codeSize - 1) {
 		FCLInstruction &instruction = code[ip];
-		debugC(1, kFreescapeDebugCode, "Executing ip: %d in code with size: %d", ip, codeSize);
+		debugC(1, kFreescapeDebugCode, "Executing ip: %d with type %d in code with size: %d", ip, instruction.getType(), codeSize);
 		switch (instruction.getType()) {
 		default:
+			if (!isCastle())
+				error("Instruction %x at ip: %d not implemented!", instruction.getType(), ip);
 			break;
 		case Token::COLLIDEDQ:
 			if (collided)
-				executeCode(*instruction._thenInstructions, shot, collided);
+				executeCode(*instruction._thenInstructions, shot, collided, timer);
 			// else branch is always empty
 			assert(instruction._elseInstructions == nullptr);
 			break;
 		case Token::SHOTQ:
 			if (shot)
-				executeCode(*instruction._thenInstructions, shot, collided);
+				executeCode(*instruction._thenInstructions, shot, collided, timer);
+			// else branch is always empty
+			assert(instruction._elseInstructions == nullptr);
+			break;
+		case Token::TIMERQ:
+			if (timer)
+				executeCode(*instruction._thenInstructions, shot, collided, timer);
 			// else branch is always empty
 			assert(instruction._elseInstructions == nullptr);
 			break;
@@ -127,6 +165,9 @@ void FreescapeEngine::executeCode(FCLInstructionVector &code, bool shot, bool co
 			break;
 		case Token::SUBVAR:
 			executeDecrementVariable(instruction);
+			break;
+		case Token::SETVAR:
+			executeSetVariable(instruction);
 			break;
 		case Token::GOTO:
 			executeGoto(instruction);
@@ -161,6 +202,12 @@ void FreescapeEngine::executeCode(FCLInstructionVector &code, bool shot, bool co
 		case Token::PRINT:
 			executePrint(instruction);
 			break;
+		case Token::SPFX:
+			executeSPFX(instruction);
+			break;
+		case Token::SCREEN:
+			// TODO
+			break;
 		case Token::BITNOTEQ:
 			if (executeEndIfBitNotEqual(instruction))
 				ip = codeSize;
@@ -181,9 +228,13 @@ void FreescapeEngine::executeRedraw(FCLInstruction &instruction) {
 	_gfx->flipBuffer();
 	g_system->updateScreen();
 	g_system->delayMillis(10);
+	waitForSounds();
 }
 
 void FreescapeEngine::executeSound(FCLInstruction &instruction) {
+	if (_firstSound)
+		stopAllSounds();
+	_firstSound = false;
 	uint16 index = instruction._source;
 	bool sync = instruction._additional;
 	debugC(1, kFreescapeDebugCode, "Playing sound %d", index);
@@ -203,6 +254,48 @@ void FreescapeEngine::executePrint(FCLInstruction &instruction) {
 	_currentAreaMessages.push_back(_messagesList[index]);
 }
 
+void FreescapeEngine::executeSPFX(FCLInstruction &instruction) {
+	uint16 src = instruction._source;
+	uint16 dst = instruction._destination;
+	if (isAmiga() || isAtariST()) {
+		int color;
+		if (src == 0 && dst >= 2 && dst <= 5) {
+			_currentArea->remapColor(dst, 1);
+			return;
+		}
+
+		if (src == 0) {
+			color = dst;
+		} else {
+
+			switch (src) {
+			case 1:
+				color = 15;
+			break;
+			case 2:
+				color = 14;
+			break;
+			default:
+				color = 0;
+			}
+		}
+
+		debugC(1, kFreescapeDebugCode, "Switching complete palette to color %d", dst);
+		for (int i = 1; i < 16; i++)
+			_currentArea->remapColor(i, color);
+	} else {
+		debugC(1, kFreescapeDebugCode, "Switching palette from position %d to %d", src, dst);
+		if (src == 0 && dst == 1)
+			_currentArea->remapColor(_currentArea->_usualBackgroundColor, _renderMode == Common::kRenderCGA ? 1 : _currentArea->_underFireBackgroundColor);
+		else if (src == 0 && dst == 0)
+			_currentArea->unremapColor(_currentArea->_usualBackgroundColor);
+		else
+			_currentArea->remapColor(src, dst);
+	}
+	executeRedraw(instruction);
+}
+
+
 bool FreescapeEngine::executeEndIfVisibilityIsEqual(FCLInstruction &instruction) {
 	uint16 source = instruction._source;
 	uint16 additional = instruction._additional;
@@ -214,13 +307,17 @@ bool FreescapeEngine::executeEndIfVisibilityIsEqual(FCLInstruction &instruction)
 		assert(obj);
 		debugC(1, kFreescapeDebugCode, "End condition if visibility of obj with id %d is %d!", source, value);
 	} else {
-		assert(_areaMap.contains(source));
-		obj = _areaMap[source]->objectWithID(additional);
-		assert(obj);
 		debugC(1, kFreescapeDebugCode, "End condition if visibility of obj with id %d in area %d is %d!", additional, source, value);
+		if (_areaMap.contains(source)) {
+			obj = _areaMap[source]->objectWithID(additional);
+			assert(obj);
+		} else {
+			assert(isDOS() && isDemo()); // Should only happen in the DOS demo
+			return (value == false);
+		}
 	}
 
-	return (obj->isInvisible() == value);
+	return (obj->isInvisible() == (value != 0));
 }
 
 bool FreescapeEngine::executeEndIfNotEqual(FCLInstruction &instruction) {
@@ -251,6 +348,9 @@ void FreescapeEngine::executeIncrementVariable(FCLInstruction &instruction) {
 		else if (_gameStateVars[variable] < 0)
 			_gameStateVars[variable] = 0;
 
+		if (increment < 0)
+			flashScreen(_renderMode == Common::kRenderCGA ? 1 :_currentArea->_underFireBackgroundColor);
+
 		debugC(1, kFreescapeDebugCode, "Shield incremented by %d up to %d", increment, _gameStateVars[variable]);
 		break;
 	default:
@@ -269,6 +369,16 @@ void FreescapeEngine::executeDecrementVariable(FCLInstruction &instruction) {
 		debugC(1, kFreescapeDebugCode, "Variable %d by %d incremented up to %d!", variable, decrement, _gameStateVars[variable]);
 }
 
+void FreescapeEngine::executeSetVariable(FCLInstruction &instruction) {
+	uint16 variable = instruction._source;
+	uint16 value = instruction._destination;
+	_gameStateVars[variable] = value;
+	if (variable == k8bitVariableEnergy)
+		debugC(1, kFreescapeDebugCode, "Energy set to %d", value);
+	else
+		debugC(1, kFreescapeDebugCode, "Variable %d by set to %d!", variable, value);
+}
+
 void FreescapeEngine::executeDestroy(FCLInstruction &instruction) {
 	uint16 objectID = 0;
 	uint16 areaID = _currentArea->getAreaID();
@@ -283,6 +393,7 @@ void FreescapeEngine::executeDestroy(FCLInstruction &instruction) {
 	debugC(1, kFreescapeDebugCode, "Destroying obj %d in area %d!", objectID, areaID);
 	assert(_areaMap.contains(areaID));
 	Object *obj = _areaMap[areaID]->objectWithID(objectID);
+	assert(obj); // We know that an object should be there
 	if (obj->isDestroyed())
 		debugC(1, kFreescapeDebugCode, "WARNING: Destroying obj %d in area %d already destroyed!", objectID, areaID);
 
@@ -301,8 +412,14 @@ void FreescapeEngine::executeMakeInvisible(FCLInstruction &instruction) {
 	}
 
 	debugC(1, kFreescapeDebugCode, "Making obj %d invisible in area %d!", objectID, areaID);
-	Object *obj = _areaMap[areaID]->objectWithID(objectID);
-	obj->makeInvisible();
+	if (_areaMap.contains(areaID)) {
+		Object *obj = _areaMap[areaID]->objectWithID(objectID);
+		assert(obj); // We assume the object was there
+		obj->makeInvisible();
+	} else {
+		assert(isDOS() && isDemo()); // Should only happen in the DOS demo
+	}
+
 }
 
 void FreescapeEngine::executeMakeVisible(FCLInstruction &instruction) {
@@ -317,8 +434,13 @@ void FreescapeEngine::executeMakeVisible(FCLInstruction &instruction) {
 	}
 
 	debugC(1, kFreescapeDebugCode, "Making obj %d visible in area %d!", objectID, areaID);
-	Object *obj = _areaMap[areaID]->objectWithID(objectID);
-	obj->makeVisible();
+	if (_areaMap.contains(areaID)) {
+		Object *obj = _areaMap[areaID]->objectWithID(objectID);
+		assert(obj); // We assume an object should be there
+		obj->makeVisible();
+	} else {
+		assert(isDOS() && isDemo()); // Should only happen in the DOS demo
+	}
 }
 
 void FreescapeEngine::executeToggleVisibility(FCLInstruction &instruction) {
@@ -346,6 +468,7 @@ void FreescapeEngine::executeToggleVisibility(FCLInstruction &instruction) {
 		// If an object is not in the area, it is considered to be invisible
 		_currentArea->addObjectFromArea(objectID, _areaMap[255]);
 		obj = _areaMap[areaID]->objectWithID(objectID);
+		assert(obj); // We know that an object should be there
 		obj->makeVisible();
 	}
 }
@@ -357,23 +480,23 @@ void FreescapeEngine::executeGoto(FCLInstruction &instruction) {
 }
 
 void FreescapeEngine::executeSetBit(FCLInstruction &instruction) {
-	uint16 index = instruction._source - 1; // Starts in 1
-	assert(index < 32);
-	_gameStateBits[_currentArea->getAreaID()] |= (1 << index);
+	uint16 index = instruction._source; // Starts at 1
+	assert(index > 0 && index <= 32);
+	setGameBit(index);
 	debugC(1, kFreescapeDebugCode, "Setting bit %d", index);
-	// debug("v: %d", (_gameStateBits[_currentArea->getAreaID()] & (1 << index)));
 }
 
 void FreescapeEngine::executeClearBit(FCLInstruction &instruction) {
-	uint16 index = instruction._source - 1; // Starts in 1
-	assert(index < 32);
-	_gameStateBits[_currentArea->getAreaID()] &= ~(1 << index);
+	uint16 index = instruction._source; // Starts at 1
+	assert(index > 0 && index <= 32);
+	clearGameBit(index);
 	debugC(1, kFreescapeDebugCode, "Clearing bit %d", index);
 }
 
 void FreescapeEngine::executeToggleBit(FCLInstruction &instruction) {
-	uint16 index = instruction._source - 1; // Starts in 1
-	_gameStateBits[_currentArea->getAreaID()] ^= (1 << index);
+	uint16 index = instruction._source; // Starts at 1
+	assert(index > 0 && index <= 32);
+	toggleGameBit(index);
 	debugC(1, kFreescapeDebugCode, "Toggling bit %d", index);
 }
 

@@ -18,7 +18,7 @@
 # -- Project information -----------------------------------------------------
 
 project = 'ScummVM Documentation'
-copyright = '2020-2022, CadiH'
+copyright = '2020-2023, CadiH'
 author = 'CadiH'
 
 
@@ -33,7 +33,8 @@ import sphinx_rtd_theme
 extensions = [
 
     "sphinx_rtd_theme",
-    "sphinx_panels"
+    "sphinx_panels",
+    "sphinx_mdinclude"
 ]
 extensions.append('sphinx_tabs.tabs')
 souce_suffix = ['.rst','.md']

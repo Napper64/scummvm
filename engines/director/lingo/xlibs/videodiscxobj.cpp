@@ -19,6 +19,13 @@
  *
  */
 
+/*************************************
+ *
+ * USED IN:
+ * Standard Macromedia Director XObject
+ *
+ *************************************/
+
 /*
  * mNew, portObject, baudRate, playerType  creates a
  *    new instance and returns error code
@@ -166,7 +173,7 @@ VideodiscXObject::VideodiscXObject(ObjectType ObjectType) :Object<VideodiscXObje
 void VideodiscXObj::m_new(int nargs) {
 	g_lingo->printSTUBWithArglist("VideodiscXObj::m_new", nargs);
 	g_lingo->dropStack(nargs);
-	g_lingo->push(g_lingo->_currentMe);
+	g_lingo->push(g_lingo->_state->me);
 }
 
 void VideodiscXObj::m_name(int nargs) {

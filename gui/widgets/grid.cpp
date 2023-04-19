@@ -119,28 +119,41 @@ void GridItemWidget::drawWidget() {
 			r.translate(0, kLineHeight);
 		}
 	} else {
-		g_gui.theme()->drawSurface(Common::Point(_x, _y), _thumbGfx, true);
+		g_gui.theme()->drawManagedSurface(Common::Point(_x, _y), _thumbGfx);
 	}
 
 	// Draw Platform Icon
 	const Graphics::ManagedSurface *platGfx = _grid->platformToSurface(_activeEntry->platform);
 	if (platGfx) {
 		Common::Point p(_x + thumbWidth - platGfx->w, _y + thumbHeight - platGfx->h);
-		g_gui.theme()->drawSurface(p, *platGfx, true);
+		g_gui.theme()->drawManagedSurface(p, *platGfx);
 	}
 
 	// Draw Flag
 	const Graphics::ManagedSurface *flagGfx = _grid->languageToSurface(_activeEntry->language);
 	if (flagGfx) {
-		Common::Point p(_x + thumbWidth - flagGfx->w - 5, _y + 5);
-		g_gui.theme()->drawSurface(p, *flagGfx, true);
+		// SVG and PNG can resize differently so it's better to use thumbWidth as reference to
+		// ensure all flags are aligned
+		Common::Point p(_x + thumbWidth - (thumbWidth / 5), _y + 5);
+		g_gui.theme()->drawManagedSurface(p, *flagGfx);
 	}
 
 	// Draw Demo Overlay
 	const Graphics::ManagedSurface *demoGfx = _grid->demoToSurface(_activeEntry->extra);
 	if (demoGfx) {
-		Common::Point p(_x + ((thumbWidth - demoGfx->w)/2) , _y + (thumbHeight - demoGfx->h - 10));
-		g_gui.theme()->drawSurface(p, *demoGfx, true);
+		Common::Point p(_x, _y);
+		g_gui.theme()->drawManagedSurface(p, *demoGfx);
+	}
+
+	bool validEntry = _activeEntry->validEntry;
+
+	// Darken thumbnail if path is unreachable
+	if (!validEntry) {
+		const Graphics::ManagedSurface *darkenGfx = _grid->disabledThumbnail();
+		if (darkenGfx) {
+			Common::Point p(_x, _y);
+			g_gui.theme()->drawManagedSurface(p, *darkenGfx);
+		}
 	}
 
 	// Draw Title
@@ -152,9 +165,13 @@ void GridItemWidget::drawWidget() {
 				titleLines[1].deleteLastChar();
 			titleLines[1] += Common::U32String("...");
 		}
+		// Display text in alternate color if the path is unreachable
+		// Should be ok using kStateDisabled, but the list widget uses FontColorAlternate so let's stick to that
+		GUI::ThemeEngine::FontColor color = validEntry ? GUI::ThemeEngine::kFontColorNormal : GUI::ThemeEngine::kFontColorAlternate;
 		Common::Rect r(_x, _y + thumbHeight, _x + thumbWidth, _y + thumbHeight + kLineHeight);
 		for (uint k = 0; k < MIN(2U, titleLines.size()); ++k) {
-			g_gui.theme()->drawText(r, titleLines[k], GUI::ThemeEngine::kStateEnabled, Graphics::kTextAlignCenter);
+			g_gui.theme()->drawText(r, titleLines[k], GUI::ThemeEngine::kStateEnabled, Graphics::kTextAlignCenter, GUI::ThemeEngine::kTextInversionNone,
+									0, true, ThemeEngine::kFontStyleBold, color);
 			r.translate(0, kLineHeight);
 		}
 	}
@@ -190,6 +207,44 @@ void GridWidget::toggleGroup(int groupID) {
 	sortGroups();
 	// TODO: Replace reflowLayout with only the necessary sequence of steps
 	reflowLayout();
+}
+
+void GridWidget::loadClosedGroups(const Common::U32String &groupName) {
+	// Recalls what groups were closed from the config
+	if (ConfMan.hasKey("group_" + groupName, ConfMan.kApplicationDomain)) {
+		const Common::String &val = ConfMan.get("group_" + groupName, ConfMan.kApplicationDomain);
+		Common::StringTokenizer hiddenGroups(val);
+
+		for (Common::String tok = hiddenGroups.nextToken(); tok.size(); tok = hiddenGroups.nextToken()) {
+			// See if the hidden group is in our group headers still, if so, hide it
+			for (Common::U32StringArray::size_type i = 0; i < _groupHeaders.size(); ++i) {
+				if (_groupHeaders[i] == tok || (tok == "unnamed" && _groupHeaders[i].size() == 0)) {
+					_groupExpanded[i] = false;
+					break;
+				}
+			}
+		}
+		sortGroups();
+		// TODO: Replace reflowLayout with only the necessary sequence of steps
+		// reflowLayout();
+	}
+}
+
+void GridWidget::saveClosedGroups(const Common::U32String &groupName) {
+	// Save the hidden groups to the config
+	Common::String hiddenGroups;
+	for (Common::U32StringArray::size_type i = 0; i < _groupHeaders.size(); ++i) {
+		if (!_groupExpanded[i]) {
+			if (_groupHeaders[i].size()) {
+				hiddenGroups += _groupHeaders[i];
+			} else {
+				hiddenGroups += "unnamed";
+			}
+			hiddenGroups += ' ';
+		}
+	}
+	ConfMan.set("group_" + groupName, hiddenGroups, ConfMan.kApplicationDomain);
+	ConfMan.flushToDisk();
 }
 
 void GridItemWidget::handleMouseDown(int x, int y, int button, int clickCount) {
@@ -229,10 +284,6 @@ GridItemTray::GridItemTray(GuiObject *boss, int x, int y, int w, int h, int entr
 	_editButton = new PicButtonWidget(this, trayPaddingX + buttonWidth + buttonSpacingX, trayPaddingY + buttonHeight + buttonSpacingY,
 									  buttonWidth, buttonHeight,
 									  _("Edit"), kEditButtonCmd);
-
-	_playButton->useThemeTransparency(true);
-	_loadButton->useThemeTransparency(true);
-	_editButton->useThemeTransparency(true);
 }
 
 void GridItemTray::reflowLayout() {
@@ -325,14 +376,8 @@ Graphics::ManagedSurface *loadSurfaceFromFile(const Common::String &name, int re
 		g_gui.lockIconsSet();
 		if (g_gui.getIconsSet().hasFile(name)) {
 			Common::SeekableReadStream *stream = g_gui.getIconsSet().createReadStreamForMember(name);
-			Graphics::SVGBitmap *image = nullptr;
-			image = new Graphics::SVGBitmap(stream);
-
+			surf = new Graphics::SVGBitmap(stream, renderWidth, renderHeight);
 			delete stream;
-
-			surf = new Graphics::ManagedSurface(renderWidth, renderHeight, *image->getPixelFormat());
-			image->render(*surf, renderWidth, renderHeight);
-			delete image;
 		} else {
 			debug(5, "GridWidget: Cannot read file '%s'", name.c_str());
 		}
@@ -354,6 +399,8 @@ GridWidget::GridWidget(GuiObject *boss, const Common::String &name)
 	_platformIconWidth = 0;
 	_extraIconHeight = 0;
 	_extraIconWidth = 0;
+	_disabledIconOverlay = nullptr;
+
 	_minGridXSpacing = 0;
 	_minGridYSpacing = 0;
 	_isTitlesVisible = 0;
@@ -392,6 +439,7 @@ GridWidget::~GridWidget() {
 	unloadSurfaces(_languageIcons);
 	unloadSurfaces(_extraIcons);
 	unloadSurfaces(_loadedSurfaces);
+	delete _disabledIconOverlay;
 	_gridItems.clear();
 	_dataEntryList.clear();
 	_headerEntryList.clear();
@@ -429,6 +477,10 @@ const Graphics::ManagedSurface *GridWidget::demoToSurface(const Common::String e
 	if (! extraString.contains("Demo") )
 		return nullptr;
 	return _extraIcons[0];
+}
+
+const Graphics::ManagedSurface *GridWidget::disabledThumbnail() {
+	return _disabledIconOverlay;
 }
 
 void GridWidget::setEntryList(Common::Array<GridItemInfo> *list) {
@@ -672,8 +724,19 @@ void GridWidget::loadFlagIcons() {
 		Graphics::ManagedSurface *gfx = loadSurfaceFromFile(path, _flagIconWidth, _flagIconHeight);
 		if (gfx) {
 			_languageIcons[l->id] = gfx;
+			continue;
+		} // if no .svg flag is available, search for a .png
+		path = Common::String::format("icons/flags/%s.png", l->code);
+		gfx = loadSurfaceFromFile(path);
+		if (gfx) {
+			const Graphics::ManagedSurface *scGfx = scaleGfx(gfx, _flagIconWidth, _flagIconHeight, true);
+			_languageIcons[l->id] = scGfx;
+			if (gfx != scGfx) {
+				gfx->free();
+				delete gfx;
+			}
 		} else {
-			_languageIcons[l->id] = nullptr;
+			_languageIcons[l->id] = nullptr; // nothing found, set to nullptr
 		}
 	}
 }
@@ -697,7 +760,12 @@ void GridWidget::loadPlatformIcons() {
 }
 
 void GridWidget::loadExtraIcons() {  // for now only the demo icon is available
-	Graphics::ManagedSurface *gfx = loadSurfaceFromFile("icons/extra/demo.png");
+	Graphics::ManagedSurface *gfx = loadSurfaceFromFile("icons/extra/demo.svg", _extraIconWidth, _extraIconHeight);
+	if (gfx) {
+		_extraIcons[0] = gfx;
+		return;
+	} // if no .svg file is available, search for a .png
+	gfx = loadSurfaceFromFile("icons/extra/demo.png");
 	if (gfx) {
 		const Graphics::ManagedSurface *scGfx = scaleGfx(gfx, _extraIconWidth, _extraIconHeight, true);
 		_extraIcons[0] = scGfx;
@@ -928,18 +996,28 @@ void GridWidget::reflowLayout() {
 	_flagIconWidth = _thumbnailWidth / 4;
 	_flagIconHeight = _flagIconWidth / 2;
 	_platformIconHeight = _platformIconWidth = _thumbnailWidth / 6;
-	_extraIconWidth = _thumbnailWidth / 2;
-	_extraIconHeight = _extraIconWidth / 4;
+	_extraIconWidth = _thumbnailWidth;
+	_extraIconHeight = _thumbnailHeight;
 
 	if ((oldThumbnailHeight != _thumbnailHeight) || (oldThumbnailWidth != _thumbnailWidth)) {
 		unloadSurfaces(_extraIcons);
 		unloadSurfaces(_platformIcons);
 		unloadSurfaces(_languageIcons);
 		unloadSurfaces(_loadedSurfaces);
+		if (_disabledIconOverlay)
+			_disabledIconOverlay->free();
 		reloadThumbnails();
 		loadFlagIcons();
 		loadPlatformIcons();
 		loadExtraIcons();
+
+		Graphics::ManagedSurface *gfx = new Graphics::ManagedSurface(_thumbnailWidth, _thumbnailHeight, g_system->getOverlayFormat());
+		uint32 disabledThumbnailColor = gfx->format.ARGBToColor(153, 0, 0, 0);  // 60% opacity black
+		gfx->fillRect(Common::Rect(0, 0, _thumbnailWidth, _thumbnailHeight), disabledThumbnailColor);
+		if (gfx)
+			_disabledIconOverlay = gfx;
+		else
+			_disabledIconOverlay = nullptr;
 	}
 
 	_trayHeight = kLineHeight * 3;

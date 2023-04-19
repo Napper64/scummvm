@@ -2,14 +2,22 @@ MODULE := engines/freescape
 
 MODULE_OBJS := \
 	area.o \
+	assets.o \
+	demo.o \
 	freescape.o \
 	games/castle.o \
-	games/dark.o \
-	games/driller.o \
+	games/dark/dark.o \
+	games/dark/dos.o \
+	games/driller/amiga.o \
+	games/driller/atari.o \
+	games/driller/c64.o \
+	games/driller/cpc.o \
+	games/driller/dos.o \
+	games/driller/driller.o \
+	games/driller/zx.o \
 	games/eclipse.o \
 	games/palettes.o \
 	gfx.o \
-	keyboard.o \
 	loaders/8bitBinaryLoader.o \
 	language/8bitDetokeniser.o \
 	language/instruction.o \
@@ -17,12 +25,20 @@ MODULE_OBJS := \
 	movement.o \
 	neo.o \
 	objects/geometricobject.o \
-	sound.o
+	objects/sensor.o \
+	scr.o \
+	sound.o \
+	ui.o
 
 ifdef USE_TINYGL
 MODULE_OBJS += \
 	gfx_tinygl.o \
 	gfx_tinygl_texture.o
+endif
+
+ifdef USE_OPENGL_SHADERS
+MODULE_OBJS += \
+	gfx_opengl_shaders.o
 endif
 
 ifdef USE_OPENGL

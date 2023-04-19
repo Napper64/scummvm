@@ -27,21 +27,21 @@
  *************************************/
 
 /*
-	-- SoundJam Copyright © Canter Technology 1995
-	SoundJam
-	II   mNew, numberOfChannels
-	ISI  mDefineFileSound, fullPathName, numberOfBeats
-	III  mDefineCastSound, castMemberNumber, numberOfBeats
-	II   mUndefineSound, soundID
-	III  mReadSome, soundID, byteCount
-	II   mStartSound, soundID
-	II   mSwitchNew, soundID
-	II   mSwitchParallel, soundID
-	I    mHasSwitchHappened
-	X    mToggleMute
-	X    mStop
-	X    mDispose
-*/
+ * -- SoundJam Copyright © Canter Technology 1995
+ * SoundJam
+ * II   mNew, numberOfChannels
+ * ISI  mDefineFileSound, fullPathName, numberOfBeats
+ * III  mDefineCastSound, castMemberNumber, numberOfBeats
+ * II   mUndefineSound, soundID
+ * III  mReadSome, soundID, byteCount
+ * II   mStartSound, soundID
+ * II   mSwitchNew, soundID
+ * II   mSwitchParallel, soundID
+ * I    mHasSwitchHappened
+ * X    mToggleMute
+ * X    mStop
+ * X    mDispose
+ */
 
 #include "director/director.h"
 #include "director/window.h"
@@ -104,7 +104,7 @@ void SoundJam::m_new(int nargs) {
 		return;
 	}
 
-	g_lingo->push(g_lingo->_currentMe);
+	g_lingo->push(g_lingo->_state->me);
 }
 
 void SoundJam::m_defineFileSound(int nargs) {
@@ -114,7 +114,7 @@ void SoundJam::m_defineFileSound(int nargs) {
 }
 
 void SoundJam::m_defineCastSound(int nargs) {
-	SoundJamObject *me = static_cast<SoundJamObject *>(g_lingo->_currentMe.u.obj);
+	SoundJamObject *me = static_cast<SoundJamObject *>(g_lingo->_state->me.u.obj);
 
 	/* Datum numberOfBeats = */ g_lingo->pop();
 	CastMemberID castMemberNumber = g_lingo->pop().asMemberID();
@@ -129,7 +129,7 @@ void SoundJam::m_defineCastSound(int nargs) {
 }
 
 void SoundJam::m_undefineSound(int nargs) {
-	SoundJamObject *me = static_cast<SoundJamObject *>(g_lingo->_currentMe.u.obj);
+	SoundJamObject *me = static_cast<SoundJamObject *>(g_lingo->_state->me.u.obj);
 	int soundID = g_lingo->pop().asInt();
 
 	if (soundID < 0) {
@@ -160,7 +160,7 @@ void SoundJam::m_startSound(int nargs) {
 }
 
 void SoundJam::m_switchNew(int nargs) {
-	SoundJamObject *me = static_cast<SoundJamObject *>(g_lingo->_currentMe.u.obj);
+	SoundJamObject *me = static_cast<SoundJamObject *>(g_lingo->_state->me.u.obj);
 	int soundID = g_lingo->pop().asInt();
 
 	if (!me->_soundMap.contains(soundID)) {
@@ -199,4 +199,3 @@ void SoundJam::m_stop(int nargs) {
 }
 
 } // End of namespace Director
-

@@ -20,15 +20,8 @@
  */
 
 #include "common/events.h"
-#include "common/system.h"
-#include "common/util.h"
-#include "common/config-manager.h"
-#include "common/algorithm.h"
-#include "common/file.h"
-#include "common/rect.h"
-#include "common/textconsole.h"
 #include "common/translation.h"
-#include "common/unzip.h"
+#include "common/zip-set.h"
 #include "gui/EventRecorder.h"
 
 #include "backends/keymapper/action.h"
@@ -113,71 +106,12 @@ GuiManager::~GuiManager() {
 	delete _theme;
 }
 
-struct ArchiveMemberListBackComparator {
-	bool operator()(const Common::ArchiveMemberPtr &a, const Common::ArchiveMemberPtr &b) {
-		return a->getName() > b->getName();
-	}
-};
 void GuiManager::initIconsSet() {
 	Common::StackLock lock(_iconsMutex);
-	Common::Archive *dat;
 
 	_iconsSet.clear();
 
-	if (!ConfMan.get("iconspath").empty()) {
-		Common::FSDirectory *iconDir = new Common::FSDirectory(ConfMan.get("iconspath"));
-		Common::ArchiveMemberList iconFiles;
-
-		iconDir->listMatchingMembers(iconFiles, "gui-icons*.dat");
-		Common::sort(iconFiles.begin(), iconFiles.end(), ArchiveMemberListBackComparator());
-
-		for (Common::ArchiveMemberList::iterator ic = iconFiles.begin(); ic != iconFiles.end(); ++ic) {
-			debug(2, "GUI: Loaded icon file: %s", (*ic)->getName().c_str());
-
-			dat = Common::makeZipArchive((*ic)->createReadStream());
-
-			if (dat) {
-				_iconsSet.add((*ic)->getName(), dat);
-			}
-		}
-
-		delete iconDir;
-	}
-
-	dat = nullptr;
-
-	const char fname[] = "gui-icons.dat";
-
-	if (ConfMan.hasKey("themepath")) {
-		Common::FSNode *fs = new Common::FSNode(normalizePath(ConfMan.get("themepath") + "/" + fname, '/'));
-		if (fs->exists()) {
-			dat = Common::makeZipArchive(*fs);
-		}
-		delete fs;
-	}
-
-	if (!dat) {
-		Common::File *file = new Common::File;
-		if (ConfMan.hasKey("iconspath"))
-			file->open(normalizePath(ConfMan.get("iconspath") + "/" + fname, '/'));
-
-		if (!file->isOpen())
-			file->open(fname);
-
-		if (file->isOpen())
-			dat = Common::makeZipArchive(file);
-
-		if (!dat) {
-			warning("GUI: Could not find '%s'", fname);
-			delete file;
-			return;
-		}
-	}
-
-	_iconsSet.add(fname, dat);
-	_iconsSetChanged = true;
-
-	debug(2, "GUI: Loaded icon file: %s", fname);
+	_iconsSetChanged = Common::generateZipSet(_iconsSet, "gui-icons.dat", "gui-icons*.dat");
 }
 
 void GuiManager::computeScaleFactor() {
@@ -508,8 +442,8 @@ void GuiManager::runLoop() {
 			// We will need to check whether the screen changed while polling
 			// for an event here. While we do send EVENT_SCREEN_CHANGED
 			// whenever this happens we still cannot be sure that we get such
-			// an event immediately. For example, we might have an mouse move
-			// event queued before an screen changed event. In some rare cases
+			// an event immediately. For example, we might have a mouse move
+			// event queued before a screen changed event. In some rare cases
 			// this would make the GUI redraw (with the code a few lines
 			// below) when it is not yet updated for new overlay dimensions.
 			// As a result ScummVM would crash because it tries to copy data
@@ -867,7 +801,7 @@ void GuiManager::setLanguageRTL() {
 	}
 #ifdef USE_TRANSLATION
 	Common::String language = TransMan.getCurrentLanguage();
-	if (language.equals("he")) {		// GUI TODO: modify when we'll support other RTL languages, such as Arabic and Farsi
+	if (language.equals("he") || language.equals("ar")) {		// GUI TODO: modify when we'll support other RTL languages, such as Arabic and Farsi
 		_useRTL = true;
 		return;
 	}

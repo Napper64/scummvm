@@ -32,7 +32,7 @@
 #include "backends/networking/curl/curljsonrequest.h"
 #include "common/config-manager.h"
 #include "common/debug.h"
-#include "common/json.h"
+#include "common/formats/json.h"
 
 namespace Cloud {
 namespace Dropbox {
@@ -44,6 +44,10 @@ DropboxStorage::DropboxStorage(Common::String accessToken, Common::String refres
 
 DropboxStorage::DropboxStorage(Common::String code, Networking::ErrorCallback cb): BaseStorage() {
 	getAccessToken(code, cb);
+}
+
+DropboxStorage::DropboxStorage(Networking::JsonResponse codeFlowJson, Networking::ErrorCallback cb) : BaseStorage() {
+	codeFlowComplete(cb, codeFlowJson);
 }
 
 DropboxStorage::~DropboxStorage() {}

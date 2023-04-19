@@ -53,7 +53,7 @@ byte clamp_color(int c) {
 		return c;
 }
 
-int luaA_passresults();
+int32 luaA_passresults();
 
 void Lua_V1::new_dofile() {
 	const char *fname_str = luaL_check_string(1);
@@ -724,7 +724,7 @@ void Lua_V1::LockFont() {
 		const char *fontName = lua_getstring(param1);
 		Font *result = g_resourceloader->loadFont(fontName);
 		if (result) {
-			lua_pushusertag(result->getId(), MKTAG('F','O','N','T'));
+			lua_pushusertag(result->getPoolId(), result->getPoolTag());
 			return;
 		}
 	}

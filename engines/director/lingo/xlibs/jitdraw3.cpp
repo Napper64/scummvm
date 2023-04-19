@@ -26,34 +26,34 @@
  *
  *************************************/
 /*
-  -- JITDraw3 External Factory. 16Feb93 PTM
-  JITDraw3
-  I      mNew                --Creates a new instance of the XObject
-  X      mDispose            --Disposes of XObject instance
-  S      mName               --Returns the XObject name (JITDraw3)
-  I      mCheckRegistration
-  I      mCheckIfCDROM
-  S      mUserName
-  S      mUserCompany
-  IS      mSetSignature
-  S      mGetSignature
-  S      mPreRegister
-  II     mBookMark1
-  II     mBookMark2
-  II     mBookMark3
-  II     mBookMark4
-  II     mBookMark5
-  II     mBookMark6
-  I              mAddDrawButton
-  I              mRemoveDrawButton
-  I              mGotoDraw
-  I              mLoadDraw
-  I              mIsDrawLoaded
-  ISS    mMsgOkCancel
-  ISS    mMsgOk
-  ISS    mMsgYesNo
-  I    mOrder
-*/
+ * -- JITDraw3 External Factory. 16Feb93 PTM
+ * JITDraw3
+ * I      mNew                --Creates a new instance of the XObject
+ * X      mDispose            --Disposes of XObject instance
+ * S      mName               --Returns the XObject name (JITDraw3)
+ * I      mCheckRegistration
+ * I      mCheckIfCDROM
+ * S      mUserName
+ * S      mUserCompany
+ * IS      mSetSignature
+ * S      mGetSignature
+ * S      mPreRegister
+ * II     mBookMark1
+ * II     mBookMark2
+ * II     mBookMark3
+ * II     mBookMark4
+ * II     mBookMark5
+ * II     mBookMark6
+ * I              mAddDrawButton
+ * I              mRemoveDrawButton
+ * I              mGotoDraw
+ * I              mLoadDraw
+ * I              mIsDrawLoaded
+ * ISS    mMsgOkCancel
+ * ISS    mMsgOk
+ * ISS    mMsgYesNo
+ * I    mOrder
+ */
 
 #include "common/system.h"
 #include "common/translation.h"
@@ -81,11 +81,11 @@ static MethodProto xlibMethods[] = {
 	{ "Dispose",			JITDraw3XObj::m_dispose,		  0, 0,	400 },	// D4
 	{ "CheckIfCDROM",		JITDraw3XObj::m_checkifcdrom,	  0, 0,	400 },	// D4
 	{ "MsgOkCancel",		JITDraw3XObj::m_msgokcancel,	  2, 2,	400 },	// D4
-	{ "MsgOk",				JITDraw3XObj::m_msgok,			  2, 2,  400 },	// D4
-	{ "MsgYesNo",			JITDraw3XObj::m_msgyesno,		  2, 2,  400 },	// D4
-	{ "GotoDraw",			JITDraw3XObj::m_gotodraw,		  0, 0,  400 },	// D4
-	{ "AddDrawButton",		JITDraw3XObj::m_adddrawbutton,	  0, 0,  400 },	// D4
-	{ "RemoveDrawButton",	JITDraw3XObj::m_removedrawbutton, 0, 0,  400 },	// D4
+	{ "MsgOk",				JITDraw3XObj::m_msgok,			  2, 2,	400 },	// D4
+	{ "MsgYesNo",			JITDraw3XObj::m_msgyesno,		  2, 2,	400 },	// D4
+	{ "GotoDraw",			JITDraw3XObj::m_gotodraw,		  0, 0,	400 },	// D4
+	{ "AddDrawButton",		JITDraw3XObj::m_adddrawbutton,	  0, 0,	400 },	// D4
+	{ "RemoveDrawButton",	JITDraw3XObj::m_removedrawbutton, 0, 0,	400 },	// D4
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
@@ -110,7 +110,7 @@ JITDraw3XObject::JITDraw3XObject(ObjectType ObjectType) :Object<JITDraw3XObject>
 }
 
 void JITDraw3XObj::m_new(int nargs) {
-	g_lingo->push(g_lingo->_currentMe);
+	g_lingo->push(g_lingo->_state->me);
 }
 
 void JITDraw3XObj::m_dispose(int nargs) {

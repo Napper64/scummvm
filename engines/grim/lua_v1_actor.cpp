@@ -19,8 +19,6 @@
  *
  */
 
-#include "common/foreach.h"
-
 #include "engines/grim/grim.h"
 #include "engines/grim/lua_v1.h"
 #include "engines/grim/actor.h"
@@ -1425,7 +1423,7 @@ void Lua_V1::GetVisibleThings() {
 
 	// TODO verify code below
 	if (actor->isInSet(g_grim->getCurrSet()->getName())) {
-		foreach (Actor *a, g_grim->getActiveActors()) {
+		for (Actor *a : g_grim->getActiveActors()) {
 			// Consider the active actor visible
 			if (actor == a || actor->getYawTo(a) < 90) {
 				lua_pushobject(result);

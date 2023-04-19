@@ -24,7 +24,7 @@
 
 
 #include "common/array.h"
-#include "common/ini-file.h"
+#include "common/formats/ini-file.h"
 #include "common/str-array.h"
 #include "common/tokenizer.h"
 
@@ -66,46 +66,30 @@ private:
 	void parseConfigFile();
 };
 
-class TestbedListWidget : public GUI::ListWidget {
-public:
-	TestbedListWidget(GUI::Dialog *boss, const Common::String &name, Common::Array<Testsuite *> tsArray) : GUI::ListWidget(boss, name), _testSuiteArray(tsArray) {}
-
-	void markAsSelected(int i) {
-		if (!_list[i].encode().contains("selected")) {
-			_list[i] = GUI::ListWidget::getThemeColor(GUI::ThemeEngine::kFontColorNormal) + _testSuiteArray[i]->getDescription() + " (selected)";
-		}
-		draw();
-	}
-
-	void markAsDeselected(int i) {
-		if (_list[i].encode().contains("selected")) {
-			_list[i] = GUI::ListWidget::getThemeColor(GUI::ThemeEngine::kFontColorAlternate) +
-					_testSuiteArray[i]->getDescription();
-		}
-		draw();
-	}
-
-private:
-	Common::Array<Testsuite *>	_testSuiteArray;
-};
-
 class TestbedOptionsDialog : public GUI::Dialog {
 public:
 	TestbedOptionsDialog(Common::Array<Testsuite *> &tsList, TestbedConfigManager *tsConfMan);
 	~TestbedOptionsDialog() override;
 	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
+	void reflowLayout() override;
 
 private:
-	GUI::ButtonWidget	*_selectButton;
+	GUI::ButtonWidget *_selectButton;
+	GUI::ButtonWidget *_runTestButton;
+	GUI::ButtonWidget *_quitButton;
+	GUI::StaticTextWidget *_messageText;
+	GUI::ScrollContainerWidget *_testContainerDisplay;
+	Common::Array<GUI::CheckboxWidget *> _testSuiteCheckboxArray;
+
 	Common::Array<Testsuite *> _testSuiteArray;
 	Common::U32StringArray _testSuiteDescArray;
-	TestbedListWidget *_testListDisplay;
+
 	TestbedConfigManager *_testbedConfMan;
 };
 
 class TestbedInteractionDialog : public GUI::Dialog {
 public:
-	TestbedInteractionDialog(uint x, uint y, uint w, uint h) : GUI::Dialog(x, y, w, h), _xOffset(0), _yOffset(0) {}
+	TestbedInteractionDialog(uint x, uint y, uint w, uint h) : GUI::Dialog(x, y, w, h, true), _xOffset(0), _yOffset(0) {}
 	~TestbedInteractionDialog() override {}
 	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
 	void addButton(uint w, uint h, const Common::String name, uint32 cmd, uint xOffset = 0, uint yPadding = 8);

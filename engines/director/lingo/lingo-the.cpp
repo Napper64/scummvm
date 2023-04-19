@@ -21,6 +21,7 @@
 
 #include "common/config-manager.h"
 #include "common/fs.h"
+#include "common/util.h"
 #include "graphics/macgui/macbutton.h"
 #include "graphics/macgui/macmenu.h"
 
@@ -544,8 +545,8 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 		// 22 - PowerBook 100			D3
 		// 23 - PowerBook 140			D3
 		// 24 - Macintosh Quadra 950	D4
-		// 25 - Macintosh LCIII			D4
-		// 27 - PowerBook Duo 210		D4
+		// 25 - PowerBook Duo 210		D4
+		// 27 - Macintosh LCIII			D4
 		// 28 - Macintosh Centris 650	D4
 		// 30 - PowerBook Duo 230		D4
 		// 31 - PowerBook 180			D4
@@ -718,6 +719,9 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 		break;
 	case kTheOptionDown:
 		d = (movie->_keyFlags & Common::KBD_ALT) ? 1 : 0;
+		break;
+	case kTheParamCount:
+		d = g_lingo->_state->callstack[g_lingo->_state->callstack.size() - 1]->paramCount;
 		break;
 	case kThePauseState:
 		d = (int) g_director->_playbackPaused;
@@ -1069,8 +1073,12 @@ void Lingo::setTheEntity(int entity, Datum &id, int field, Datum &d) {
 		break;
 	case kTheRomanLingo:
 		g_lingo->_romanLingo = bool(d.asInt());
-		warning("BUILDBOT: the romanLingo is set to %d", g_lingo->_romanLingo);
-		setTheEntitySTUB(kTheRomanLingo);
+
+		// Catching when we set to Japanese
+		if (!g_lingo->_romanLingo) {
+			warning("BUILDBOT: the romanLingo is set to %d", g_lingo->_romanLingo);
+			setTheEntitySTUB(kTheRomanLingo);
+		}
 		break;
 	case kTheScummvmVersion:
 		// Allow director version change: used for testing version differences via the lingo tests.
@@ -1078,6 +1086,9 @@ void Lingo::setTheEntity(int entity, Datum &id, int field, Datum &d) {
 		break;
 	case kTheSearchCurrentFolder:
 		warning("BUILDBOT: Trying to set SearchCurrentFolder lingo property");
+		break;
+	case kTheSearchPath:
+		g_lingo->_searchPath = d;
 		break;
 	case kTheSelEnd:
 		movie->_selEnd = d.asInt();
@@ -1130,9 +1141,9 @@ void Lingo::setTheEntity(int entity, Datum &id, int field, Datum &d) {
 	case kTheStageColor:
 		g_director->getCurrentWindow()->setStageColor(g_director->transformColor(d.asInt()));
 
-		// Queue an immediate update of the stage
-		if (!score->getNextFrame())
-			score->setCurrentFrame(score->getCurrentFrame());
+		// Redraw the stage
+		score->renderSprites(score->getCurrentFrame(), kRenderForceUpdate);
+		g_director->getCurrentWindow()->render();
 		break;
 	case kTheSwitchColorDepth:
 		setTheEntitySTUB(kTheSwitchColorDepth);
@@ -1265,7 +1276,7 @@ Datum Lingo::getTheSprite(Datum &id1, int field) {
 		d = (int)g_director->transformColor(sprite->_backColor);
 		break;
 	case kTheBlend:
-		d = sprite->_blend;
+		d = (255 - sprite->_blendAmount) * 255 / 100;
 		break;
 	case kTheBottom:
 		d = channel->getBbox().bottom;
@@ -1418,9 +1429,13 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 		}
 		break;
 	case kTheBlend:
-		if (d.asInt() != sprite->_blend) {
-			sprite->_blend = (d.asInt() == 100 ? 0 : d.asInt());
-			channel->_dirty = true;
+		{
+			// Convert from (0, 100) range to (0xff, 0x00)
+			int blend = (100 - CLIP(d.asInt(), 0, 100)) * 255 / 100;
+			if (blend != sprite->_blendAmount) {
+				sprite->_blendAmount = blend;
+				channel->_dirty = true;
+			}
 		}
 		break;
 	case kTheCastNum:

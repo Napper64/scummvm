@@ -33,8 +33,8 @@ namespace Nancy {
 
 class NancyEngine;
 
-#define ID_DATA     MKTAG('D', 'A', 'T', 'A')
-#define ID_PCAL     MKTAG('P', 'C', 'A', 'L')
+#define ID_DATA		MKTAG('D', 'A', 'T', 'A')
+#define ID_PCAL		MKTAG('P', 'C', 'A', 'L')
 
 class IFF {
 public:
@@ -45,7 +45,6 @@ public:
 	const byte *getChunk(uint32 id, uint &size, uint index = 0) const;
 	Common::SeekableReadStream *getChunkStream(const Common::String &id, uint index = 0) const;
 
-	// Debugger functions
 	void list(Common::Array<Common::String> &nameList) const;
 
 private:

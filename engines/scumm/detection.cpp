@@ -62,6 +62,7 @@ static const DebugChannelDef debugFlagList[] = {
 		{Scumm::DEBUG_INSANE, "INSANE", "Track INSANE"},
 		{Scumm::DEBUG_SMUSH, "SMUSH", "Track SMUSH"},
 		{Scumm::DEBUG_MOONBASE_AI, "MOONBASEAI", "Track Moonbase AI"},
+		{Scumm::DEBUG_NETWORK, "NETWORK", "Track Networking"},
 		DEBUG_CHANNEL_END
 };
 
@@ -83,6 +84,10 @@ public:
 	PlainGameList getSupportedGames() const override;
 	PlainGameDescriptor findGame(const char *gameid) const override;
 	DetectedGames detectGames(const Common::FSList &fslist, uint32 /*skipADFlags*/, bool /*skipIncomplete*/) override;
+
+	uint getMD5Bytes() const override {
+		 return 1024 * 1024;
+	}
 
 	Common::String parseAndCustomizeGuiOptions(const Common::String &optionsString, const Common::String &domain) const override;
 };
@@ -206,7 +211,7 @@ Common::String ScummMetaEngineDetection::parseAndCustomizeGuiOptions(const Commo
 		break;
 	default:
 		// Leave this as nullptr for platforms that don't have a specific render option (SegaCD, NES, ...).
-		// These targets will then have the full set of render mode options in the launcher options dialog. 
+		// These targets will then have the full set of render mode options in the launcher options dialog.
 		break;
 	}
 

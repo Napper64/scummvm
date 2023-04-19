@@ -26,45 +26,46 @@
 #include "engines/nancy/graphics.h"
 #include "engines/nancy/resource.h"
 #include "engines/nancy/util.h"
-#include "engines/nancy/constants.h"
 
 namespace Nancy {
 
-void CursorManager::init() {
-	Common::SeekableReadStream *chunk = g_nancy->getBootChunkStream("INV");
-	chunk->seek(0xD6 + g_nancy->getConstants().numCurtainAnimationFrames * 0x20 + 0x1C);
-	Common::String inventoryCursorsImageName = chunk->readString();
+void CursorManager::init(Common::SeekableReadStream *chunkStream) {
+	assert(chunkStream);
 
-	chunk = g_nancy->getBootChunkStream("CURS");
-	chunk->seek(0);
-	uint numCursors = g_nancy->getConstants().numNonItemCursors + g_nancy->getConstants().numItems * 4;
-	_cursors.reserve(numCursors);
+	chunkStream->seek(0);
+	uint numCursorTypes = g_nancy->getGameType() <= kGameTypeNancy1 ? 4 : 5;
+	uint numCursors = g_nancy->getStaticData().numNonItemCursors + g_nancy->getStaticData().numItems * numCursorTypes;
+	_cursors.resize(numCursors);
+
 	for (uint i = 0; i < numCursors; ++i) {
-		_cursors.push_back(Cursor());
-		chunk->seek(i * 16, SEEK_SET);
-		Cursor &cur = _cursors.back();
-		readRect(*chunk, cur.bounds);
-		chunk->seek(numCursors * 16 + i * 8, SEEK_SET);
-		cur.hotspot.x = chunk->readUint32LE();
-		cur.hotspot.y = chunk->readUint32LE();
+		readRect(*chunkStream, _cursors[i].bounds);
 	}
 
-	readRect(*chunk, _primaryVideoInactiveZone);
-	_primaryVideoInitialPos.x = chunk->readUint16LE();
-	_primaryVideoInitialPos.y = chunk->readUint16LE();
+	for (uint i = 0; i < numCursors; ++i) {
+		_cursors[i].hotspot.x = chunkStream->readUint32LE();
+		_cursors[i].hotspot.y = chunkStream->readUint32LE();
+	}
 
-	g_nancy->_resource->loadImage(inventoryCursorsImageName, _invCursorsSurface);
+	readRect(*chunkStream, _primaryVideoInactiveZone);
+	_primaryVideoInitialPos.x = chunkStream->readUint16LE();
+	_primaryVideoInitialPos.y = chunkStream->readUint16LE();
+
+	g_nancy->_resource->loadImage(g_nancy->_inventoryData->inventoryCursorsImageName, _invCursorsSurface);
 
 	setCursor(kNormalArrow, -1);
 	showCursor(false);
 
 	_isInitialized = true;
+	
+	delete chunkStream;
 }
 
 void CursorManager::setCursor(CursorType type, int16 itemID) {
 	if (!_isInitialized) {
 		return;
 	}
+
+	Nancy::GameType gameType = g_nancy->getGameType();
 
 	if (type == _curCursorType && itemID == _curItemID) {
 		return;
@@ -73,17 +74,27 @@ void CursorManager::setCursor(CursorType type, int16 itemID) {
 		_curItemID = itemID;
 	}
 
-	bool hasItem = false;
+	_hasItem = false;
 
 	switch (type) {
 	case kNormalArrow:
-		_curCursorID = 4;
+		if (gameType <= kGameTypeNancy1) {
+			_curCursorID = 4;
+		} else {
+			_curCursorID = 5;
+		}
+		
 		break;
 	case kHotspotArrow:
-		_curCursorID = 5;
+		if (gameType <= kGameTypeNancy1) {
+			_curCursorID = 5;
+		} else {
+			_curCursorID = 6;
+		}
+
 		break;
 	case kExit:
-		if (g_nancy->getGameType() != kGameTypeVampire) {
+		if (gameType != kGameTypeVampire) {
 			_curCursorID = 3;
 			break;
 		}
@@ -95,19 +106,29 @@ void CursorManager::setCursor(CursorType type, int16 itemID) {
 			itemID = 0;
 		} else {
 			// Item held
-			itemsOffset = g_nancy->getConstants().numNonItemCursors;
-			hasItem = true;
+			itemsOffset = g_nancy->getStaticData().numNonItemCursors;
+			_hasItem = true;
 		}
 
-		_curCursorID = itemID * 4 + itemsOffset + type;
+		_curCursorID = itemID * (gameType <= kGameTypeNancy1? 4 : 5) + itemsOffset + type;
 	}
 	}
+}
 
+void CursorManager::setCursorType(CursorType type) {
+	setCursor(type, _curItemID);
+}
+
+void CursorManager::setCursorItemID(int16 itemID) {
+	setCursor(_curCursorType, itemID);
+}
+
+void CursorManager::applyCursor() {
 	Graphics::ManagedSurface *surf;
 	Common::Rect bounds = _cursors[_curCursorID].bounds;
 	Common::Point hotspot = _cursors[_curCursorID].hotspot;
 
-	if (hasItem) {
+	if (_hasItem) {
 		surf = &_invCursorsSurface;
 
 	} else {
@@ -124,12 +145,9 @@ void CursorManager::setCursor(CursorType type, int16 itemID) {
 	// Convert the trans color from the original format to the screen format
 	uint transColor;
 	if (g_nancy->getGameType() == kGameTypeVampire) {
-		uint8 r, g, b;
-		uint32 input = surf->getPalette()[1];
-		r = input & 0xFF;
-		g = (input & 0xFF00) >> 8;
-		b = (input & 0xFF0000) >> 16;
-		transColor = temp.format.RGBToColor(r, g, b);
+		uint8 palette[1 * 3];
+		surf->grabPalette(palette, 1, 1);
+		transColor = temp.format.RGBToColor(palette[0], palette[1], palette[2]);
 	} else {
 		uint8 r, g, b;
 		surf->format.colorToRGB(g_nancy->_graphicsManager->getTransColor(), r, g, b);
@@ -137,14 +155,6 @@ void CursorManager::setCursor(CursorType type, int16 itemID) {
 	}
 
 	CursorMan.replaceCursor(temp.getPixels(), temp.w, temp.h, hotspot.x, hotspot.y, transColor, false, &temp.format);
-}
-
-void CursorManager::setCursorType(CursorType type) {
-	setCursor(type, _curItemID);
-}
-
-void CursorManager::setCursorItemID(int16 itemID) {
-	setCursor(_curCursorType, itemID);
 }
 
 void CursorManager::showCursor(bool shouldShow) {

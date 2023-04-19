@@ -120,6 +120,7 @@ static const char *const selectorNameTable[] = {
 	"solvePuzzle",  // Quest For Glory 3
 	"curIcon",      // Quest For Glory 3, QFG4
 	"curInvIcon",   // Quest For Glory 3, QFG4
+	"edgeHit",      // King's Quest 5
 	"startText",    // King's Quest 6 CD / Laura Bow 2 CD for audio+text support
 	"startAudio",   // King's Quest 6 CD / Laura Bow 2 CD for audio+text support
 	"modNum",       // King's Quest 6 CD / Laura Bow 2 CD for audio+text support
@@ -147,6 +148,7 @@ static const char *const selectorNameTable[] = {
 	"loop",         // Laura Bow 1 Colonel's Bequest, QFG4
 	"setLoop",      // Laura Bow 1 Colonel's Bequest, QFG4
 	"ignoreActors", // Laura Bow 1 Colonel's Bequest
+	"saveCursor",   // Laura Bow 2 CD
 	"setVol",       // Laura Bow 2 CD
 	"at",           // Longbow, QFG4
 	"owner",        // Longbow, QFG4
@@ -260,6 +262,7 @@ enum ScriptPatcherSelectors {
 	SELECTOR_solvePuzzle,
 	SELECTOR_curIcon,
 	SELECTOR_curInvIcon,
+	SELECTOR_edgeHit,
 	SELECTOR_startText,
 	SELECTOR_startAudio,
 	SELECTOR_modNum,
@@ -287,6 +290,7 @@ enum ScriptPatcherSelectors {
 	SELECTOR_loop,
 	SELECTOR_setLoop,
 	SELECTOR_ignoreActors,
+	SELECTOR_saveCursor,
 	SELECTOR_setVol,
 	SELECTOR_at,
 	SELECTOR_owner,
@@ -553,9 +557,6 @@ static const uint16 torinLarry7NumSavesPatch[] = {
 // We disable speed tests by patching them to return fixed results so that all
 //  graphics are enabled and games behave consistently. This also fixes the bug
 //  where tests fail on fast CPUs because their scores overflow. (bug #13529)
-//  We still have a heuristic in GfxAnimate::throttleSpeed() that attempts to
-//  detect tests and unthrottle the engine so that they score well. That should
-//  reasonably handle any games or versions that haven't been patched yet.
 //
 // Note that these patches are only for SCI16 games; the test was rewritten for
 //  SCI32 and we have separate patches for those.
@@ -616,6 +617,9 @@ static const uint16 sci01SpeedTestLocalPatch[] = {
 
 // The second generation of speed tests measured how much time it takes to do a
 //  fixed amount of work. Patch the duration calculation to always be zero.
+//  We also disable speed throttling in these rooms in kGameIsRestarting, but
+//  that's just to prevent the delay these tests create. Each game's script does
+//  different work, so that part can't be generically patched.
 static const uint16 sci11SpeedTestSignature[] = {
 	0x76,                               // push0
 	0x43, 0x42, 0x00,                   // callk GetTime 00
@@ -789,8 +793,8 @@ static const uint16 sciPatchTimerRollover[] = {
 // ===========================================================================
 // Conquests of Camelot
 // At the bazaar in Jerusalem, it's possible to see a girl taking a shower.
-//  If you get too close, you get warned by the father - if you don't get away,
-//  he will kill you.
+//  If you get too close, you get warned by Merlin - if you don't get away,
+//  the girl's father will kill you.
 // Instead of walking there manually, it's also possible to enter "look window"
 //  and ego will automatically walk to the window. It seems that this is something
 //  that wasn't properly implemented, because instead of getting killed, you will
@@ -4912,6 +4916,49 @@ static const SciScriptPatcherEntry kq1Signatures[] = {
 };
 
 // ===========================================================================
+// King's Quest IV
+
+// In early versions of KQ4, Game:replay has a typo that crashes when restoring
+//  a game that was saved while a modeless dialog was on screen. The script
+//  attempts to dispose of the current dialog if one exist, but it pushes an
+//  invalid property to the stack instead of the dispose selector.
+//
+// We fix this by restoring the broken Dialog:dispose call. It's unclear if this
+//  buggy script ever executed in the original; KQ4:save disposes of modeless
+//  dialogs before displaying the save dialog. But the ScummVM save dialog patch
+//  overrides KQ4:save, so our saves can still contain a dialog.
+//
+// Applies to: PC 1.000.106, PC 1.000.111
+// Responsible method: Game:replay
+static const uint16 kq4SignatureRestoreFix1[] = {
+	SIG_MAGICDWORD,
+	0x66, SIG_UINT16(0x4854),        // pTos ????
+	0x76,                            // push0
+	0x4a, 0x04,                      // send 04
+	SIG_END
+};
+
+static const uint16 kq4PatchRestoreFix1[] = {
+	0x38, PATCH_SELECTOR16(dispose), // pushi dispose
+	PATCH_END
+};
+
+// same as above but for PC 1.000.111
+static const uint16 kq4SignatureRestoreFix2[] = {
+	0x30, SIG_UINT16(0x0005),        // bnt 0005
+	SIG_MAGICDWORD,
+	0x67, 0x00,                      // pTos ????
+	0x76,                            // push0
+	0x4a, 0x04,                      // send 04
+	SIG_END
+};
+
+static const uint16 kq4PatchRestoreFix2[] = {
+	0x31, 0x06,                      // bnt 06
+	0x38, PATCH_SELECTOR16(dispose), // pushi dispose
+	PATCH_END
+};
+
 // In KQ4 1.000.111, falling down the lower stairs in room 90 sends a message to
 //  a non-object, which also crashes the original. It appears that the fragment
 //  of code which instantiated the Sound object was accidentally deleted from
@@ -5075,6 +5122,8 @@ static const SciScriptPatcherEntry kq4Signatures[] = {
 	{  true,    90, "fall down stairs",                            1, kq4SignatureFallDownStairs,               kq4PatchFallDownStairs },
 	{  true,    98, "disable speed test",                          1, sci0EarlySpeedTestSignature,              sci0EarlySpeedTestPatch },
 	{  true,    99, "disable speed test",                          1, sci0EarlySpeedTestSignature,              sci0EarlySpeedTestPatch },
+	{  true,   994, "restore fix",                                 1, kq4SignatureRestoreFix1,                  kq4PatchRestoreFix1 },
+	{  true,   994, "restore fix",                                 1, kq4SignatureRestoreFix2,                  kq4PatchRestoreFix2 },
 	{  true,   994, "ride unicorn at night",                       1, kq4SignatureUnicornNightRide,             kq4PatchUnicornNightRide },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
@@ -5299,10 +5348,51 @@ static const uint16 kq5PatchPc98CampfireMessages[] = {
 	PATCH_END
 };
 
+// When the boat sinks while game speed is set to fast, the boat jumps from its
+//  initial position to the left edge of the screen. This is because at fast
+//  speeds, ego reaches the right edge when leaving the previous screen.
+//  The sinking script doesn't expect ego:edgeHit to be set, and when it is,
+//  Rm:init moves ego back to the opposite edge.
+//
+// We fix this by clearing ego:edgeHit when initializing the sinking boat.
+//
+// Applies to: All versions
+// Responsible method: rm047:init
+// Fixes bug: #14218
+static const uint16 kq5SignatureSinkingBoatPosition[] = {
+	0x30, SIG_UINT16(0x0078),        // bnt 0078
+	SIG_ADDTOOFFSET(+9),
+	0x81, 0x00,                      // lag 00
+	0x4a, 0x08,                      // send 08 [ ego ... ]
+	SIG_ADDTOOFFSET(+24),
+	SIG_MAGICDWORD,
+	0x39, SIG_SELECTOR8(loop),       // pushi loop
+	0x78,                            // push1
+	0x76,                            // push0 [ redundant, loop is already 0 ]
+	SIG_ADDTOOFFSET(+8),
+	0x4a, 0x24,                      // send 24 [ sailBoat ... loop: 0 ... ]
+	SIG_END
+};
+
+static const uint16 kq5PatchSinkingBoatPosition[] = {
+	0x31, 0x79,                      // bnt 79
+	PATCH_GETORIGINALBYTES(3, 9),
+	0x38, PATCH_SELECTOR16(edgeHit), // pushi edgeHit
+	0x78,                            // push1
+	0x76,                            // push0
+	0x81, 0x00,                      // lag 00
+	0x4a, 0x0e,                      // send 0e [ ego ... edgeHit: 0 ]
+	PATCH_GETORIGINALBYTES(16, 24),
+	PATCH_ADDTOOFFSET(+8),
+	0x4a, 0x1e,                      // send 1e [ sailBoat ... ]
+	PATCH_END
+};
+
 //          script, description,                                      signature                  patch
 static const SciScriptPatcherEntry kq5Signatures[] = {
 	{  true,     0, "CD: harpy volume change",                     1, kq5SignatureCdHarpyVolume,            kq5PatchCdHarpyVolume },
 	{  true,     0, "timer rollover",                              1, sciSignatureTimerRollover,            sciPatchTimerRollover },
+	{  true,    47, "sinking boat position",                       1, kq5SignatureSinkingBoatPosition,      kq5PatchSinkingBoatPosition },
 	{  true,    99, "disable speed test",                          1, sci01SpeedTestLocalSignature,         sci01SpeedTestLocalPatch },
 	{  true,    99, "disable speed test",                          1, sci11SpeedTestSignature,              sci11SpeedTestPatch },
 	{ false,   109, "Crispin intro signal",                        1, kq5SignatureCrispinIntroSignal,       kq5PatchCrispinIntroSignal },
@@ -7868,6 +7958,27 @@ static const uint16 longbowPatchAmigaPubFix[] = {
 	PATCH_END
 };
 
+// During the party in the pub, one of the sheriff's men has a broken doVerb
+//  method that attempts to load an invalid class when clicking an item on him.
+//  This fails silently in the original. We patch out the broken instruction.
+//
+// Applies to: All versions
+// Responsible method: man2:doVerb
+static const uint16 longbowSignaturePubPartyFix[] = {
+	0x50, SIG_ADDTOOFFSET(+2),      // class ????
+	0x1a,                           // eq?
+	0x30, SIG_UINT16(0x0004),       // bnt 0004
+	SIG_MAGICDWORD,
+	0x63, 0x00,                     // pToa species
+	0x87, 0x01,                     // lap 01
+	SIG_END
+};
+
+static const uint16 longbowPatchPubPartyFix[] = {
+	0x34, PATCH_UINT16(0xffff),     // ldi ffff
+	PATCH_END
+};
+
 // WORKAROUND: Script needed, because of differences in our pathfinding
 // algorithm
 // When the guards kick Robin out of archery room 320 the game locks up due to
@@ -7975,6 +8086,63 @@ static const uint16 longbowPatchGreenManForestSweepFix[] = {
 	0x76,                           // push0
 	0x38, PATCH_GETORIGINALUINT16(+25), // pushi stopUpd
 	0x76,                           // push0
+	PATCH_END
+};
+
+// In Longbow 1.0, when a monk opens the abbey door, clicking Walk interrupts
+//  the monkAtDoor script and prevents ego from entering.
+//
+// We fix this by calling HandsOff as Sierra did in later versions.
+//
+// Applies to: English PC Floppy 1.0
+// Responsible method: monkLeaves:doit
+static const uint16 longbowSignatureAbbeyDoorFix[] = {
+	SIG_MAGICDWORD,
+	0x36,                           // push
+	0x35, 0x02,                     // ldi 02
+	0x12,                           // and
+	0x30, SIG_UINT16(0x001a),       // bnt 001a
+	SIG_ADDTOOFFSET(+18),
+	0x72, SIG_UINT16(0x0510),       // lofsa monkAtDoor
+	0x36,                           // push
+	SIG_END
+};
+
+static const uint16 longbowPatchAbbeyDoorFix[] = {
+	0x7a,                           // push2
+	0x12,                           // and
+	0x31, 0x1d,                     // bnt 1d
+	0x76,                           // push0
+	0x45, 0x03, 0x00,               // callb proc0_3 [ HandsOff ]
+	PATCH_GETORIGINALBYTES(7, 18),
+	0x74, PATCH_UINT16(0x0510),     // lofss monkAtDoor
+	PATCH_END
+};
+
+// When entering the abbey in Longbow 1.0, clicking too quickly on the map
+//  breaks the game. The room is missing a HandsOff call to prevent the player
+//  from interrupting ego's initial motion. When this happens, the room script
+//  never completes and ego can never leave the map.
+//
+// We fix this by calling HandsOff as Sierra did in later versions.
+//
+// Applies to: English PC Floppy 1.0
+// Responsible method: rm450:init
+static const uint16 longbowSignatureAbbeyMapFix[] = {
+	SIG_MAGICDWORD,
+	0x72, SIG_UINT16(0x0754),       // lofsa arrived [ already in accumulator ]
+	0x4a, 0x06,                     // send 06 [ arrived client: self ]
+	SIG_ADDTOOFFSET(+7),
+	0x30, SIG_UINT16(0x0005),       // bnt 0005
+	SIG_END
+};
+
+static const uint16 longbowPatchAbbeyMapFix[] = {
+	0x4a, 0x06,                     // send 06 [ arrived client: self ]
+	0x76,                           // push0
+	0x45, 0x03, 0x00,               // callb proc0_3 [ HandsOff ]
+	PATCH_GETORIGINALBYTES(5, 7),
+	0x31, 0x05,                     // bnt 05
 	PATCH_END
 };
 
@@ -8169,21 +8337,87 @@ static const uint16 longbowPatchHedgeMazeMusic[] = {
 	PATCH_END
 };
 
+// Map rooms palette animate their rivers at unthrottled speeds, except that
+//  scripts limit them to every X game cycles based on speed test results.
+//  On fast DOS machines this was still effectively unthrottled because there is
+//  no cast to animate in these rooms. In ScummVM we patch speed tests to pass
+//  and throttle game cycles to a reasonable rate. Under these conditions, the
+//  map animates slowly every 2.5 seconds.
+//
+// We fix this by setting the map palette animation speed to once every 15 game
+//  cycles instead of using speed test results. This is what DOSBox achieves at
+//  3,000 clock cycles per second.
+//
+// Applies to: All versions
+// Responsible methods: rm100:init, rm260:init
+// Fixes bug: #13966
+static const uint16 longbowSignatureMapPaletteSpeed[] = {
+	SIG_MAGICDWORD,
+	0x89, 0x57,                     // lsg 57 [ speed test result ]
+	0x3c,                           // dup
+	0x35, 0x00,                     // ldi 00
+	0x1a,                           // eq?
+	0x30, SIG_UINT16(0x0005),       // bnt 0005
+	0x35, 0x28,                     // ldi 28 [ animate every 40 cycles ]
+	0x32,                           // jmp    [ toss ]
+	SIG_END
+};
+
+static const uint16 longbowPatchMapPaletteSpeed[] = {
+	0x35, 0x0f,                     // ldi 0f [ animate every 15 cycles ]
+	0x36,                           // push   [ for toss ]
+	0x33, 0x06,                     // jmp 06 [ toss ]
+	PATCH_END
+};
+
+// After rescuing Marian from the fire, closing message boxes too quickly causes
+//  the game to lockup when using the emerald in the next scene. This is a bug
+//  in room 179, the synopsis room that displays messages and awards points.
+//  synop:dispose calls kDisposeScript(806), but script 806 contains the sound
+//  object for the points sound effect. If a sound object is playing while its
+//  script is disposed then the global sounds collection enters an invalid state
+//  and sound cues no longer work.
+//
+// We fix this by patching out the call to kDisposeScript(806) in synop:dispose.
+//  This call is unnecessary because script 806 already unloads itself in every
+//  procedure, and also whenever specialSound:check finishes playing.
+//
+// Applies to: All versions
+// Responsible method: synop:dispose
+static const uint16 longbowSignatureEmeraldLockup[] = {
+	SIG_MAGICDWORD,
+	0x78,                           // push1
+	0x38, SIG_UINT16(0x0326),       // pushi 0326
+	0x43, 0x03, 0x02,               // callk DisposeScript [ DisposeScript 806 ]
+	SIG_END
+};
+
+static const uint16 longbowPatchEmeraldLockup[] = {
+	0x33, 0x05,                     // jmp 05 [ skip DisposeScript ]
+	PATCH_END
+};
+
 //          script, description,                                      signature                                patch
 static const SciScriptPatcherEntry longbowSignatures[] = {
 	{  true,    29, "amiga day 1 peasant woman",                   1, longbowSignatureAmigaPeasantWoman,       longbowPatchAmigaPeasantWoman},
+	{  true,   100, "map palette speed",                           1, longbowSignatureMapPaletteSpeed,         longbowPatchMapPaletteSpeed },
 	{  true,   140, "green man riddles and forest sweep fix",      1, longbowSignatureGreenManForestSweepFix,  longbowPatchGreenManForestSweepFix },
 	{  true,   150, "day 5/6 camp sunset fix",                     2, longbowSignatureCampSunsetFix,           longbowPatchCampSunsetFix },
 	{  true,   150, "day 7 tuck net fix",                          1, longbowSignatureTuckNetFix,              longbowPatchTuckNetFix },
+	{  true,   179, "emerald lockup",                              1, longbowSignatureEmeraldLockup,           longbowPatchEmeraldLockup },
 	{  true,   210, "hand code crash",                             5, longbowSignatureShowHandCode,            longbowPatchShowHandCode },
 	{  true,   225, "arithmetic berry bush fix",                   1, longbowSignatureBerryBushFix,            longbowPatchBerryBushFix },
 	{  true,   250, "day 5/6 rescue flag fix",                     1, longbowSignatureRescueFlagFix,           longbowPatchRescueFlagFix },
 	{  true,   260, "day 5/6 town map sunset fix",                 1, longbowSignatureTownMapSunsetFix,        longbowPatchTownMapSunsetFix },
+	{  true,   260, "map palette speed",                           1, longbowSignatureMapPaletteSpeed,         longbowPatchMapPaletteSpeed },
 	{  true,   320, "day 8 archer pathfinding workaround",         1, longbowSignatureArcherPathfinding,       longbowPatchArcherPathfinding },
 	{  true,   350, "day 9 cobbler hut fix",                      10, longbowSignatureCobblerHut,              longbowPatchCobblerHut },
 	{  true,   422, "marian messages fix",                         1, longbowSignatureMarianMessagesFix,       longbowPatchMarianMessagesFix },
+	{  true,   440, "abbey door fix",                              1, longbowSignatureAbbeyDoorFix,            longbowPatchAbbeyDoorFix },
+	{  true,   450, "abbey map fix",                               1, longbowSignatureAbbeyMapFix,             longbowPatchAbbeyMapFix },
 	{  true,   490, "hedge maze music",                            1, longbowSignatureHedgeMazeMusic,          longbowPatchHedgeMazeMusic },
 	{  true,   530, "amiga pub fix",                               1, longbowSignatureAmigaPubFix,             longbowPatchAmigaPubFix },
+	{  true,   532, "pub party fix",                               1, longbowSignaturePubPartyFix,             longbowPatchPubPartyFix },
 	{  true,   600, "amiga fulk rescue fix",                       1, longbowSignatureAmigaFulkRescue,         longbowPatchAmigaFulkRescue },
 	{  true,   803, "amiga speed test",                            1, longbowSignatureAmigaSpeedTest,          longbowPatchAmigaSpeedTest },
 	{  true,   803, "disable speed test",                          1, sci01SpeedTestLocalSignature,            sci01SpeedTestLocalPatch },
@@ -8191,8 +8425,33 @@ static const SciScriptPatcherEntry longbowSignatures[] = {
 };
 
 // ===========================================================================
-// Leisure Suit Larry 1 (Spanish)
+// Leisure Suit Larry 1
+
+// Pushing the penthouse elevator button in room 350 causes a broken polygon to
+//  be used for pathfinding. openObstacle:points is set to a local array of 17
+//  points but its size property is incorrectly set to 19. We fix the size so
+//  that the interpreter doesn't use the wrong values for pathfinding.
 //
+// Applies to: All versions
+// Responsible method: rm350:init
+static const uint16 larry1SignatureElevatorPolygon[] = {
+	SIG_MAGICDWORD,
+	0x5b, 0x02, 0x1f,                // lea 02 1f
+	0x36,                            // push
+	0x39, SIG_SELECTOR8(size),       // pushi size
+	0x78,                            // push1
+	0x39, 0x13,                      // pushi 13 [ incorrect size ]
+	0x72, SIG_ADDTOOFFSET(+2),       // lofsa openObstacle
+	0x4a, 0x0c,                      // send 0c [ openObstacle points: @local31 size: 19 ]
+	SIG_END
+};
+
+static const uint16 larry1PatchElevatorPolygon[] = {
+	PATCH_ADDTOOFFSET(+7),
+	0x39, 0x11,                      // pushi 11 [ correct size ]
+	PATCH_END
+};
+
 // It seems originally the Spanish version of Larry 1 used some beta code at
 // least for the man wearing a barrel, who walks around in front of the casino.
 // The script inside the resource files even uses a class, that does not exist
@@ -8308,9 +8567,11 @@ static const uint16 larry1PatchBuyApple[] = {
 	PATCH_END
 };
 
-//          script, description,                               signature                patch
+//          script, description,                                signature                       patch
 static const SciScriptPatcherEntry larry1Signatures[] = {
-	{  true,   300, "Spanish: buy apple from barrel man",    1, larry1SignatureBuyApple, larry1PatchBuyApple },
+	{  true,   300, "Spanish: buy apple from barrel man",    1, larry1SignatureBuyApple,        larry1PatchBuyApple },
+	{  true,   350, "elevator polygon size",                 1, larry1SignatureElevatorPolygon, larry1PatchElevatorPolygon },
+	{  true,   803, "disable speed test",                    1, sci01SpeedTestLocalSignature,   sci01SpeedTestLocalPatch },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -8571,9 +8832,67 @@ static const uint16 larry5PatchGermanEndingPattiTalker[] = {
 	PATCH_END
 };
 
+// The Hollywood sign in room 190 doesn't respond to clicks or display its
+//  messages. This is a script typo. The author attempted to initialize the
+//  `HollywoodSign` object, but typed the word `sign` instead. The compiler
+//  accepted this because `sign` is the name of a procedure in script 999.
+//  The `init` selector was interpreted as a non-existent property.
+//
+// We fix this by calling HollywoodSign:init instead of sign.
+//
+// Applies to: All versions
+// Responsible method: rm190:init
+static const uint16 larry5SignatureHollywoodSign[] = {
+	0x78,                               // push1
+	0x66, SIG_ADDTOOFFSET(+2),          // pTos ????
+	SIG_MAGICDWORD,
+	0x46, SIG_UINT16(0x03e7),           // calle proc999_0 [ sign(????) ]
+	      SIG_UINT16(0x0000), 0x02,
+	SIG_ADDTOOFFSET(+3),
+	0x72,                               // lofsa tree [ 0x40 bytes before HollywoodSign ]
+	SIG_END
+};
+
+static const uint16 larry5PatchHollywoodSign[] = {
+	0x38, PATCH_SELECTOR16(init),       // pushi init
+	0x39, 0x00,                         // pushi 00
+	0x72, PATCH_GETORIGINALUINT16ADJUST(+14, +0x40), // lofsa HollywoodSign
+	0x4a, 0x04,                         // send 04 [ HollywoodSign init: ]
+	PATCH_END
+};
+
+// LSL5's TPrint procedure causes an uninitialized parameter read when printing
+//  messages. This generates many warnings throughout the game. Ideally, we
+//  could suppress these with the workarounds table, but it would take several
+//  entries and bytecode signatures due to all of the callers and versions.
+//  Instead, it can be fixed in all versions with one small script patch.
+//
+// We fix this by removing the uninitialized parameter from TPrint's Print call
+//  and increasing the size of the &rest parameter. TPrint's second parameter is
+//  now only passed to Print when it exists.
+//
+// Applies to: All versions
+// Responsible method: Export 14 in script 0 (TPrint)
+static const uint16 larry5SignatureHTPrintUninitParameter[] = {
+	SIG_MAGICDWORD,
+	0x8f, 0x02,                         // lsp 02 [ often non-existent ]
+	0x59, 0x03,                         // &rest 03
+	0x47, 0xff, 0x00, 0x08,             // calle proc255_0 [ Print ... param2 &rest ]
+	SIG_END
+};
+
+static const uint16 larry5PatchTPrintUninitParameter[] = {
+	0x33, 0x00,                         // jmp 00
+	0x59, 0x02,                         // &rest 02
+	0x47, 0xff, 0x00, 0x06,             // calle proc225_0 [ Print ... &rest ]
+	PATCH_END
+};
+
 //          script, description,                                      signature                               patch
 static const SciScriptPatcherEntry larry5Signatures[] = {
 	{  true,     0, "update stopGroop client",                     1, larry5SignatureUpdateStopGroopClient,   larry5PatchUpdateStopGroopClient },
+	{  true,     0, "TPrint uninit parameter",                     1, larry5SignatureHTPrintUninitParameter,  larry5PatchTPrintUninitParameter },
+	{  true,   190, "hollywood sign",                              1, larry5SignatureHollywoodSign,           larry5PatchHollywoodSign },
 	{  true,   280, "English-only: fix green card limo bug",       1, larry5SignatureGreenCardLimoBug,        larry5PatchGreenCardLimoBug },
 	{  true,   380, "German-only: Enlarge Patti Textbox",          1, larry5SignatureGermanEndingPattiTalker, larry5PatchGermanEndingPattiTalker },
 	SCI_SIGNATUREENTRY_TERMINATOR
@@ -9642,39 +9961,162 @@ static const uint16 laurabow2CDPatchPaintingClosing[] = {
 	PATCH_END
 };
 
-// In the CD version the system menu is disabled for certain rooms. LB2::handsOff is called,
-//  when leaving the room (and in other cases as well). This method remembers the disabled
-//  icons of the icon bar. In the new room LB2::handsOn will get called, which then enables
-//  all icons, but also disabled the ones, that were disabled before.
+// The CD version disables the control panel icon in many rooms. It's unclear
+//  why this was done; it may have been to conserve memory. Unfortunately, the
+//  CD script is quite buggy, and it also disables the icon in other rooms at
+//  seemingly random times, preventing saving and restoring in even more places.
+//  In ScummVM we allow arbitrary saving and restoring through the Global Main
+//  Menu so these restrictions are unnecessary.
 //
-// Because of this behaviour certain rooms, that should have the system menu enabled, have
-//  it disabled, when entering those rooms from rooms, where the menu is supposed to be
-//  disabled.
+// The CD version attempts to disable the control panel icon by:
+// - Adding code to LB2:handsOn to disable the icon when in a list of 14 rooms.
+// - Adding many calls to IconBar:disable(7) in these rooms.
+// - Removing the code from Inset:dispose that re-enables the icon. This has the
+//   side effect of disabling the icon after viewing an inset in any room.
 //
-// We patch this by injecting code into LB2::newRoom (which is called right after a room change)
-//  and reset the global variable there, that normally holds the disabled buttons.
+// These changes don't take into account that handsOff records IconBar state
+//  and handsOn restores it. This causes restricted rooms to contaminate others
+//  when traveling between them with handsOff scripts such as doors.
 //
-// This patch may cause side-effects and it's difficult to test, because it affects every room
-//  in the game. At least for the intro, the speakeasy and plenty of rooms in the beginning it
-//  seems to work correctly.
+// We remove these restrictions by patching out all of the new CD code and
+//  restoring the floppy code in Inset:dispose. We make room by overwriting
+//  unnecessary code in Inset:onMe that sets variables and doesn't use them.
+//  While we're at it, we also remove IconBar:disable(7) from the vat room (610)
+//  in all versions. This restriction was only to make searching the vats harder
+//  when the puzzle hadn't been solved, but it didn't work consistently.
 //
-// Applies to at least: English PC-CD
-// Responsible method: LB2::newRoom, LB2::handsOff, LB2::handsOn
+// Applies to: English PC-CD for most patches, floppy versions for others
+// Responsible methods: LB2:handsOn, Inset:dispose, many others
 // Fixes bug: #6440
-static const uint16 laurabow2CDSignatureFixProblematicIconBar[] = {
+static const uint16 laurabow2CDSignatureEnableControlPanel[] = {
+	0x38, SIG_UINT16(0x00f1),           // pushi disable [ CD selector ]
 	SIG_MAGICDWORD,
-	0x38, SIG_UINT16(0x00f1),           // pushi 00f1 (disable) - hardcoded, we only want to patch the CD version
-	0x76,                               // push0
-	0x81, 0x45,                         // lag global[45]
-	0x4a, 0x04,                         // send 04
+	0x78,                               // push1
+	0x39, 0x07,                         // pushi 07
+	0x81, 0x45,                         // lag 45
+	0x4a, 0x06,                         // send 06 [ IconBar disable: 7 ]
 	SIG_END
 };
 
-static const uint16 laurabow2CDPatchFixProblematicIconBar[] = {
-	0x35, 0x00,                      // ldi 00
-	0xa1, 0x74,                      // sag global[74]
-	0x35, 0x00,                      // ldi 00 (waste bytes)
-	0x35, 0x00,                      // ldi 00
+static const uint16 laurabow2FloppySignatureEnableControlPanel[] = {
+	0x38, SIG_UINT16(0x00e9),           // pushi disable [ Floppy selector ]
+	SIG_MAGICDWORD,
+	0x78,                               // push1
+	0x39, 0x07,                         // pushi 07
+	0x81, 0x45,                         // lag 45
+	0x4a, 0x06,                         // send 06 [ IconBar disable: 7 ]
+	SIG_END
+};
+
+static const uint16 laurabow2PatchEnableControlPanel[] = {
+	0x32, PATCH_UINT16(0x0007),         // jmp 0007
+	PATCH_END
+};
+
+static const uint16 laurabow2CDSignatureInsetEnableControlPanel[] = {
+	// Inset:onMe
+	SIG_MAGICDWORD,
+	0x3f, 0x02,                         // link 02
+	0x78,                               // push1
+	0x8f, 0x01,                         // lsp 01
+	SIG_ADDTOOFFSET(+0x1f),
+	0x63, 0x18,                         // pToa view
+	SIG_ADDTOOFFSET(+0x1b5),
+	// Inset:dispose
+	0x31, 0x12,                         // bnt 12
+	SIG_ADDTOOFFSET(+2),
+	0x31, 0x0e,                         // bnt 0e
+	0xa5, 0x00,                         // sat 00
+	0x35, 0x00,                         // ldi 00
+	0x65, 0x28,                         // aTop caller [ caller = 0 ]
+	SIG_ADDTOOFFSET(+4),
+	0x85, 0x00,                         // lat 00
+	0x4a, 0x04,                         // send 04
+	0x48,                               // ret
+	SIG_END
+};
+
+static const uint16 laurabow2CDPatchInsetEnableControlPanel[] = {
+	// Inset:onMe
+	PATCH_ADDTOOFFSET(+2),
+	0xa5, 0x00,                         // sat 00 [ prevents uninitialized-parameter warning ]
+	0x33, 0x1e,                         // jmp 1e [ skip our new code ]
+	0x67, 0x2a,                         // pTos owner
+	0x81, 0x02,                         // lag 02
+	0x1a,                               // eq?
+	0x31, 0x0a,                         // bnt 0a
+	0x38, PATCH_SELECTOR16(enable),     // pushi enable
+	0x78,                               // pushi
+	0x39, 0x07,                         // pushi 07
+	0x81, 0x45,                         // lag 45
+	0x4a, 0x06,                         // send 06 [ IconBar enable: 7 ]
+	0x48,                               // ret
+	PATCH_ADDTOOFFSET(+0x1c3),
+	// Inset:dispose
+	0x31, 0x10,                         // bnt 10
+	PATCH_ADDTOOFFSET(+2),
+	0x31, 0x0c,                         // bnt 0c
+	PATCH_ADDTOOFFSET(+2),
+	0x39, 0x00,                         // pushi 00
+	0x69, 0x28,                         // sTop caller [ caller = 0, acc = temp0 ]
+	PATCH_ADDTOOFFSET(+4),
+	0x4a, 0x04,                         // send 04
+	0x32, PATCH_UINT16(0xfe16),         // jmp fe16 [ our new code, ret ]
+	PATCH_END
+};
+
+// The CD version frequently displays the hands-off cursor when the player has
+//  control. This occurs when speech is enabled. For example: climbing down a
+//  vat ladder or picking up items like the charcoal, wire cutters, or lasso.
+//
+// When re-enabling control and displaying a message at the same time, scripts
+//  are supposed to call handsOn before saying the message, otherwise the wrong
+//  cursor is shown while the message is displayed. In LB2, this also applies to
+//  ego:get, because it also says "You pick it up and place it in your purse."
+//  Many scripts call these in the wrong order. In the floppy version this had
+//  little effect, but the CD version added speech code to Narrator that records
+//  and restores the previous cursor. If handsOn is called after say then the
+//  Narrator restores the hands-off cursor when the speech eventually completes.
+//
+// We fix this by adding code to handsOn that detects if a Narrator is saying a
+//  message, and if so, updates its saveCursor to the correct previous cursor.
+//  We make room by overwriting the large list of rooms that handsOn attempts to
+//  disable the control panel icon in. This list is unused because we patch out
+//  that restriction. See also: laurabow2PatchEnableControlPanel
+//
+// Applies to: English PC-CD
+// Responsible method: LB2:handsOn
+static const uint16 laurabow2CDSignatureFixHandsOffCursor[] = {
+	SIG_MAGICDWORD,
+	0x39, 0x0f,                         // pushi 0f [ OneOf parameter count ]
+	0x89, 0x0b,                         // lsg 0b   [ roomNumber ]
+	SIG_ADDTOOFFSET(+42),
+	0x46, SIG_UINT16(0x03e7),           // calle 999 0005 1e [ OneOf roomNumber ... ]
+	SIG_UINT16(0x0005), 0x1e,
+	0x31, 0x0a,                         // bnt 0a
+	SIG_END
+};
+
+static const uint16 laurabow2CDPatchFixHandsOffCursor[] = {
+	0x81, 0x54,                         // lag 54 [ fastCast ]
+	0x31, 0x3c,                         // bnt 3c [ skip if no message ]
+	0x39, PATCH_SELECTOR8(at),          // pushi at
+	0x78,                               // push1
+	0x76,                               // push0
+	0x4a, 0x06,                         // send 06 [ fastCast at: 0 ]
+	0x31, 0x34,                         // bnt 34  [ skip if no Narrator ]
+	0xa1, 0x61,                         // sag 61  [ store Narrator in unused global ]
+	0x81, 0x79,                         // lag 79  [ icon when handsOff was called ]
+	0x31, 0x2e,                         // bnt 2e  [ skip if no icon is set ]
+	0x39, PATCH_SELECTOR8(cursor),      // pushi cursor
+	0x76,                               // push0
+	0x4a, 0x04,                         // send 04 [ icon cursor? ]
+	0x38, PATCH_SELECTOR16(saveCursor), // pushi saveCursor
+	0x78,                               // push1
+	0x36,                               // push
+	0x81, 0x61,                         // lag 61
+	0x4a, 0x06,                         // send 06 [ Narrator saveCursor: previous icon cursor ]
+	0x33, 0x1e,                         // jmp 1e
 	PATCH_END
 };
 
@@ -9724,6 +10166,7 @@ static const uint16 laurabow2CDPatchFixYvetteTutResponse[] = {
 // We fix this by setting the correct loop in the CD version so that Wolf and
 //  O'Riley face the direction the scripts request like in the floppy versions.
 //  This patch is only enabled in the CD version since the scripts don't change.
+//  See also: resource patch lauraBow2CdView828
 //
 // Applies to: English CD
 // Responsible methods: sPartysOver:changeState, rm400:init, sHeimlichShoos:changeState
@@ -9848,81 +10291,111 @@ static const uint16 laurabow2PatchMuseumPartyFixEnteringSouth2[] = {
 	PATCH_END
 };
 
-// Opening/Closing the east door in the pterodactyl room doesn't check, if it's
-//  locked and will open/close the door internally even when it is.
+// At the start of the act 5 chase, leaving the first screen within five seconds
+//  breaks all timers for the rest of the game. This breaks the wire puzzle,
+//  prevents the killer from appearing in many rooms, and would crash the floppy
+//  version in the original. Room 420 starts a local timer before the killer
+//  appears on screen, but Sierra forgot to dispose of the timer when leaving
+//  the room. If it's still active then it remains in the global timer list even
+//  though its owner script has been disposed. This causes kIsObject to return
+//  false and that causes Collect:eachElementDo to abort without processing any
+//  further timers.
 //
-// It will get wired shut later in the game by Laura Bow and will be "locked"
-//  because of this. We patch in a check for the locked state. We also add
-//  code, that will set the "locked" state in case our eastDoor-wired-global is
-//  set. This makes the locked state effectively persistent.
+// We fix this by adding a call to timers:dispose before setting pursuitTimer
+//  when leaving room 420.
 //
-// Applies to at least: English PC-CD, English PC-Floppy
-// Responsible method (CD): eastDoor::doVerb
-// Responsible method (Floppy): eastDoor::<noname300>
-// Fixes bug: #6458 (partly, see additional patch below)
-static const uint16 laurabow2SignatureFixWiredEastDoor[] = {
-	0x30, SIG_UINT16(0x0022),           // bnt [skip hand action]
-	0x67, SIG_ADDTOOFFSET(+1),          // pTos (CD: doorState, Floppy: state)
-	0x35, 0x00,                         // ldi 00
-	0x1a,                               // eq?
-	0x31, 0x08,                         // bnt [close door code]
-	0x78,                               // push1
+// Applies to: All versions
+// Responsible method: rm420:newRoom
+static const uint16 laurabow2SignatureFixAct5BrokenTimers[] = {
 	SIG_MAGICDWORD,
-	0x39, 0x63,                         // pushi 63h
-	0x45, 0x04, 0x02,                   // callb [export 4 of script 0], 02 (sets door-bitflag)
-	0x33, 0x06,                         // jmp [super-code]
+	0x43, 0x02, 0x04,                   // callk ScriptID 04 [ ScriptID 94 1 ]
+	0x36,                               // push [ pursuitTimer ]
+	0x8b, 0x00,                         // lsl 00
+	0x7a,                               // push2
+	0x39, 0x5e,                         // pushi 5e
 	0x78,                               // push1
-	0x39, 0x63,                         // pushi 63h
-	0x45, 0x03, 0x02,                   // callb [export 3 of script 0], 02 (resets door-bitflag)
-	0x38, SIG_ADDTOOFFSET(+2),          // pushi (CD: 011dh, Floppy: 012ch)
-	0x78,                               // push1
-	0x8f, 0x01,                         // lsp param[1]
-	0x59, 0x02,                         // rest 02
-	0x57, SIG_ADDTOOFFSET(+1), 0x06,    // super (CD: LbDoor, Floppy: Door), 06
-	0x33, 0x0b,                         // jmp [ret]
+	0x43, 0x02, 0x04,                   // callk ScriptID 04 [ ScriptID 94 1 ]
 	SIG_END
 };
 
-static const uint16 laurabow2PatchFixWiredEastDoor[] = {
-	0x31, 0x23,                         // bnt [skip hand action] (saves 1 byte)
-	0x81, 0x61,                         // lag global[97d] (get our eastDoor-wired-global)
-	0x31, 0x04,                         // bnt [skip setting locked property]
-	0x35, 0x01,                         // ldi 01
-	0x65, 0x6a,                         // aTop locked (set eastDoor::locked to 1)
-	0x63, 0x6a,                         // pToa locked (get eastDoor::locked)
-	0x2f, 0x17,                         // bt [skip hand action]
-	0x63, PATCH_GETORIGINALBYTE(+4),    // pToa (CD: doorState, Floppy: state)
-	0x78,                               // push1
-	0x39, 0x63,                         // pushi 63h
-	0x2f, 0x05,                         // bt [close door code]
-	0x45, 0x04, 0x02,                   // callb [export 4 of script 0], 02 (sets door-bitflag)
-	0x33, 0x0b,                         // jmp [super-code]
-	0x45, 0x03, 0x02,                   // callb [export 3 of script 0], 02 (resets door-bitflag)
-	0x33, 0x06,                         // jmp [super-code]
+static const uint16 laurabow2PatchFixAct5BrokenTimers[] = {
+	0x39, 0x6f,                         // pushi dispose
+	0x76,                               // push0
+	0x81, 0x07,                         // lag 07
+	0x4a, 0x04,                         // send 04 [ timers dispose: ]
+	0x43, 0x02, 0x04,                   // callk ScriptID 04 [ ScriptID 94 1 ]
+	0x36,                               // push [ pursuitTimer ]
+	0x8b, 0x00,                         // lsl 00
 	PATCH_END
 };
 
-// We patch in code, so that our eastDoor-wired-global will get set to 1.
-//  This way the wired-state won't get lost when exiting room 430.
+// In act 5, the east door in the pterodactyl room has several problems once it
+//  is wired shut. Re-entering the room shows the door open with floating wire,
+//  or allows the door to be re-opened with floating wire.
 //
-// Applies to at least: English PC-CD, English PC-Floppy
-// Responsible method (CD): sWireItShut::changeState
-// Responsible method (Floppy): sWireItShut::<noname144>
-// Fixes bug: #6458 (partly, see additional patch above)
-static const uint16 laurabow2SignatureRememberWiredEastDoor[] = {
-	SIG_MAGICDWORD,
-	0x33, 0x27,                         // jmp [ret]
-	0x3c,                               // dup
-	0x35, 0x06,                         // ldi 06
+// There are two flags and three problems:
+// - Flag 99 is set when the door is closed and cleared when opened.
+// - Flag 45 is set when the door is wired shut.
+// - Clicking the wire on the open door sets flag 45 but not 99.
+// - Clicking Do on the closed door clears flag 99 even when locked.
+// - eastDoor:locked is not re-initialized when re-entering the room.
+//
+// We fix all of this by patching eastDoor:doVerb to handle Do (hand) and the
+//  wire correctly. Clicking the wire now sets flag 99 so that the door always
+//  remains closed when re-entering. Clicking Do now resets the locked property
+//  according to flag 45 so that the door can't be re-opened, and the code no
+//  longer clears flag 99 if the door is locked.
+//
+// Applies to: All versions
+// Responsible method: eastDoor:doVerb
+// Fixes bug: #6458
+static const uint16 laurabow2SignatureFixWiredEastDoor[] = {
+	// eastDoor:doVerb(44) - wire
+	0x31, 0x0f,                         // bnt 0f [ skip sWireItShut if not act 5 ]
+	0x38, SIG_UINT16(0x0092),           // pushi setScript
+	0x78,                               // push1
+	0x72, SIG_ADDTOOFFSET(+2),          // lofsa sWireItShut
+	0x36,                               // push
+	0x81, 0x02,                         // lag 02
+	0x4a, 0x06,                         // send 06  [ rm430 setScript: sWireItShut ]
+	0x32, SIG_UINT16(0x0042),           // jmp 0042 [ toss / ret ]
+	SIG_ADDTOOFFSET(+11),               // [ super: doVerb param1 &rest ]
+	0x32, SIG_UINT16(0x0034),           // jmp 0034 [ toss / ret ]
+	// eastDoor:doVerb(4) - do (hand)
+	SIG_ADDTOOFFSET(+7),
+	0x67, SIG_ADDTOOFFSET(+1),          // pTos (CD: doorState, Floppy: state)
+	0x35, 0x00,                         // ldi 00
 	0x1a,                               // eq?
-	0x31, 0x21,                         // bnt [skip step]
-	SIG_END
+	0x31, 0x08,                         // bnt 08 [ skip clearing flag 99 ]
+	0x78,                               // push1
+	SIG_MAGICDWORD,
+	0x39, 0x63,                         // pushi 63
+	0x45, 0x04, 0x02,                   // callb proc0_2 [ clear flag 99 (door is closed) ]
+	0x33, 0x06,                         // jmp 06 [ super: doVerb param1 &rest ]
+	0x78,                               // push1
+	0x39, 0x63,                         // pushi 63
+	0x45, 0x03, 0x02,                   // callb proc0_3 [ set flag 99 (door is open) ]
+	SIG_ADDTOOFFSET(+11),               // [ super: doVerb param1 &rest ]
+	0x33, 0x0b,                         // jmp [ toss / ret ]
+	SIG_END                             // [ super: doVerb param1 &rest ]
 };
 
-static const uint16 laurabow2PatchRememberWiredEastDoor[] = {
-	PATCH_ADDTOOFFSET(+2),              // skip jmp [ret]
-	0x34, PATCH_UINT16(0x0001),         // ldi 0001
-	0xa1, PATCH_UINT16(0x0061),         // sag global[97d] (set our eastDoor-wired-global)
+static const uint16 laurabow2PatchFixWiredEastDoor[] = {
+	// eastDoor:doVerb(44) - wire
+	0x31, 0x46,                         // bnt 46 [ super:doVerb if not act 5 ]
+	PATCH_ADDTOOFFSET(+12),
+	0x78,                               // push1
+	0x39, 0x63,                         // pushi 63
+	0x45, 0x03, 0x02,                   // callb proc0_3 [ set flag 99 (door is open) ]
+	0x33, 0x3d,                         // jmp 3d [ toss / ret ]
+	PATCH_ADDTOOFFSET(+16),
+	// eastDoor:doVerb(4) - do (hand)
+	0x38, PATCH_UINT16(0x0001),         // pushi 0001
+	0x39, 0x2d,                         // pushi 2d
+	0x45, 0x02, 0x02,                   // callb proc0_2 [ is flag 45 set? (door wired) ]
+	0x65, 0x6a,                         // pToa locked   [ locked = is flag 45 set? ]
+	0x2e, PATCH_UINT16(0x0015),         // bt 0015 [ skip setting/clearing flag 99 if locked ]
+	PATCH_GETORIGINALBYTES(38, 21),     // [ set or clear flag 99, super: doVerb ... ]
 	PATCH_END
 };
 
@@ -9973,6 +10446,90 @@ static const uint16 laurabow2PatchFixDaggerCaseError[] = {
 	0x18,                               // not [ acc = 1 ]
 	0x3a,                               // toss
 	0x48,                               // ret
+	PATCH_END
+};
+
+// During the act 5 chase, the game locks up if the player clicks on the open
+//  lid of the mummy coffin in room 454. The coffin can be left open from an
+//  earlier act. Clicking on the coffin works, but the lid has a different
+//  handler that evaluates conditions in the wrong order. If the lid is open
+//  then lid2:doVerb runs the script for earlier acts, sHandleTheCase, and that
+//  script doesn't call LB2:handsOn to enable input in act 5.
+//
+// We fix this by patching lid2:doVerb to evaluate act 5 conditions first. If
+//  those don't apply, then sHandleTheCase is called with its register set to
+//  open or close the coffin based on the lid state in global 115. Clicking on
+//  the lid now behaves like the rest of the coffin in act 5. This patch is in
+//  two parts to handle different instruction sizes in different versions.
+//
+// Applies to: All versions
+// Responsible method: lid2:doVerb
+static const uint16 laurabow2SignatureMummyCoffinLid1[] = {
+	SIG_MAGICDWORD,
+	0x81, 0x73,                         // lag 73 [ 0 if lid is closed, 1 if open ]
+	0x31, 0x12,                         // bnt 12 [ skip closing the lid ]
+	SIG_END
+};
+
+static const uint16 laurabow2PatchMummyCoffinLid1[] = {
+	0x35, 0x00,                         // ldi 00 [ disable the first lid condition ]
+	PATCH_END
+};
+
+static const uint16 laurabow2SignatureMummyCoffinLid2[] = {
+	0x38, SIG_ADDTOOFFSET(+2),          // pushi setScript
+	0x39, 0x03,                         // pushi 03
+	0x72, SIG_ADDTOOFFSET(+2),          // lofsa sHandleTheCase
+	0x36,                               // push
+	SIG_MAGICDWORD,
+	0x76,                               // push0
+	0x78,                               // push1 [ register = true (lid is closed) ]
+	0x81, 0x02,                         // lag 02
+	0x4a, 0x0a,                         // send 0a [ rm454 setScript: sHandleTheCase 0 1 ]
+	SIG_END
+};
+
+static const uint16 laurabow2PatchMummyCoffinLid2[] = {
+	PATCH_ADDTOOFFSET(+5),
+	0x74, PATCH_ADDTOOFFSET(+2),        // lofss sHandleTheCase
+	0x76,                               // push0
+	0xe9, 0x73,                         // -sg 73 [ register = false if open, true if closed ]
+	PATCH_END
+};
+
+// When closing the lid of the empty mummy coffin in room 454, the animation
+//  glitches and shows the coffin closed before showing Laura re-close it.
+//  This only occurs in the CD version, but it's a script bug in all versions.
+//
+// sHandleTheCase attempts to run the coffin animation in reverse by setting
+//  ego:cel to the last cel of view 454 loop 3, but it calls ego:lastCel before
+//  setting the view, so instead it queries ego's normal view and sets the new
+//  cel to 7. In the floppy version the coffin loop has 11 cels and this mistake
+//  isn't noticeable, but the CD version changed the view to only have 3 cels,
+//  making 7 an invalid cel number. The Cycler script resets invalid cels to 0
+//  before jumping to the final cel and animating normally.
+//
+// We fix this by patching the CD version to use the correct last cel value.
+//
+// Applies to: English PC-CD
+// Responsible method: sHandleTheCase:changeState(0)
+static const uint16 laurabow2CDSignatureMummyCoffinClosingCel[] = {
+	0x63, 0x24,                         // pToa register
+	0x31, 0x04,                         // bnt 04
+	0x35, 0x00,                         // ldi 00
+	0x33, 0x08,                         // jmp 08
+	SIG_MAGICDWORD,
+	0x38, SIG_UINT16(0x0100),           // pushi lastCel [ CD selector ]
+	0x76,                               // push0
+	0x81, 0x00,                         // lag 00
+	0x4a, 0x04,                         // send 04 [ ego lastCel: ]
+	SIG_END
+};
+
+static const uint16 laurabow2CDPatchMummyCoffinClosingCel[] = {
+	PATCH_ADDTOOFFSET(+8),
+	0x35, 0x02,                         // ldi 02 [ last cel of view 454 loop 3 ]
+	0x33, 0x04,                         // jmp 04
 	PATCH_END
 };
 
@@ -10191,6 +10748,45 @@ static const uint16 laurabow2PatchFixAct4Initialization[] = {
 	PATCH_END
 };
 
+// The act 5 trigger in Olympia's office is supposed to occur when exiting to
+//  room 510 but it can also occur just by looking at the Countess' body again.
+//  The close up of the Countess is also implemented as a room, but the trigger
+//  in rm520:newRoom only tests the act number and inventory. This prevents the
+//  game from being completed if the player picks up the grapes and looks at the
+//  Countess again to get the smelling salts.
+//
+// We fix this by adding a room 520 test to the act 5 trigger.
+//
+// Applies to: All versions
+// Responsible method: rm520:newRoom
+static const uint16 laurabow2SignatureAct5Trigger[] = {
+	0x31, 0x0c,                         // bnt 0c
+	0x38, SIG_ADDTOOFFSET(+2),          // pushi newRoom
+	0x78,                               // push1
+	0x8f, 0x01,                         // lsp 01
+	0x57, SIG_ADDTOOFFSET(+1), 0x06,    // super 06 [ LBRoom newRoom: roomNumber ]
+	SIG_MAGICDWORD,
+	0x32, SIG_UINT16(0x0059),           // jmp 0059 [ end of cond ]
+	0x89, 0x7b,                         // lsg 7b   [ act ]
+	0x35, 0x04,                         // ldi 04
+	0x1a,                               // eq?
+	SIG_ADDTOOFFSET(+0x4B),
+	0x38, SIG_ADDTOOFFSET(+2),          // pushi newRoom
+	0x78,                               // push1
+	0x8f, 0x01,                         // lsp 01
+	SIG_END
+};
+
+static const uint16 laurabow2PatchAct5Trigger[] = {
+	0x2f, 0x5c,                         // bt 0c [ LBRoom newRoom: roomNumber ]
+	0x8f, 0x01,                         // lsp 01
+	0x34, PATCH_UINT16(0x01fe),         // ldi 01fe
+	0x1a,                               // eq?      [ roomNumber == 510 ]
+	0x30, PATCH_UINT16(0x0008),         // bnt 0008 [ skip act 5 trigger ]
+	0x32, PATCH_UINT16(0x0000),         // jmp 0000 [ continue ]
+	PATCH_END
+};
+
 // The armor exhibit rooms (440 and 448) have event handlers that fail to handle
 //  all events, preventing messages from being displayed.
 //
@@ -10222,6 +10818,116 @@ static const uint16 laurabow2SignatureHandleArmorRoomEvents[] = {
 static const uint16 laurabow2PatchHandleArmorRoomEvents[] = {
 	PATCH_ADDTOOFFSET(+5),
 	0x34, PATCH_UINT16(0x5000),         // ldi 5000 [ move event | verb event ]
+	PATCH_END
+};
+
+// During the act 5 chase, a script bug can cause infinite recursion and crash
+//  the armor hall with a stack overflow. Room 448 cues the global pursuitTimer
+//  to run the sHeKills script if the player returns without first hiding in the
+//  in the mummy coffin, but it doesn't stop the timer. If pursuitTimer expires
+//  during sHeKills then rm448:notify schedules sHeKills to run next, even if
+//  it's already the current room script. Setting a script's `next` property to
+//  itself causes Script:dispose to infinitely recurse when changing rooms, and
+//  sHeKills ends in room 99.
+//
+// We fix this by adding a test to rm448:notify to detect if sHeKills is already
+//  the current room script and ignore the notification.
+//
+// Applies to: All versions
+// Responsible method: rm448:notify
+static const uint16 laurabow2SignatureAct5TimerCrash[] = {
+	0x31, 0x29,                         // bnt 29 [ ret ]
+	0x38, SIG_ADDTOOFFSET(+2),          // pushi script
+	0x76,                               // push0
+	0x81, 0x02,                         // lag 02
+	0x4a, 0x04,                         // send 04 [ rm448 script? ]
+	SIG_MAGICDWORD,
+	0x31, 0x13,                         // bnt 13
+	0x39, 0x41,                         // pushi next
+	0x78,                               // pushi1
+	0x72,                               // lofsa sHeKills
+	SIG_END
+};
+
+static const uint16 laurabow2PatchAct5TimerCrash[] = {
+	PATCH_ADDTOOFFSET(+2),
+	0x63, 0x12,                         // pToa script
+	0x31, 0x19,                         // bnt 19
+	0x74, PATCH_GETORIGINALUINT16(16),  // lofss sHeKills
+	0x1a,                               // eq?   [ script == sHeKills]
+	0x2f, 0x1f,                         // bt 1f [ ret ]
+	PATCH_END
+};
+
+// During act 5, the transom in room 448 behaves inconsistently depending on
+//  the speed setting and machine speed. When the player opens or closes the
+//  transom, the script animates ego at game speed and the transom at speed 6,
+//  but it terminates the transom's animation when ego's completes. The transom
+//  animation is often interrupted and may not even be able to start at all.
+//  Although there is a game flag for the transom state, some scripts use the
+//  current cel to infer if it is open or closed. When these states are out of
+//  sync the transom behaves unpredictably and may not be able to be closed.
+//
+// We fix this by synchronizing the transom speed with ego's when opening or
+//  closing so that the animation always completes. This does not change the
+//  duration of the scene.
+//
+// Applies to: All versions
+// Responsible method: transomWin:doVerb
+static const uint16 laurabow2SignatureFixTransomSpeed[] = {
+	0x39, 0x04,                         // pushi cel
+	0x76,                               // push0
+	0x72, SIG_ADDTOOFFSET(+2),          // lofsa transomWin
+	0x4a, SIG_MAGICDWORD, 0x04,         // send 04 [ transomWin cel? ]
+	0x36,                               // push
+	0x35, 0x00,                         // ldi 00
+	0x1a,                               // eq? [ transomWin:cel == 0 ]
+	SIG_END
+};
+
+static const uint16 laurabow2PatchFixTransomSpeed[] = {
+	0x80, PATCH_UINT16(0x0171),         // lag 0171 [ ego speed ]
+	0x65, 0x5c,                         // aTop cycleSpeed [ transomWin:cycleSpeed = ego speed ]
+	0x39, 0x04,                         // pushi cel
+	0x76,                               // push0
+	0x54, 0x04,                         // self 04 [ self cel? ]
+	0x76,                               // push0
+	PATCH_END
+};
+
+// During act 5, room 448 does not re-initialize the transom correctly. There is
+//  a flag that is set when the player moves the chair, and a flag that is set
+//  or cleared when the player opens or closed the transom, but the transom is
+//  initialized to open if either flag is set. This can leave the graphics out
+//  of sync with the flag and break further toggling.
+//
+// We fix this by re-ordering the instructions so that the chair flag controls
+//  the chair and the transom flag controls the transom.
+//
+// Applies to: All versions
+// Responsible method: rm448:init
+static const uint16 laurabow2SignatureRememberTransom[] = {
+	SIG_MAGICDWORD,
+	0x78,                               // push1
+	0x39, 0x27,                         // pushi 27
+	0x45, 0x02, 0x02,                   // callb proc0_2 [ is flag 39 set? (transom open) ]
+	0x2f, 0x06,                         // bt 06 [ open transom and move chair ]
+	0x78,                               // push1
+	0x39, 0x74,                         // pushi 74
+	0x45, 0x02, 0x02,                   // callb proc0_2 [ is flag 116 set? (chair moved) ]
+	0x31, 0x1c,                         // bnt 1c [ skip open transom and move chair ]
+	0x39, 0x3f,                         // pushi setPri
+	SIG_ADDTOOFFSET(+14),
+	0x4a, 0x0e,                         // send 0e [ chair setPri: ... (move chair) ]
+	SIG_END
+};
+
+static const uint16 laurabow2PatchRememberTransom[] = {
+	PATCH_GETORIGINALBYTES(8, 6),       // acc = is flag 116 set? (chair moved)
+	0x31, 0x12,                         // bnt 12 [ skip move chair ]
+	PATCH_GETORIGINALBYTES(16, 18),     // move chair
+	PATCH_GETORIGINALBYTES(0, 6),       // acc = is flag 39 set? (transom open)
+	0x31, 0x0a,                         // bnt 0a [ skip open transom ]
 	PATCH_END
 };
 
@@ -10297,6 +11003,28 @@ static const uint16 laurabow2CDPatchFixBugsWithMeat[] = {
 	0x81, 0x50,                         // lag global[50] [ User ]
 	0x4a, 0x04,                         // send 4
 	0x2f, 0x0e,                         // bt 0e [ run sDoMeat if User:canControl? ]
+	PATCH_END
+};
+
+// The dinosaur bone in room 480 has a broken verb handler. Clicking on the bone
+//  itself doesn't work, instead the player has to click on the surrounding area
+//  to look at it or pick it up. bone:doVerb calls dinoBones:doVerb but doesn't
+//  pass the verb parameter. We fix this by increasing the &rest parameter.
+//  
+// Applies to: All versions
+// Responsible method: bone:doVerb
+static const uint16 laurabow2SignatureFixDinosaurBone[] = {
+	SIG_MAGICDWORD,
+	0x76,                               // push0
+	0x59, 0x02,                         // &rest 02 [ excludes verb parameter ]
+	0x72, SIG_ADDTOOFFSET(+2),          // lofsa dinoBones
+	0x4a, 0x04,                         // send 04 [ dinoBones doVerb: &rest ]
+	SIG_END
+};
+
+static const uint16 laurabow2PatchFixDinosaurBone[] = {
+	0x76,                               // push0
+	0x59, 0x01,                         // &rest 01 [ includes verb parameter ]
 	PATCH_END
 };
 
@@ -10452,6 +11180,28 @@ static const uint16 laurabow2PatchMuseumMusicVolume[] = {
 	PATCH_END
 };
 
+// In the news room (230) there are two reporters on the left, but one of them
+//  responds to Ask with the other's message, talker, and voice. The script
+//  passes the wrong noun to lb2Messager:say.
+//
+// We fix this by patching both doVerb methods to pass their noun property so
+//  that they both respond to Ask with their own message.
+//
+// Applies to: All versions
+// Responsible Methods: personS:doVerb, personT:doVerb
+static const uint16 laurabow2SignatureReporterMessage[] = {
+	0x39, 0x0d,                         // pushi 0d [ noun ]
+	SIG_MAGICDWORD,
+	0x39, 0x06,                         // pushi 06 [ verb ]
+	0x39, 0x2e,                         // pushi 2e [ cond ]
+	SIG_END
+};
+
+static const uint16 laurabow2PatchReporterMessage[] = {
+	0x67, 0x1a,                         // pTos noun
+	PATCH_END
+};
+
 // LB2CD reduces the music volume significantly during the introduction when
 //  characters talk while disembarking the ship in room 120. This is done so
 //  that their speech can be heard but it also occurs in text-only mode.
@@ -10595,28 +11345,37 @@ static const uint16 laurabow2CDPatchAudioTextMenuSupport2[] = {
 //          script, description,                                      signature                                      patch
 static const SciScriptPatcherEntry laurabow2Signatures[] = {
 	{  true,   560, "CD: painting closing immediately",               1, laurabow2CDSignaturePaintingClosing,            laurabow2CDPatchPaintingClosing },
+	{  true,     0, "CD: fix hands-off cursor",                       1, laurabow2CDSignatureFixHandsOffCursor,          laurabow2CDPatchFixHandsOffCursor },
 	{  true,     0, "CD/Floppy: museum music volume",                 1, laurabow2SignatureMuseumMusicVolume,            laurabow2PatchMuseumMusicVolume },
-	{  true,     0, "CD: fix problematic icon bar",                   1, laurabow2CDSignatureFixProblematicIconBar,      laurabow2CDPatchFixProblematicIconBar },
 	{  true,    26, "CD: fix act 4 wrong music",                      1, laurabow2CDSignatureFixAct4WrongMusic,          laurabow2CDPatchFixAct4WrongMusic },
 	{  true,    90, "CD: fix yvette's tut response",                  1, laurabow2CDSignatureFixYvetteTutResponse,       laurabow2CDPatchFixYvetteTutResponse },
 	{  true,   110, "CD: fix intro music",                            1, laurabow2CDSignatureFixIntroMusic,              laurabow2CDPatchFixIntroMusic },
+	{  true,   230, "CD/Floppy: reporter message",                    2, laurabow2SignatureReporterMessage,              laurabow2PatchReporterMessage },
 	{  true,   350, "CD/Floppy: museum party fix entering south 1/2", 1, laurabow2SignatureMuseumPartyFixEnteringSouth1, laurabow2PatchMuseumPartyFixEnteringSouth1 },
 	{  true,   350, "CD/Floppy: museum party fix entering south 2/2", 1, laurabow2SignatureMuseumPartyFixEnteringSouth2, laurabow2PatchMuseumPartyFixEnteringSouth2 },
 	{ false,   355, "CD: fix museum actor loops",                     2, laurabow2CDSignatureFixMuseumActorLoops1,       laurabow2CDPatchFixMuseumActorLoops1 },
-	{  true,   430, "CD/Floppy: make wired east door persistent",     1, laurabow2SignatureRememberWiredEastDoor,        laurabow2PatchRememberWiredEastDoor },
 	{  true,   430, "CD/Floppy: fix wired east door",                 1, laurabow2SignatureFixWiredEastDoor,             laurabow2PatchFixWiredEastDoor },
 	{  true,   448, "CD/Floppy: fix armor hall door pathfinding",     1, laurabow2SignatureFixArmorHallDoorPathfinding,  laurabow2PatchFixArmorHallDoorPathfinding },
 	{ false,   400, "CD: fix museum actor loops",                     4, laurabow2CDSignatureFixMuseumActorLoops1,       laurabow2CDPatchFixMuseumActorLoops1 },
 	{ false,   420, "CD: fix museum actor loops",                     1, laurabow2CDSignatureFixMuseumActorLoops1,       laurabow2CDPatchFixMuseumActorLoops1 },
+	{  true,   420, "CD/Floppy: fix act 5 broken timers",             1, laurabow2SignatureFixAct5BrokenTimers,          laurabow2PatchFixAct5BrokenTimers },
 	{  true,   450, "Floppy: fix dagger case error",                  2, laurabow2SignatureFixDaggerCaseError,           laurabow2PatchFixDaggerCaseError },
+	{  true,   454, "CD/Floppy: fix coffin lockup 1/2",               1, laurabow2SignatureMummyCoffinLid1,              laurabow2PatchMummyCoffinLid1 },
+	{  true,   454, "CD/Floppy: fix coffin lockup 2/2",               1, laurabow2SignatureMummyCoffinLid2,              laurabow2PatchMummyCoffinLid2 },
+	{  true,   454, "CD: fix coffin closing cel",                     1, laurabow2CDSignatureMummyCoffinClosingCel,      laurabow2CDPatchMummyCoffinClosingCel },
 	{  true,   460, "CD/Floppy: fix crate room east door lockup",     1, laurabow2SignatureFixCrateRoomEastDoorLockup,   laurabow2PatchFixCrateRoomEastDoorLockup },
+	{  true,   480, "CD/Floppy: fix dinosaur bone",                   1, laurabow2SignatureFixDinosaurBone,              laurabow2PatchFixDinosaurBone },
 	{ false,   500, "CD: fix museum actor loops",                     3, laurabow2CDSignatureFixMuseumActorLoops1,       laurabow2CDPatchFixMuseumActorLoops1 },
 	{  true,  2660, "CD/Floppy: fix elevator lockup",                 1, laurabow2SignatureFixElevatorLockup,            laurabow2PatchFixElevatorLockup },
+	{  true,   520, "CD/Floppy: act 5 trigger",                       1, laurabow2SignatureAct5Trigger,                  laurabow2PatchAct5Trigger },
 	{  true,   550, "CD/Floppy: fix back rub east entrance lockup",   1, laurabow2SignatureFixBackRubEastEntranceLockup, laurabow2PatchFixBackRubEastEntranceLockup },
 	{  true,   550, "CD/Floppy: fix disappearing desk items",         1, laurabow2SignatureFixDisappearingDeskItems,     laurabow2PatchFixDisappearingDeskItems },
 	{  true,    26, "Floppy: fix act 4 initialization",               1, laurabow2SignatureFixAct4Initialization,        laurabow2PatchFixAct4Initialization },
 	{  true,   440, "CD/Floppy: handle armor room events",            1, laurabow2SignatureHandleArmorRoomEvents,        laurabow2PatchHandleArmorRoomEvents },
 	{  true,   448, "CD/Floppy: handle armor hall room events",       1, laurabow2SignatureHandleArmorRoomEvents,        laurabow2PatchHandleArmorRoomEvents },
+	{  true,   448, "CD/Floppy: act 5 timer crash",                   1, laurabow2SignatureAct5TimerCrash,               laurabow2PatchAct5TimerCrash },
+	{  true,   448, "CD/Floppy: fix transom speed",                   1, laurabow2SignatureFixTransomSpeed,              laurabow2PatchFixTransomSpeed },
+	{  true,   448, "CD/Floppy: remember transom",                    1, laurabow2SignatureRememberTransom,              laurabow2PatchRememberTransom },
 	{  true,   600, "Floppy: fix bugs with meat",                     1, laurabow2FloppySignatureFixBugsWithMeat,        laurabow2FloppyPatchFixBugsWithMeat },
 	{  true,   600, "CD: fix bugs with meat",                         1, laurabow2CDSignatureFixBugsWithMeat,            laurabow2CDPatchFixBugsWithMeat },
 	{ false,   650, "CD: fix museum actor loops",                     1, laurabow2CDSignatureFixMuseumActorLoops2,       laurabow2CDPatchFixMuseumActorLoops2 },
@@ -10624,6 +11383,17 @@ static const SciScriptPatcherEntry laurabow2Signatures[] = {
 	{  true,    28, "disable speed test",                             1, sci11SpeedTestSignature,                        sci11SpeedTestPatch },
 	{  true,   120, "CD: disable intro volume change in text mode",   1, laurabow2CDSignatureIntroVolumeChange,          laurabow2CDPatchIntroVolumeChange },
 	{  true,   928, "Narrator lockup fix",                            1, sciNarratorLockupSignature,                     sciNarratorLockupPatch },
+	{ false,     0, "CD: enable control panel",                       1, laurabow2CDSignatureEnableControlPanel,         laurabow2PatchEnableControlPanel },
+	{ false,   310, "CD: enable control panel",                       1, laurabow2CDSignatureEnableControlPanel,         laurabow2PatchEnableControlPanel },
+	{ false,   441, "CD: enable control panel",                       2, laurabow2CDSignatureEnableControlPanel,         laurabow2PatchEnableControlPanel },
+	{ false,   454, "CD: enable control panel",                       7, laurabow2CDSignatureEnableControlPanel,         laurabow2PatchEnableControlPanel },
+	{ false,   520, "CD: enable control panel",                      13, laurabow2CDSignatureEnableControlPanel,         laurabow2PatchEnableControlPanel },
+	{ false,   550, "CD: enable control panel",                       8, laurabow2CDSignatureEnableControlPanel,         laurabow2PatchEnableControlPanel },
+	{ false,   610, "CD: enable control panel",                       3, laurabow2CDSignatureEnableControlPanel,         laurabow2PatchEnableControlPanel },
+	{ false,   700, "CD: enable control panel",                       6, laurabow2CDSignatureEnableControlPanel,         laurabow2PatchEnableControlPanel },
+	{ false,   710, "CD: enable control panel",                       1, laurabow2CDSignatureEnableControlPanel,         laurabow2PatchEnableControlPanel },
+	{ false,   923, "CD: enable control panel",                       1, laurabow2CDSignatureInsetEnableControlPanel,    laurabow2CDPatchInsetEnableControlPanel },
+	{ false,   610, "Floppy: enable control panel",                   3, laurabow2FloppySignatureEnableControlPanel,     laurabow2PatchEnableControlPanel },
 	// King's Quest 6 and Laura Bow 2 share basic patches for audio + text support
 	{ false,   924, "CD: audio + text support 1",                     1, kq6laurabow2CDSignatureAudioTextSupport1,       kq6laurabow2CDPatchAudioTextSupport1 },
 	{ false,   924, "CD: audio + text support 2",                     1, kq6laurabow2CDSignatureAudioTextSupport2,       kq6laurabow2CDPatchAudioTextSupport2 },
@@ -10976,6 +11746,51 @@ static const uint16 phant1RatPatch[] = {
 	PATCH_END
 };
 
+// In the basement there is a moment where clicking the fast-forward button
+//  locks up the game. Fast-forward changes the current room script to state
+//  zero and sets global 115. Most scripts' changeState methods start by testing
+//  this global to implement fast-forward behavior. They then reset the global
+//  when disposing before calling handsOn. scaryHandsOnCode:doit enables input,
+//  empties the event queue, and then polls and processes one final event.
+//  This creates a window where handsOn can process a fast-forward click and
+//  re-enter the room script while it's in the middle of disposing itself.
+//
+// Most room scripts have a structure that survives this re-entrancy, but room
+//  20100's sEnterFrom20200 is unusual. It doesn't test the fast-forward global
+//  in state zero. Instead, it unconditionally calls handsOff, causing the
+//  original handsOn call to undo its work before it returns.
+//
+// We fix this by swapping two function calls in sEnterFrom20200:dispose:
+//  handsOn and super:dispose. Now the script is fully disposed before handsOn.
+//  If a fast-forward click occurs it will no longer have any effect, because
+//  the room no longer has a script. If other scripts are discovered with this
+//  same problem, this patch will probably apply.
+//
+// Applies to: All versions
+// Responsible method: sEnterFrom20200:dispose
+// Fixes bug: #14368
+static const uint16 phant1BasementFastForwardSignature[] = {
+	0x35, 0x00,                     // ldi 00
+	0xa1, SIG_MAGICDWORD, 0x73,     // lag 73 [ fast-forward = 0 ]
+	0x38, SIG_SELECTOR16(handsOn),  // pushi handsOn
+	0x76,                           // push0
+	0x81, 0x01,                     // lag 01
+	0x4a, SIG_UINT16(0x0004),       // send 04 [ Scary handsOn: ]
+	0x38, SIG_SELECTOR16(dispose),  // pushi dispose
+	0x76,                           // push0
+	0x59, 0x01,                     // &rest 01
+	0x57, SIG_ADDTOOFFSET(+1),      // super 04 [ super dispose: &rest ]
+	      SIG_UINT16(0x0004),
+	SIG_END
+};
+
+static const uint16 phant1BasementFastForwardPatch[] = {
+	PATCH_ADDTOOFFSET(+4),          // [ fast-forward = 0 ]
+	PATCH_GETORIGINALBYTES(13, 10), // [ super dispose: &rest ]
+	PATCH_GETORIGINALBYTES(4, 9),   // [ Scary handsOn: ]
+	PATCH_END
+};
+
 // In Phantasmagoria the cursor's hover state will not trigger on any of the
 // buttons in the main menu after returning to the main menu from a game, or
 // when choosing "Quit" on the main menu and then cancelling the quit in the
@@ -11161,6 +11976,52 @@ static const uint16 phant1CopyChaseFilePatch[] = {
 	PATCH_END
 };
 
+// Clicking "Start New Game" when all 10 saves are in the chapter 7 chase
+//  crashes the game. Room 901 is supposed to prompt the player to delete one of
+//  their saves first, but in delete mode this room only shows regular saves,
+//  not chase saves. If all of the saves are chase saves then the screen is
+//  unexpectedly empty, and it crashes when trying to select a default icon.
+//
+// We fix this by showing all saves when in delete mode. This fixes the obscure
+//  bug and makes it easier to manage saves. Room 91 sets flag 152 when there
+//  are 10 saves to put room 901 in delete mode. Now that flag is tested before
+//  the save type to determine if a save should be displayed.
+//
+// Applies to: All versions
+// Responsible method: selectGameRoom:init
+// Fixes bug: #14361
+static const uint16 phant1DeleteSaveSignature[] = {
+	SIG_MAGICDWORD,
+	0x31, 0x06,                     // bnt 06
+	0x35, 0x00,                     // ldi 00
+	0xa5, 0x02,                     // sat 02 [ temp2 = 0, redundant ]
+	0x33, SIG_ADDTOOFFSET(+1),      // jmp    [ exit cond ]
+	SIG_ADDTOOFFSET(+7),
+	0x31, 0x17,                     // bnt 17
+	SIG_ADDTOOFFSET(+11),
+	0x36,                           // push
+	0x35, 0x02,                     // ldi 02
+	0x12,                           // and
+	0x31, 0x06,                     // bnt 06
+	0x35, 0x01,                     // ldi 01
+	SIG_END
+};
+
+static const uint16 phant1DeleteSavePatch[] = {
+	0x2f, PATCH_GETORIGINALBYTEADJUST(7, +6), // bt [ exit cond ]
+	0x78,                                     // push1
+	0x38, PATCH_UINT16(0x0098),               // pushi 0098
+	0x45, 0x03, PATCH_UINT16(0x0002),         // callb proc0_3 [ is flag 152 set? ]
+	0xa5, 0x02,                               // sat 02 [ show save in delete mode ]
+	PATCH_GETORIGINALBYTES(8, 7),
+	0x31, 0x1d,                               // bnt 1d
+	PATCH_GETORIGINALBYTES(17, 11),
+	0x7a,                                     // push2
+	0x12,                                     // and
+	0x31, 0x04,                               // bnt 04
+	PATCH_END
+};
+
 // During the chase, the west exit in room 46980 has incorrect logic which kills
 //  the player if they went to the crypt with the crucifix, among other bugs.
 //
@@ -11332,7 +12193,9 @@ static const SciScriptPatcherEntry phantasmagoriaSignatures[] = {
 	{  true,    26, "fix video 2020 censorship",                   1, phant1Video2020CensorSignature,  phant1Video2020CensorPatch },
 	{  true,    33, "disable video benchmarking",                  1, sci2BenchmarkSignature,          sci2BenchmarkPatch },
 	{  true,   901, "fix invalid array construction",              1, sci21IntArraySignature,          sci21IntArrayPatch },
+	{  true,   901, "fix delete save",                             1, phant1DeleteSaveSignature,       phant1DeleteSavePatch },
 	{  true,  1111, "ignore audio settings from save game",        1, phant1SavedVolumeSignature,      phant1SavedVolumePatch },
+	{  true, 20100, "fix basement fast-forward",                   1, phant1BasementFastForwardSignature, phant1BasementFastForwardPatch },
 	{  true, 20200, "fix broken rat init in sEnterFromAlcove",     1, phant1RatSignature,              phant1RatPatch },
 	{  true, 20200, "fix chapter 5 wine cask hotspot",             1, phant1WineCaskHotspotSignature,  phant1WineCaskHotspotPatch },
 	{  true, 45950, "fix chase file deletion",                     1, phant1DeleteChaseFileSignature,  phant1DeleteChaseFilePatch },
@@ -13889,6 +14752,27 @@ static const uint16 qfg1vgaPatchDrinkWaterMessage[] = {
 	PATCH_END
 };
 
+// QFG1VGA throttles the Sierra logo palette animation to once every third
+//  game cycle. This runs very slow when combined with our own throttling.
+//  This appears to be the only game that does this, so we just disable it.
+//
+// Applies to: All versions
+// Responsible method: LogoRoom:doit
+static const uint16 qfg1vgaSignatureSierraLogoSpeed[] = {
+	SIG_MAGICDWORD,
+	0x0a,                                   // mod
+	0x36,                                   // push
+	0x35, 0x00,                             // ldi 00
+	0x1a,                                   // eq?
+	SIG_END
+};
+
+static const uint16 qfg1vgaPatchSierraLogoSpeed[] = {
+	PATCH_ADDTOOFFSET(+1),
+	0x76,                                   // push0
+	PATCH_END
+};
+
 //          script, description,                                      signature                            patch
 static const SciScriptPatcherEntry qfg1vgaSignatures[] = {
 	{  true,     0, "inventory weight warning",                    1, qfg1vgaSignatureInventoryWeightWarn, qfg1vgaPatchInventoryWeightWarn },
@@ -13914,6 +14798,7 @@ static const SciScriptPatcherEntry qfg1vgaSignatures[] = {
 	{  true,   340, "dagnabit inventory fix",                      1, qfg1vgaSignatureDagnabitInventory,   qfg1vgaPatchDagnabitInventory },
 	{  true,   340, "mac: dagnabit icon bar fix",                  1, qfg1vgaSignatureMacDagnabitIconBar,  qfg1vgaPatchMacDagnabitIconBar },
 	{  true,   603, "mac: logo mouse-up fix",                      1, qfg1vgaSignatureMacLogoIntroSkip,    qfg1vgaPatchMacLogoIntroSkip },
+	{  true,   603, "sierra logo speed",                           1, qfg1vgaSignatureSierraLogoSpeed,     qfg1vgaPatchSierraLogoSpeed },
 	{  true,   814, "window text temp space",                      1, qfg1vgaSignatureTempSpace,           qfg1vgaPatchTempSpace },
 	{  true,   814, "dialog header offset",                        3, qfg1vgaSignatureDialogHeader,        qfg1vgaPatchDialogHeader },
 	{  true,   928, "Narrator lockup fix",                         1, sciNarratorLockupSignature,          sciNarratorLockupPatch },
@@ -14137,76 +15022,41 @@ static const uint16 qfg3PatchImportDialog[] = {
 	PATCH_END
 };
 
-// Patch for the Woo dialog option in Uhura's conversation.
+// Asking Uhura about Woo in room 440 crashes. The Woo dialog option (-75) is
+//  handled by uhuraTell:doChild so that it can award 2 points, but the script
+//  is missing a necessary return statement. This causes the default handler to
+//  also run, but because the "query" value is negative, the default handler
+//  treats it as opening a submenu. There is no submenu for query -75, and this
+//  causes Teller:doChild to read uhuraTell:keys out of bounds.
 //
-// Problem: The Woo dialog option (0xffb5) is negative, and therefore
-//  treated as an option opening a submenu. This leads to uhuraTell::doChild
-//  being called, which calls hero::solvePuzzle and then proceeds with
-//  Teller::doChild to open the submenu. However, there is no actual submenu
-//  defined for option -75 since -75 does not show up in uhuraTell::keys.
-//  This will cause Teller::doChild to run out of bounds while scanning through
-//  uhuraTell::keys.
+// The Woo dialog handler isn't just broken, it's redundant. It never awards the
+//  points it attempts to. The points are tied to flag 268, but this same method
+//  already sets that flag when awarding points for asking Uhura about marriage.
+//  Asking about marriage is the precondition for asking about Woo.
 //
-// Strategy: there is another conversation option in uhuraTell::doChild calling
-//  hero::solvePuzzle (0xfffc) which does a ret afterwards without going to
-//  Teller::doChild. We jump to this call of hero::solvePuzzle to get that same
-//  behaviour.
+// We fix this by replacing the redundant hero:solvePuzzle call with the missing
+//  return statement. Alternatively, we could patch the heap to change the Woo
+//  dialog option from -75 to 75, but existing save games could still crash.
 //
-// Applies to at least: English, German, Italian, French, Spanish Floppy
-// Responsible method: uhuraTell::doChild
+// Applies to: All versions
+// Responsible method: uhuraTell:doChild
 // Fixes bug: #5172
 static const uint16 qfg3SignatureWooDialog[] = {
-	SIG_MAGICDWORD,
-	0x67, 0x12,                         // pTos 12 (query)
-	0x35, 0xb6,                         // ldi b6
-	0x1a,                               // eq?
-	0x2f, 0x05,                         // bt 05
-	0x67, 0x12,                         // pTos 12 (query)
-	0x35, 0x9b,                         // ldi 9b
-	0x1a,                               // eq?
-	0x31, 0x0c,                         // bnt 0c
-	0x38, SIG_SELECTOR16(solvePuzzle),  // pushi solvePuzzle (0297)
+	0x38, SIG_SELECTOR16(solvePuzzle),  // pushi solvePuzzle
 	0x7a,                               // push2
 	0x38, SIG_UINT16(0x010c),           // pushi 010c
 	0x7a,                               // push2
-	0x81, 0x00,                         // lag global[0]
-	0x4a, 0x08,                         // send 08
-	0x67, 0x12,                         // pTos 12 (query)
-	0x35, 0xb5,                         // ldi b5
+	0x81, 0x00,                         // lag 00
+	0x4a, 0x08,                         // send 08 [ hero solvePuzzle: 268 2 ]
+	SIG_MAGICDWORD,
+	0x67, 0x12,                         // pTos query
+	0x35, 0xfc,                         // ldi fc
 	SIG_END
 };
 
 static const uint16 qfg3PatchWooDialog[] = {
-	PATCH_ADDTOOFFSET(+0x29),
-	0x33, 0x11,                         // jmp [to 0x6a2, the call to hero::solvePuzzle for 0xFFFC]
-	PATCH_END
-};
-
-// Alternative version, with uint16 offsets, for GOG release of QfG3.
-static const uint16 qfg3SignatureWooDialogAlt[] = {
-	SIG_MAGICDWORD,
-	0x67, 0x12,                         // pTos 12 (query)
-	0x35, 0xb6,                         // ldi b6
-	0x1a,                               // eq?
-	0x2e, SIG_UINT16(0x0005),           // bt 05
-	0x67, 0x12,                         // pTos 12 (query)
-	0x35, 0x9b,                         // ldi 9b
-	0x1a,                               // eq?
-	0x30, SIG_UINT16(0x000c),           // bnt 0c
-	0x38, SIG_SELECTOR16(solvePuzzle),  // pushi solvePuzzle (0297)
-	0x7a,                               // push2
-	0x38, SIG_UINT16(0x010c),           // pushi 010c
-	0x7a,                               // push2
-	0x81, 0x00,                         // lag global[0]
-	0x4a, 0x08,                         // send 08
-	0x67, 0x12,                         // pTos 12 (query)
-	0x35, 0xb5,                         // ldi b5
-	SIG_END
-};
-
-static const uint16 qfg3PatchWooDialogAlt[] = {
-	PATCH_ADDTOOFFSET(+44),
-	0x33, 0x12,                         // jmp [to 0x708, the call to hero::solvePuzzle for 0xFFFC]
+	0x35, 0x01,                         // ldi 01
+	0x48,                               // ret
 	PATCH_END
 };
 
@@ -15046,7 +15896,6 @@ static const uint16 qfg3PatchLaibonTeller[] = {
 static const SciScriptPatcherEntry qfg3Signatures[] = {
 	{  true,   944, "import dialog continuous calls",                     1, qfg3SignatureImportDialog,           qfg3PatchImportDialog },
 	{  true,   440, "dialog crash when asking about Woo",                 1, qfg3SignatureWooDialog,              qfg3PatchWooDialog },
-	{  true,   440, "dialog crash when asking about Woo",                 1, qfg3SignatureWooDialogAlt,           qfg3PatchWooDialogAlt },
 	{  true,    47, "barter events",                                      1, qfg3SignatureBarterEvents,           qfg3PatchBarterEvents },
 	{  true,    52, "export character save bug",                          2, qfg3SignatureExportChar,             qfg3PatchExportChar },
 	{  true,    54, "import character from QfG1 bug",                     1, qfg3SignatureImportQfG1Char,         qfg3PatchImportQfG1Char },
@@ -23017,6 +23866,7 @@ static const uint16 ramaDemoBrokenButtonsPatch[] = {
 
 static const SciScriptPatcherEntry ramaSignatures[] = {
 	{  true,     0, "disable video benchmarking",                     1, sci2BenchmarkSignature,          sci2BenchmarkReversePatch },
+	{  true,    12, "disable video benchmarking",                     1, sci2BenchmarkSignature,          sci2BenchmarkReversePatch },
 	{  true,    15, "disable video benchmarking",                     1, sci2BenchmarkSignature,          sci2BenchmarkReversePatch },
 	{  true,    55, "fix bad DocReader::init priority calculation",   1, ramaDocReaderInitSignature,      ramaDocReaderInitPatch },
 	{  true,    85, "fix SaveManager to use normal readWord calls",   1, ramaSerializeRegTSignature1,     ramaSerializeRegTPatch1 },
@@ -23797,7 +24647,7 @@ void ScriptPatcher::applyPatch(const SciScriptPatcherEntry *patchEntry, SciSpan<
 	const uint16 *patchData = patchEntry->patchData;
 	byte orgData[PATCH_VALUELIMIT];
 	int32 offset = signatureOffset;
-	uint16 patchWord = *patchEntry->patchData;
+	uint16 patchWord = *patchData;
 	uint16 patchSelector = 0;
 
 	// Copy over original bytes from script
@@ -23813,6 +24663,16 @@ void ScriptPatcher::applyPatch(const SciScriptPatcherEntry *patchEntry, SciSpan<
 		case PATCH_CODE_ADDTOOFFSET: {
 			// add value to offset
 			offset += patchValue;
+			break;
+		}
+		case PATCH_CODE_GETORIGINALBYTES: {
+			// get range of original bytes from script
+			uint16 lengthValue;
+			patchData++; lengthValue = (uint16)(*patchData);
+			if ((uint32)patchValue + lengthValue >= orgDataSize)
+				error("Script-Patcher: can not get requested original byte from script");
+			memcpy(scriptData.getUnsafeDataAt(offset, lengthValue), &orgData[patchValue], lengthValue);
+			offset += lengthValue;
 			break;
 		}
 		case PATCH_CODE_GETORIGINALBYTE: {
@@ -24485,6 +25345,10 @@ void ScriptPatcher::processScript(uint16 scriptNr, SciSpan<byte> scriptData) {
 
 					// Enables Dual mode patches (audio + subtitles at the same time) for Laura Bow 2
 					enablePatch(signatureTable, "CD: audio + text support");
+
+					enablePatch(signatureTable, "CD: enable control panel");
+				} else {
+					enablePatch(signatureTable, "Floppy: enable control panel");
 				}
 				break;
 			case GID_QFG4:

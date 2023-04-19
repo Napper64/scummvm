@@ -127,6 +127,8 @@ public:
 	void engineInit() override;
 	void engineDone() override;
 
+	void updateStartSettings(const Common::String &executable, Common::String &command, Common::StringMap &settings, Common::StringArray& additionalArgs) override;
+
 	bool hasFeature(Feature f) override;
 	void setFeatureState(Feature f, bool enable) override;
 	bool getFeatureState(Feature f) override;
@@ -177,7 +179,7 @@ public:
 	bool showMouse(bool visible) override;
 
 	void warpMouse(int x, int y) override;
-	void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor = 255, bool dontScale = false, const Graphics::PixelFormat *format = NULL) override;
+	void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor = 255, bool dontScale = false, const Graphics::PixelFormat *format = NULL, const byte *mask = NULL) override;
 	void setCursorPalette(const byte *colors, uint start, uint num) override;
 
 	bool pollEvent(Common::Event &event) override;
@@ -215,6 +217,8 @@ public:
 	Common::String getSystemLanguage() const override;
 
 	bool isConnectionLimited() override;
+
+	virtual Common::String getDefaultLogFileName() { return Common::String("/var/mobile/.scummvm.log"); }
 
 protected:
 	void initVideoContext();

@@ -55,7 +55,7 @@ static const GameIdStrToEnum s_gameIdStrToEnum[] = {
 	{ "camelot",         "arthur",          GID_CAMELOT,          false, SCI_VERSION_NONE },
 	{ "castlebrain",     "brain",           GID_CASTLEBRAIN,      false, SCI_VERSION_1_LATE },	// Amiga is SCI1 middle, PC SCI1 late
 	{ "chest",           "archive",         GID_CHEST,            true,  SCI_VERSION_NONE },
-	{ "christmas1988",   "demo",            GID_CHRISTMAS1988,    false, SCI_VERSION_NONE },
+	{ "christmas1988",   "demo",            GID_CHRISTMAS1988,    false, SCI_VERSION_0_EARLY },
 	{ "christmas1990",   "card",            GID_CHRISTMAS1990,    false, SCI_VERSION_1_EARLY },
 	{ "christmas1992",   "card",            GID_CHRISTMAS1992,    false, SCI_VERSION_1_1 },
 	{ "cnick-kq",        "",                GID_CNICK_KQ,         false, SCI_VERSION_NONE },	// Sierra ID is "hoyle3", distinguished by resource count
@@ -149,6 +149,7 @@ static const DemoIdEntry s_demoIdTable[] = {
 	{ "ll5",       "lsl5" },
 	{ "hq",        "qfg1" },	// QFG1 SCI0/EGA
 	{ "hq2demo",   "qfg2" },
+	{ "demo",      "rama" },
 	{ "sq1demo",   "sq1sci" },
 	{ nullptr,      nullptr }
 };
@@ -354,7 +355,8 @@ SaveStateList SciMetaEngine::listSaves(const char *target) const {
 				}
 				SaveStateDescriptor descriptor(this, slotNr, meta.name);
 
-				if (descriptor.isAutosave()) {
+				if (slotNr == 0) {
+					// ScummVM auto-save slot (note however, that autosave support is currently revoked)
 					hasAutosave = true;
 				}
 
@@ -494,6 +496,19 @@ Common::Language charToScummVMLanguage(const char c) {
 		return Common::PT_BRA;
 	default:
 		return Common::UNK_LANG;
+	}
+}
+
+Common::Language sciToScummVMLanguage(const int sciLanguage) {
+	switch (sciLanguage) {
+	case K_LANG_ENGLISH:    return Common::EN_ANY;
+	case K_LANG_FRENCH:     return Common::FR_FRA;
+	case K_LANG_SPANISH:    return Common::ES_ESP;
+	case K_LANG_ITALIAN:    return Common::IT_ITA;
+	case K_LANG_GERMAN:     return Common::DE_DEU;
+	case K_LANG_JAPANESE:   return Common::JA_JPN;
+	case K_LANG_PORTUGUESE: return Common::PT_BRA;
+	default:                return Common::UNK_LANG;
 	}
 }
 
@@ -700,6 +715,35 @@ ADDetectedGame SciMetaEngine::fallbackDetectExtern(uint md5Bytes, const FileMap 
 				}
 			}
 			seeker++;
+		}
+	}
+
+	// Try to determine the game language from config file (SCI1.1 and later)
+	const char *configNames[] = { "resource.cfg", "resource.win" };
+	for (int i = 0; i < ARRAYSIZE(configNames) && language == Common::EN_ANY; i++) {
+		Common::File file;
+		if (allFiles.contains(configNames[i]) && file.open(allFiles[configNames[i]])) {
+			while (true) {
+				Common::String line = file.readLine();
+				if (file.eos()) {
+					break;
+				}
+				uint32 separatorPos = line.find('=');
+				if (separatorPos == Common::String::npos) {
+					continue;
+				}
+				Common::String key = line.substr(0, separatorPos);
+				key.trim();
+				if (key.equalsIgnoreCase("language")) {
+					Common::String val = line.substr(separatorPos + 1);
+					val.trim();
+					Common::Language parsedLanguage = sciToScummVMLanguage(atoi(val.c_str()));
+					if (parsedLanguage != Common::UNK_LANG) {
+						language = parsedLanguage;
+					}
+					break;
+				}
+			}
 		}
 	}
 

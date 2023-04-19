@@ -26,9 +26,19 @@
 #include "director/lingo/lingo-object.h"
 #include "director/lingo/xlibs/movemousexobj.h"
 
-namespace Director {
+/*************************************
+ *
+ * USED IN:
+ * MediaBook Sampler CD/XObject Studio
+ *
+ *************************************/
 
-// MoveMouse 0.1 - (c) Andrew Green 1993 for Mac
+/*
+ * MoveMouse 0.1 - (c) Andrew Green 1993 for Mac
+ */
+
+
+namespace Director {
 
 const char *MoveMouseXObj::xlibName = "MoveMouse";
 const char *MoveMouseXObj::fileNames[] = {
@@ -72,7 +82,7 @@ void MoveMouseXObj::m_new(int nargs) {
 		warning("MoveMouse::m_new: expected 0 arguments");
 		g_lingo->dropStack(nargs);
 	}
-	g_lingo->push(g_lingo->_currentMe);
+	g_lingo->push(g_lingo->_state->me);
 }
 
 void MoveMouseXObj::m_setMouseLoc(int nargs) {

@@ -396,7 +396,7 @@ int main(int argc, char *argv[]) {
 		setup.defines.push_back("POSIX");
 		// Define both MACOSX, and IPHONE, but only one of them will be associated to the
 		// correct target by the Xcode project provider.
-		// This define will help catching up target dependend files, like "browser_osx.mm"
+		// This define will help catching up target-dependent files, like "browser_osx.mm"
 		// The suffix ("_osx", or "_ios") will be used by the project provider to filter out
 		// the files, according to the target.
 		setup.defines.push_back("MACOSX");
@@ -431,9 +431,6 @@ int main(int argc, char *argv[]) {
 		cout << "\nBuilding against SDL 1.2\n\n";
 	} else {
 		cout << "\nBuilding against SDL 2.0\n\n";
-		// TODO: This also defines USE_SDL2 in the preprocessor, we don't do
-		// this in our configure/make based build system. Adapt create_project
-		// to replicate this behavior.
 		setup.defines.push_back("USE_SDL2");
 	}
 
@@ -452,6 +449,7 @@ int main(int argc, char *argv[]) {
 	// actually...). While in MSVC this is solely for disabling warnings.
 	// That is really not nice. We should consider a nicer way of doing this.
 	StringList globalWarnings;
+	StringList globalErrors;
 	std::map<std::string, StringList> projectWarnings;
 
 	CreateProjectTool::ProjectProvider *provider = nullptr;
@@ -470,7 +468,7 @@ int main(int argc, char *argv[]) {
 
 		addGCCWarnings(globalWarnings);
 
-		provider = new CreateProjectTool::CMakeProvider(globalWarnings, projectWarnings);
+		provider = new CreateProjectTool::CMakeProvider(globalWarnings, projectWarnings, globalErrors);
 
 		break;
 
@@ -482,7 +480,7 @@ int main(int argc, char *argv[]) {
 
 		addGCCWarnings(globalWarnings);
 
-		provider = new CreateProjectTool::CodeBlocksProvider(globalWarnings, projectWarnings);
+		provider = new CreateProjectTool::CodeBlocksProvider(globalWarnings, projectWarnings, globalErrors);
 
 		break;
 
@@ -613,6 +611,16 @@ int main(int argc, char *argv[]) {
 			globalWarnings.push_back("4577");
 		}
 
+		globalErrors.push_back("4701"); // potential use of uninitialized local variable
+		globalErrors.push_back("4703"); // potential use of uninitialized local pointer
+		globalErrors.push_back("4456"); // declaration hides previous local declaration
+		globalErrors.push_back("4003"); // not enough arguments for function-like macro invocation
+		globalErrors.push_back("4840"); // use of non-trivial class as an argument to a variadic function
+		globalErrors.push_back("4805"); // comparison of bool to non-bool, unsafe mix of bool and int in arithmetic or bitwise operation
+		globalErrors.push_back("4305"); // truncation of double to float or int to bool
+		globalErrors.push_back("4366"); // address taken of unaligned field
+		globalErrors.push_back("4315"); // unaligned field has constructor that expects to be aligned
+
 		projectWarnings["agi"].push_back("4510");
 		projectWarnings["agi"].push_back("4610");
 
@@ -631,7 +639,9 @@ int main(int argc, char *argv[]) {
 
 		projectWarnings["sci"].push_back("4373");
 
-		provider = new CreateProjectTool::MSBuildProvider(globalWarnings, projectWarnings, msvcVersion, *msvc);
+		projectWarnings["grim"].push_back("4611");
+
+		provider = new CreateProjectTool::MSBuildProvider(globalWarnings, projectWarnings, globalErrors, msvcVersion, *msvc);
 
 		break;
 
@@ -643,7 +653,7 @@ int main(int argc, char *argv[]) {
 
 		addGCCWarnings(globalWarnings);
 
-		provider = new CreateProjectTool::XcodeProvider(globalWarnings, projectWarnings);
+		provider = new CreateProjectTool::XcodeProvider(globalWarnings, projectWarnings, globalErrors);
 		break;
 	}
 
@@ -1056,8 +1066,10 @@ const Feature s_features[] = {
 	{       "png",         "USE_PNG", true, true,  "libpng support" },
 	{       "gif",         "USE_GIF", true, false, "libgif support" },
 	{      "faad",        "USE_FAAD", true, false, "AAC support" },
+	{    "mikmod",      "USE_MIKMOD", true, false, "libmikmod support" },
 	{     "mpeg2",       "USE_MPEG2", true, true,  "MPEG-2 support" },
 	{ "theoradec",   "USE_THEORADEC", true, true,  "Theora decoding support" },
+	{       "vpx",         "USE_VPX", true, false, "VP8/VP9 decoding support" },
 	{ "freetype2",   "USE_FREETYPE2", true, true,  "FreeType support" },
 	{      "jpeg",        "USE_JPEG", true, true,  "libjpeg support" },
 	{"fluidsynth",  "USE_FLUIDSYNTH", true, true,  "FluidSynth support" },
@@ -1084,6 +1096,7 @@ const Feature s_features[] = {
 	{   "opengl_shaders",            "USE_OPENGL_SHADERS", false, true,  "OpenGL support (shaders) in 3d games" },
 	{          "taskbar",                   "USE_TASKBAR", false, true,  "Taskbar integration support" },
 	{            "cloud",                     "USE_CLOUD", false, true,  "Cloud integration support" },
+	{            "enet",                       "USE_ENET", false, true,  "ENet networking support" },
 	{      "translation",               "USE_TRANSLATION", false, true,  "Translation support" },
 	{           "vkeybd",                 "ENABLE_VKEYBD", false, false, "Virtual keyboard support"},
 	{    "eventrecorder",          "ENABLE_EVENTRECORDER", false, false, "Event recorder support"},
@@ -1528,8 +1541,8 @@ FileNode *scanFiles(const std::string &dir, const StringList &includeList, const
 //////////////////////////////////////////////////////////////////////////
 // Project Provider methods
 //////////////////////////////////////////////////////////////////////////
-ProjectProvider::ProjectProvider(StringList &global_warnings, std::map<std::string, StringList> &project_warnings, const int version)
-	: _version(version), _globalWarnings(global_warnings), _projectWarnings(project_warnings) {
+ProjectProvider::ProjectProvider(StringList &global_warnings, std::map<std::string, StringList> &project_warnings, StringList &global_errors, const int version)
+	: _version(version), _globalWarnings(global_warnings), _projectWarnings(project_warnings), _globalErrors(global_errors) {
 }
 
 void ProjectProvider::createProject(BuildSetup &setup) {
@@ -1608,6 +1621,8 @@ void ProjectProvider::createProject(BuildSetup &setup) {
 		createModuleList(setup.srcDir + "/backends/platform/sdl", setup.defines, setup.testDirs, in, ex);
 		createModuleList(setup.srcDir + "/base", setup.defines, setup.testDirs, in, ex);
 		createModuleList(setup.srcDir + "/common", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/common/compression", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/common/formats", setup.defines, setup.testDirs, in, ex);
 		createModuleList(setup.srcDir + "/common/lua", setup.defines, setup.testDirs, in, ex);
 		createModuleList(setup.srcDir + "/engines", setup.defines, setup.testDirs, in, ex);
 		createModuleList(setup.srcDir + "/graphics", setup.defines, setup.testDirs, in, ex);
@@ -1633,6 +1648,7 @@ void ProjectProvider::createProject(BuildSetup &setup) {
 			in.push_back(setup.srcDir + "/LICENSES/COPYING.ISC");
 			in.push_back(setup.srcDir + "/LICENSES/COPYING.LUA");
 			in.push_back(setup.srcDir + "/LICENSES/COPYING.MIT");
+			in.push_back(setup.srcDir + "/LICENSES/COPYING.MKV");
 			in.push_back(setup.srcDir + "/LICENSES/COPYING.TINYGL");
 			in.push_back(setup.srcDir + "/LICENSES/COPYING.GLAD");
 			in.push_back(setup.srcDir + "/COPYRIGHT");

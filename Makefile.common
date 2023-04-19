@@ -36,6 +36,8 @@ MODULES += \
 	audio \
 	math \
 	common \
+	common/compression \
+	common/formats \
 	po \
 	doc
 
@@ -358,7 +360,10 @@ dist-src: \
 	@#DEB-src?
 
 # Common files
-DIST_FILES_DOCS:=$(addprefix $(srcdir)/,AUTHORS COPYING LICENSES/COPYING.BSD LICENSES/COPYING.LGPL LICENSES/COPYING.FREEFONT LICENSES/COPYING.OFL LICENSES/COPYING.ISC LICENSES/COPYING.LUA LICENSES/COPYING.MIT LICENSES/COPYING.TINYGL LICENSES/COPYING.GLAD COPYRIGHT NEWS.md README.md CONTRIBUTING.md)
+DIST_FILES_DOCS:=$(addprefix $(srcdir)/,AUTHORS COPYING LICENSES/COPYING.BSD LICENSES/COPYING.LGPL \
+	LICENSES/COPYING.FREEFONT LICENSES/COPYING.OFL LICENSES/COPYING.ISC LICENSES/COPYING.LUA \
+	LICENSES/COPYING.MIT LICENSES/COPYING.MKV LICENSES/COPYING.TINYGL LICENSES/COPYING.GLAD\
+	COPYRIGHT NEWS.md README.md CONTRIBUTING.md)
 ifdef USE_PANDOC
 DIST_FILES_DOCS+=README$(PANDOCEXT) NEWS$(PANDOCEXT) CONTRIBUTING$(PANDOCEXT)
 endif
@@ -382,7 +387,7 @@ DIST_FILES_DOCS_no-nb:=$(addprefix $(srcdir)/doc/no-nb/,HurtigStart)
 DIST_FILES_DOCS_se:=$(addprefix $(srcdir)/doc/se/,LasMig Snabbstart)
 
 # Themes files
-DIST_FILES_THEMES=scummmodern.zip scummclassic.zip scummremastered.zip residualvm.zip gui-icons.dat
+DIST_FILES_THEMES=scummmodern.zip scummclassic.zip scummremastered.zip residualvm.zip gui-icons.dat shaders.dat
 ifdef USE_TRANSLATION
 DIST_FILES_THEMES+=translations.dat
 endif
@@ -432,8 +437,14 @@ endif
 ifdef ENABLE_MORTEVIELLE
 DIST_FILES_ENGINEDATA+=mort.dat
 endif
+ifdef ENABLE_NANCY
+DIST_FILES_ENGINEDATA+=nancy.dat
+endif
 ifdef ENABLE_NEVERHOOD
 DIST_FILES_ENGINEDATA+=neverhood.dat
+endif
+ifdef ENABLE_PRINCE
+DIST_FILES_ENGINEDATA+=prince_translation.dat
 endif
 ifdef ENABLE_QUEEN
 DIST_FILES_ENGINEDATA+=queen.tbl
@@ -463,7 +474,7 @@ ifdef ENABLE_WINTERMUTE
 DIST_FILES_ENGINEDATA+=wintermute.zip
 endif
 ifdef ENABLE_XEEN
-DIST_FILES_ENGINEDATA+=xeen.ccs
+DIST_FILES_ENGINEDATA+=mm.dat
 endif
 ifdef ENABLE_FREESCAPE
 DIST_FILES_ENGINEDATA+=freescape.dat
@@ -507,6 +518,12 @@ DIST_FILES_SHADERS+=$(wildcard $(srcdir)/engines/wintermute/base/gfx/opengl/shad
 endif
 ifdef ENABLE_PLAYGROUND3D
 DIST_FILES_SHADERS+=$(wildcard $(srcdir)/engines/playground3d/shaders/*)
+endif
+ifdef ENABLE_HPL1
+DIST_FILES_SHADERS+=$(wildcard $(srcdir)/engines/hpl1/engine/impl/shaders/*)
+endif
+ifdef ENABLE_FREESCAPE
+DIST_FILES_SHADERS+=$(wildcard $(srcdir)/engines/freescape/shaders/*)
 endif
 endif
 

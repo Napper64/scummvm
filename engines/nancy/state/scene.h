@@ -44,16 +44,22 @@ namespace Nancy {
 
 class NancyEngine;
 class NancyConsole;
-class CheatDialog;
 struct SceneChangeDescription;
 
 namespace Action {
-class SliderPuzzle;
-class PlayPrimaryVideoChan0;
+class ConversationSound;
+}
+
+namespace Misc {
+class Lightning;
 }
 
 namespace UI {
 class Button;
+class ViewportOrnaments;
+class TextboxOrnaments;
+class InventoryBoxOrnaments;
+class Clock;
 }
 
 namespace State {
@@ -69,10 +75,8 @@ struct SceneInfo {
 class Scene : public State, public Common::Singleton<Scene> {
 	friend class Nancy::Action::ActionRecord;
 	friend class Nancy::Action::ActionManager;
-	friend class Nancy::Action::SliderPuzzle;
 	friend class Nancy::NancyConsole;
 	friend class Nancy::NancyEngine;
-	friend class Nancy::CheatDialog;
 
 public:
 	enum GameStateChange : byte {
@@ -94,8 +98,8 @@ public:
 		Common::String audioFile;
 		SoundDescription sound;
 		//
-		NancyFlag dontWrap;
-		uint16 soundWrapAroundPan;
+		byte panningType;
+		uint16 numberOfVideoFrames;
 		uint16 soundPanPerFrame;
 		uint16 totalViewAngle;
 		uint16 horizontalScrollDelta;
@@ -114,10 +118,10 @@ public:
 
 	// State API
 	void process() override;
-	void onStateEnter() override;
-	void onStateExit() override;
+	void onStateEnter(const NancyState::NancyState prevState) override;
+	bool onStateExit(const NancyState::NancyState nextState) override;
 
-	void changeScene(uint16 id, uint16 frame, uint16 verticalOffset, bool noSound);
+	void changeScene(uint16 id, uint16 frame, uint16 verticalOffset, byte continueSceneSound, int8 paletteID = -1);
 	void changeScene(const SceneChangeDescription &sceneDescription);
 	void pushScene();
 	void popScene();
@@ -125,26 +129,30 @@ public:
 	void pauseSceneSpecificSounds();
 	void unpauseSceneSpecificSounds();
 
+	void setPlayerTime(Time time, byte relative);
+	Time getPlayerTime() const { return _timers.playerTime; }
+	byte getPlayerTOD() const;
+
 	void addItemToInventory(uint16 id);
 	void removeItemFromInventory(uint16 id, bool pickUp = true);
 	int16 getHeldItem() const { return _flags.heldItem; }
 	void setHeldItem(int16 id);
-	NancyFlag hasItem(int16 id) const { return _flags.items[id]; }
+	byte hasItem(int16 id) const { return _flags.items[id]; }
 
-	void setEventFlag(int16 label, NancyFlag flag = kTrue);
-	void setEventFlag(EventFlagDescription eventFlag);
-	bool getEventFlag(int16 label, NancyFlag flag = kTrue) const;
-	bool getEventFlag(EventFlagDescription eventFlag) const;
+	void setEventFlag(int16 label, byte flag = kEvOccurred);
+	void setEventFlag(FlagDescription eventFlag);
+	bool getEventFlag(int16 label, byte flag = kEvOccurred) const;
+	bool getEventFlag(FlagDescription eventFlag) const;
 
-	void setLogicCondition(int16 label, NancyFlag flag = kTrue);
-	bool getLogicCondition(int16 label, NancyFlag flag = kTrue) const;
+	void setLogicCondition(int16 label, byte flag = kLogUsed);
+	bool getLogicCondition(int16 label, byte flag = kLogUsed) const;
 	void clearLogicConditions();
 
 	void setDifficulty(uint difficulty) { _difficulty = difficulty; }
 	uint16 getDifficulty() const { return _difficulty; }
 
 	byte getHintsRemaining() const { return _hintsRemaining[_difficulty]; }
-	void useHint(int hintID, int hintWeight);
+	void useHint(uint16 characterID, uint16 hintID);
 
 	void requestStateChange(NancyState::NancyState state) { _gameStateRequested = state; }
 	void resetStateToInit() { _state = kInit; }
@@ -171,13 +179,23 @@ public:
 	SceneInfo &getNextSceneInfo() { return _sceneState.nextScene; }
 	const SceneSummary &getSceneSummary() const { return _sceneState.summary; }
 
-	void setActivePrimaryVideo(Action::PlayPrimaryVideoChan0 *activeVideo);
-	Action::PlayPrimaryVideoChan0 *getActivePrimaryVideo();
+	void setActiveConversation(Action::ConversationSound *activeConversation);
+	Action::ConversationSound *getActiveConversation();
+
+	// The Vampire Diaries only;
+	void beginLightning(int16 distance, uint16 pulseTime, int16 rgbPercent);
+
+	// Game-specific data that needs to be saved/loaded
+	SliderPuzzleState *_sliderPuzzleState;
+	RippedLetterPuzzleState *_rippedLetterPuzzleState;
+	TowerPuzzleState *_towerPuzzleState;
+	RiddlePuzzleState *_riddlePuzzleState;
 
 private:
 	void init();
 	void load();
 	void run();
+	void handleInput();
 
 	void initStaticData();
 
@@ -197,11 +215,10 @@ private:
 		SceneInfo pushedScene;
 		bool isScenePushed;
 
-		bool doNotStartSound = false;
+		uint16 continueSceneSound = kLoadSceneSound;
 	};
 
 	struct Timers {
-		enum TimeOfDay { kDay = 0, kNight = 1, kDuskDawn = 2 };
 		Time pushedPlayTime;
 		Time lastTotalTime;
 		Time sceneTime;
@@ -209,26 +226,20 @@ private:
 		bool timerIsActive = false;
 		Time playerTime; // In-game time of day, adds a minute every 5 seconds
 		Time playerTimeNextMinute; // Stores the next tick count until we add a minute to playerTime
-		TimeOfDay timeOfDay = kDay;
 	};
 
 	struct PlayFlags {
 		struct LogicCondition {
-			NancyFlag flag = NancyFlag::kFalse;
+			byte flag = kLogNotUsed;
 			Time timestamp;
 		};
 
 		LogicCondition logicConditions[30];
-		Common::Array<NancyFlag> eventFlags;
+		Common::Array<byte> eventFlags;
 		uint16 sceneHitCount[2001];
-		Common::Array<NancyFlag> items;
+		Common::Array<byte> items;
 		int16 heldItem = -1;
 		int16 primaryVideoResponsePicked = -1;
-	};
-
-	struct SliderPuzzleState {
-		Common::Array<Common::Array<int16>> playerTileOrder;
-		bool playerHasTriedPuzzle;
 	};
 
 	// UI
@@ -239,25 +250,32 @@ private:
 
 	UI::Button *_menuButton;
 	UI::Button *_helpButton;
+	Time _buttonPressActivationTime;
 
-	// Data
+	UI::ViewportOrnaments *_viewportOrnaments;
+	UI::TextboxOrnaments *_textboxOrnaments;
+	UI::InventoryBoxOrnaments *_inventoryBoxOrnaments;
+	UI::Clock *_clock;
+
+	// General data
 	SceneState _sceneState;
 	PlayFlags _flags;
 	Timers _timers;
-	SliderPuzzleState _sliderPuzzleState;
 	uint16 _difficulty;
 	Common::Array<uint16> _hintsRemaining;
-	int16 _lastHint;
+	int16 _lastHintCharacter;
+	int16 _lastHintID;
 	NancyState::NancyState _gameStateRequested;
+
+	Misc::Lightning *_lightning;
 
 	Common::Rect _mapHotspot;
 
 	Action::ActionManager _actionManager;
-	Action::PlayPrimaryVideoChan0 *_activePrimaryVideo;
+	Action::ConversationSound *_activeConversation;
 
 	State _state;
 
-	bool _isComingFromMenu = true;
 	bool _shouldClearTextbox = true;
 };
 

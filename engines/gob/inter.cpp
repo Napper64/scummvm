@@ -35,7 +35,7 @@
 
 namespace Gob {
 
-Inter::Inter(GobEngine *vm) : _vm(vm), _varStack(600) {
+Inter::Inter(GobEngine *vm) : _vm(vm), _varStack(1000) {
 	_terminate = 0;
 	_break = false;
 
@@ -77,8 +77,8 @@ void Inter::executeOpcodeDraw(byte i) {
 }
 
 void Inter::executeOpcodeFunc(byte i, byte j, OpFuncParams &params) {
-	debugC(1, kDebugFuncOp, "opcodeFunc %d.%d [0x%X.0x%X] (%s)",
-			i, j, i, j, getDescOpcodeFunc(i, j));
+	debugC(1, kDebugFuncOp, "%s:%08d: opcodeFunc %d.%d [0x%X.0x%X] (%s)",
+		   _vm->_game->_curTotFile.c_str(), _vm->_game->_script->pos(), i, j, i, j, getDescOpcodeFunc(i, j));
 
 	int n = i * 16 + j;
 	if ((i <= 4) && (j <= 15) && _opcodesFunc[n].proc && _opcodesFunc[n].proc->isValid())

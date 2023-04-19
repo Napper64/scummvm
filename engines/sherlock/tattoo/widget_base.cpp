@@ -135,42 +135,18 @@ void WidgetBase::drawBackground() {
 
 Common::String WidgetBase::splitLines(const Common::String &str, Common::StringArray &lines, int maxWidth, uint maxLines) {
 	Talk &talk = *_vm->_talk;
-	const char *strP = str.c_str();
 
-	// Loop counting up lines
 	lines.clear();
-	do {
-		int width = 0;
-		const char *spaceP = nullptr;
-		const char *lineStartP = strP;
-
-		// Find how many characters will fit on the next line
-		while (width < maxWidth && *strP && ((byte)*strP < talk._opcodes[OP_SWITCH_SPEAKER] ||
-				(byte)*strP == talk._opcodes[OP_NULL])) {
-			width += _surface.charWidth(*strP);
-
-			// Keep track of the last space
-			if (*strP == ' ')
-				spaceP = strP;
-			++strP;
-		}
-
-		// If the line was too wide to fit on a single line, go back to the last space
-		// if there was one, or otherwise simply break the line at this point
-		if (width >= maxWidth && spaceP != nullptr)
-			strP = spaceP;
-
-		// Add the line to the output array
-		lines.push_back(Common::String(lineStartP, strP));
-
-		// Move the string ahead to the next line
-		if (*strP == ' ' || *strP == 13)
-			++strP;
-	} while (*strP && (lines.size() < maxLines) && ((byte)*strP < talk._opcodes[OP_SWITCH_SPEAKER]
-			|| (byte)*strP == talk._opcodes[OP_NULL]));
+	uint idx;
+	for (idx = 0; idx < str.size(); idx++)
+		if (str[idx] >= talk._opcodes[OP_SWITCH_SPEAKER] && str[idx] != talk._opcodes[OP_NULL])
+			break;
+	Common::String rest;
+	Common::Array<Common::String> arr = _surface.wordWrap(str.substr(0, idx), maxWidth, rest, Common::String::npos, maxLines);
+	lines.swap(arr);
 
 	// Return any remaining text left over
-	return *strP ? Common::String(strP) : Common::String();
+	return rest + str.substr(idx);
 }
 
 void WidgetBase::restrictToScreen() {

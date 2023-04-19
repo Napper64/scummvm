@@ -25,8 +25,9 @@
 #include "common/archive.h"
 #include "common/config-manager.h"
 #include "common/file.h"
+#include "common/memstream.h"
 #include "common/translation.h"
-#include "common/unzip.h"
+#include "common/compression/unzip.h"
 
 namespace Networking {
 
@@ -95,6 +96,12 @@ Common::String HandlerUtils::readEverythingFromStream(Common::SeekableReadStream
 		result += Common::String(buf, readBytes);
 	}
 	return result;
+}
+
+Common::SeekableReadStream *HandlerUtils::makeResponseStreamFromString(Common::String response) {
+	byte *data = new byte[response.size()];
+	memcpy(data, response.c_str(), response.size());
+	return new Common::MemoryReadStream(data, response.size(), DisposeAfterUse::YES);
 }
 
 Common::String HandlerUtils::normalizePath(const Common::String &path) {

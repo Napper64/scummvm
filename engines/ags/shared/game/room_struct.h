@@ -102,6 +102,7 @@ enum RoomFlags {
 #define MAX_ROOM_BGFRAMES  5   // max number of frames in animating bg scene
 
 #define MAX_ROOM_HOTSPOTS  50  // v2.62: 20 -> 30; v2.8: -> 50
+#define MAX_ROOM_OBJECTS_v300 40 // for some legacy logic support
 #define MAX_ROOM_OBJECTS   256 // v3.6.0: 40 -> 256 (now limited by room format)
 #define MAX_ROOM_REGIONS   16
 // TODO: this is remains of the older code, MAX_WALK_AREAS = real number - 1, where
@@ -315,7 +316,7 @@ public:
 	// Game's unique ID, corresponds to GameSetupStructBase::uniqueid.
 	// If this field has a valid value and does not match actual game's id,
 	// then engine will refuse to start this room.
-	// May be set to NO_GAME_ID_IN_ROOM_FILE to let it run within any _GP(game).
+	// May be set to NO_GAME_ID_IN_ROOM_FILE to let it run within any game.
 	int32_t                 GameID;
 	// Loaded room file's data version. This value may be used to know when
 	// the room must have behavior specific to certain version of AGS.

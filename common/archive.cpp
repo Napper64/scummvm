@@ -20,9 +20,12 @@
  */
 
 #include "common/archive.h"
+#include "common/file.h"
 #include "common/fs.h"
 #include "common/system.h"
 #include "common/textconsole.h"
+#include "common/memstream.h"
+#include "common/punycode.h"
 
 namespace Common {
 
@@ -39,19 +42,20 @@ SeekableReadStream *GenericArchiveMember::createReadStream() const {
 }
 
 
-int Archive::listMatchingMembers(ArchiveMemberList &list, const Path &pattern) const {
+int Archive::listMatchingMembers(ArchiveMemberList &list, const Path &pattern, bool matchPathComponents) const {
 	// Get all "names" (TODO: "files" ?)
 	ArchiveMemberList allNames;
 	listMembers(allNames);
 
 	String patternString = pattern.toString();
 	int matches = 0;
+	const char *wildcardExclusions = matchPathComponents ? NULL : "/";
 
 	ArchiveMemberList::const_iterator it = allNames.begin();
 	for (; it != allNames.end(); ++it) {
 		// TODO: We match case-insenstivie for now, our API does not define whether that's ok or not though...
 		// For our use case case-insensitive is probably what we want to have though.
-		if ((*it)->getName().matchString(patternString, true, "/")) {
+		if ((*it)->getName().matchString(patternString, true, wildcardExclusions)) {
 			list.push_back(*it);
 			matches++;
 		}
@@ -60,6 +64,90 @@ int Archive::listMatchingMembers(ArchiveMemberList &list, const Path &pattern) c
 	return matches;
 }
 
+void Archive::dumpArchive(String destPath) {
+	Common::ArchiveMemberList files;
+
+	listMembers(files);
+
+	byte *data = nullptr;
+	uint dataSize = 0;
+
+	for (auto &f : files) {
+		Common::String filename = Common::punycode_encodefilename(f->getName());
+		warning("File: %s", filename.c_str());
+
+		Common::SeekableReadStream *stream = f->createReadStream();
+
+		uint32 len = stream->size();
+		if (dataSize < len) {
+			free(data);
+			data = (byte *)malloc(stream->size());
+			dataSize = stream->size();
+		}
+
+		stream->read(data, len);
+
+		Common::DumpFile out;
+		Common::String outname = destPath + filename;
+		if (!out.open(outname, true)) {
+			warning("Archive::dumpArchive(): Can not open dump file %s", outname.c_str());
+		} else {
+			out.write(data, len);
+			out.flush();
+			out.close();
+		}
+
+		delete stream;
+	}
+
+	free(data);
+}
+
+SeekableReadStream *MemcachingCaseInsensitiveArchive::createReadStreamForMember(const Path &path) const {
+	String translated = translatePath(path);
+	bool isNew = false;
+	if (!_cache.contains(translated)) {
+		SharedArchiveContents readResult = readContentsForPath(translated);
+		if (readResult._bypass)
+			return readResult._bypass;
+		_cache[translated] = readResult;
+		isNew = true;
+	}
+
+	SharedArchiveContents* entry = &_cache[translated];
+
+	// Errors and missing files. Just return nullptr,
+	// no need to create stream.
+	if (entry->isFileMissing())
+		return nullptr;
+
+	// Check whether the entry is still valid as WeakPtr might have expired.
+	if (!entry->makeStrong()) {
+		// If it's expired, recreate the entry.
+		SharedArchiveContents readResult = readContentsForPath(translated);
+		if (readResult._bypass)
+			return readResult._bypass;
+		_cache[translated] = readResult;
+		entry = &_cache[translated];
+		isNew = true;
+	}
+
+	// It's possible that recreation failed in case of e.g. network
+	// share going offline.
+	if (entry->isFileMissing())
+		return nullptr;
+
+	// Now we have a valid contents reference. Make stream for it.
+	Common::MemoryReadStream *memStream = new Common::MemoryReadStream(entry->getContents(), entry->getSize());
+
+	// If the entry was just created and it's too big for strong caching,
+	// mark the copy in cache as weak
+	if (isNew && entry->getSize() > _maxStronglyCachedSize) {
+		entry->makeWeak();
+	}
+
+	return memStream;
+}
 
 
 SearchSet::ArchiveNodeList::iterator SearchSet::find(const String &name) {
@@ -180,6 +268,15 @@ bool SearchSet::hasArchive(const String &name) const {
 	return (find(name) != _list.end());
 }
 
+Archive *SearchSet::getArchive(const String &name) const {
+	auto arch = find(name);
+
+	if (arch == _list.end())
+		return nullptr;
+
+	return arch->_arc;
+}
+
 void SearchSet::clear() {
 	for (ArchiveNodeList::iterator i = _list.begin(); i != _list.end(); ++i) {
 		if (i->_autoFree)
@@ -218,12 +315,12 @@ bool SearchSet::hasFile(const Path &path) const {
 	return false;
 }
 
-int SearchSet::listMatchingMembers(ArchiveMemberList &list, const Path &pattern) const {
+int SearchSet::listMatchingMembers(ArchiveMemberList &list, const Path &pattern, bool matchPathComponents) const {
 	int matches = 0;
 
 	ArchiveNodeList::const_iterator it = _list.begin();
 	for (; it != _list.end(); ++it)
-		matches += it->_arc->listMatchingMembers(list, pattern);
+		matches += it->_arc->listMatchingMembers(list, pattern, matchPathComponents);
 
 	return matches;
 }
@@ -265,6 +362,24 @@ SeekableReadStream *SearchSet::createReadStreamForMember(const Path &path) const
 	return nullptr;
 }
 
+SeekableReadStream *SearchSet::createReadStreamForMemberNext(const Path &path, const Archive *starting) const {
+	if (path.empty())
+		return nullptr;
+
+	ArchiveNodeList::const_iterator it = _list.begin();
+	for (; it != _list.end(); ++it)
+		if (it->_arc == starting) {
+			++it;
+			break;
+		}
+	for (; it != _list.end(); ++it) {
+		SeekableReadStream *stream = it->_arc->createReadStreamForMember(path);
+		if (stream)
+			return stream;
+	}
+
+	return nullptr;
+}
 
 SearchManager::SearchManager() {
 	clear(); // Force a reset

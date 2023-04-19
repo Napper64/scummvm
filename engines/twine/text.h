@@ -162,7 +162,7 @@ public:
 	 * Initialize dialogue
 	 * @param bankIdx Text bank index
 	 */
-	void initTextBank(TextBankId bankIdx);
+	void initDial(TextBankId bankIdx);
 	void initSceneTextBank();
 	inline TextBankId textBank() const {
 		return _currentBankIdx;
@@ -224,7 +224,7 @@ public:
 
 	/**
 	 * Get dialogue text into text buffer from the currently loaded text bank
-	 * @sa initTextBank()
+	 * @sa initDial()
 	 * @param index dialogue index
 	 */
 	bool getText(TextId index);
@@ -237,8 +237,8 @@ public:
 	 */
 	bool getMenuText(TextId index, char *text, uint32 textSize);
 
-	void textClipFull();
-	void textClipSmall();
+	void bigWinDial();
+	void normalWinDial();
 
 	void drawAskQuestion(TextId index);
 	void drawHolomapLocation(TextId index);

@@ -19,6 +19,7 @@
  *
  */
 
+#include "common/keyboard.h"
 #include "ultima/ultima8/gumps/scroll_gump.h"
 #include "ultima/ultima8/gumps/widgets/text_widget.h"
 #include "ultima/ultima8/games/game_data.h"
@@ -80,6 +81,21 @@ void ScrollGump::onMouseDouble(int button, int32 mx, int32 my) {
 	Close();
 }
 
+bool ScrollGump::OnKeyDown(int key, int mod) {
+	switch (key) {
+	case Common::KEYCODE_ESCAPE:
+		Close();
+		break;
+	case Common::KEYCODE_SPACE:
+		NextText();
+		break;
+	default:
+		break;
+	}
+
+	return true;
+}
+
 uint32 ScrollGump::I_readScroll(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ITEM_FROM_PTR(item);
 	ARG_STRING(str);
@@ -93,11 +109,11 @@ uint32 ScrollGump::I_readScroll(const uint8 *args, unsigned int /*argsize*/) {
 }
 
 void ScrollGump::saveData(Common::WriteStream *ws) {
-	CANT_HAPPEN_MSG("Trying to save ModalGump");
+	warning("Trying to save ModalGump");
 }
 
 bool ScrollGump::loadData(Common::ReadStream *rs, uint32 version) {
-	CANT_HAPPEN_MSG("Trying to load ModalGump");
+	warning("Trying to load ModalGump");
 
 	return false;
 }

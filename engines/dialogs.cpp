@@ -51,8 +51,7 @@ MainMenuDialog::MainMenuDialog(Engine *engine)
 	_logo = 0;
 	if (g_gui.xmlEval()->getVar("Globals.ShowGlobalMenuLogo", 0) == 1 && g_gui.theme()->supportsImages()) {
 		_logo = new GUI::GraphicsWidget(this, "GlobalMenu.Logo");
-		_logo->useThemeTransparency(true);
-		_logo->setGfx(g_gui.theme()->getImageSurface(GUI::ThemeEngine::kImageLogoSmall));
+		_logo->setGfxFromTheme(GUI::ThemeEngine::kImageLogoSmall);
 	} else {
 		GUI::StaticTextWidget *title = new GUI::StaticTextWidget(this, "GlobalMenu.Title", Common::U32String("ScummVM"));
 		title->setAlign(Graphics::kTextAlignCenter);
@@ -171,8 +170,7 @@ void MainMenuDialog::reflowLayout() {
 	if (g_gui.xmlEval()->getVar("Globals.ShowGlobalMenuLogo", 0) == 1 && g_gui.theme()->supportsImages()) {
 		if (!_logo)
 			_logo = new GUI::GraphicsWidget(this, "GlobalMenu.Logo");
-		_logo->useThemeTransparency(true);
-		_logo->setGfx(g_gui.theme()->getImageSurface(GUI::ThemeEngine::kImageLogoSmall));
+		_logo->setGfxFromTheme(GUI::ThemeEngine::kImageLogoSmall);
 
 		GUI::StaticTextWidget *title = (GUI::StaticTextWidget *)findWidget("GlobalMenu.Title");
 		if (title) {
@@ -323,7 +321,7 @@ ConfigDialog::ConfigDialog() :
 	//
 	int backendTabId = tab->addTab(_("Backend"), "GlobalConfig_Backend", false);
 
-	_backendOptions = g_system->buildBackendOptionsWidget(tab, "GlobalConfig_Backend.Container", _domain);
+	_backendOptions = g_system->buildBackendOptionsWidget(tab, "GlobalConfig_Backend.Container", gameDomain);
 
 	if (_backendOptions) {
 		_backendOptions->setParentDialog(this);

@@ -19,7 +19,7 @@
  *
  */
 
-#include "ultima/ultima8/misc/pent_include.h"
+#include "ultima/ultima8/misc/debugger.h"
 
 #include "ultima/ultima8/games/game_info.h"
 #include "ultima/ultima8/misc/util.h"
@@ -129,16 +129,11 @@ Std::string GameInfo::getPrintDetails() const {
 	if (lang == "") lang = "Unknown";
 	ret += lang;
 
-	if (_type != GAME_PENTAGRAM_MENU) {
-		// version, md5 don't make sense for the pentagram menu
+	ret += ", version ";
+	ret += getPrintableVersion();
 
-		ret += ", version ";
-		ret += getPrintableVersion();
-
-		ret += ", md5 ";
-		ret += getPrintableMD5();
-	}
-
+	ret += ", md5 ";
+	ret += getPrintableMD5();
 	return ret;
 }
 

@@ -347,7 +347,7 @@ Datum Lingo::findVarV4(int varType, const Datum &id) {
 	case 4: // arg
 	case 5: // local
 		{
-			Common::Array<CFrame *> &callstack = _vm->getCurrentWindow()->_callstack;
+			Common::Array<CFrame *> &callstack = _state->callstack;
 			if (callstack.empty()) {
 				warning("BUILDBOT: findVarV4: no call frame");
 				return res;
@@ -420,7 +420,7 @@ void LC::cb_localcall() {
 
 	Datum nargs = g_lingo->pop();
 	if ((nargs.type == ARGC) || (nargs.type == ARGCNORET)) {
-		Common::String name = g_lingo->_currentScriptContext->_functionNames[functionId];
+		Common::String name = g_lingo->_state->context->_functionNames[functionId];
 		if (debugChannelSet(3, kDebugLingoExec))
 			printWithArgList(name.c_str(), nargs.u.i, "localcall:");
 
@@ -587,12 +587,10 @@ void LC::cb_theassign() {
 	// cb_theassign is for setting script/factory-level properties
 	Common::String name = g_lingo->readString();
 	Datum value = g_lingo->pop();
-	if (g_lingo->_currentMe.type == OBJECT) {
-		if (g_lingo->_currentMe.u.obj->hasProp(name)) {
-			g_lingo->_currentMe.u.obj->setProp(name, value);
-		} else {
-			warning("cb_theassign: me object has no property '%s'", name.c_str());
-		}
+	if (g_lingo->_state->me.type == OBJECT) {
+		// Don't bother checking if the property is defined, leave that to the object.
+		// For D3-style anonymous objects/factories, you are allowed to define whatever properties you like.
+		g_lingo->_state->me.u.obj->setProp(name, value);
 	} else {
 		warning("cb_theassign: no me object");
 	}
@@ -616,9 +614,9 @@ void LC::cb_theassign2() {
 
 void LC::cb_thepush() {
 	Common::String name = g_lingo->readString();
-	if (g_lingo->_currentMe.type == OBJECT) {
-		if (g_lingo->_currentMe.u.obj->hasProp(name)) {
-			g_lingo->push(g_lingo->_currentMe.u.obj->getProp(name));
+	if (g_lingo->_state->me.type == OBJECT) {
+		if (g_lingo->_state->me.u.obj->hasProp(name)) {
+			g_lingo->push(g_lingo->_state->me.u.obj->getProp(name));
 			return;
 		}
 		warning("cb_thepush: me object has no property '%s'", name.c_str());
@@ -949,7 +947,7 @@ void LC::cb_zeropush() {
 	g_lingo->push(d);
 }
 
-ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &stream, LingoArchive *archive, const Common::String &archName, uint16 version) {
+ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &stream, uint16 lctxIndex, LingoArchive *archive, const Common::String &archName, uint16 version) {
 	if (stream.size() < 0x5c) {
 		warning("Lscr header too small");
 		return nullptr;
@@ -976,7 +974,14 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 	/* uint32 length = */ stream.readUint32();
 	/* uint32 length2 = */ stream.readUint32();
 	uint16 codeStoreOffset = stream.readUint16();
-	uint16 scriptId = stream.readUint16() + 1;
+
+	/* uint16 scriptId = */ stream.readUint16() /* + 1 */;
+	// This field *should* match the script's index in Lctx, but this
+	// is unreliable. (e.g. script 261 in DATA/LEVEL1.DIR in betterd-win
+	// has this field incorrectly set to 263 instead of 261.)
+	// Thus, ignore it and simply use the script's index in Lctx.
+	uint16 scriptId = lctxIndex;
+
 	// unk2
 	for (uint32 i = 0; i < 0x10; i++) {
 		stream.readByte();
@@ -1000,9 +1005,9 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 	for (uint32 i = 0; i < 0x4; i++) {
 		stream.readByte();
 	}
-	/* uint16 castId = */ stream.readUint16();
+	/* uint16 _assemblyId = */ stream.readUint16();
 	// The script is coupled with to a Cast via the script ID.
-	// This castId isn't always correct.
+	// This _assemblyId isn't always correct.
 
 	int16 factoryNameId = stream.readSint16();
 
@@ -1034,19 +1039,17 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 	ScriptType scriptType = kCastScript;
 	Common::String castName;
 	CastMember *member = archive->cast->getCastMemberByScriptId(scriptId);
-	int castId;
 	if (member) {
 		if (member->_type == kCastLingoScript)
 			scriptType = ((ScriptCastMember *)member)->_scriptType;
 
-		castId = member->getID();
+		_assemblyId = member->getID();
 		CastMemberInfo *info = member->getInfo();
 		if (info)
 			castName = info->name;
 	} else {
 		warning("Script %d has no associated cast member", scriptId);
 		scriptType = kNoneScript;
-		castId = -1;
 	}
 
 	_assemblyArchive = archive;
@@ -1062,12 +1065,12 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 		}
 		debugC(1, kDebugCompile, "Add V4 script %d: factory '%s'", scriptId, factoryName.c_str());
 
-		sc = _assemblyContext = new ScriptContext(factoryName, scriptType, castId);
+		sc = _assemblyContext = new ScriptContext(factoryName, scriptType, _assemblyId);
 		registerFactory(factoryName);
 	} else {
-		debugC(1, kDebugCompile, "Add V4 script %d: %s %d", scriptId, scriptType2str(scriptType), castId);
+		debugC(1, kDebugCompile, "Add V4 script %d: %s %d", scriptId, scriptType2str(scriptType), _assemblyId);
 
-		sc = _assemblyContext = new ScriptContext(!castName.empty() ? castName : Common::String::format("%d", castId), scriptType, castId);
+		sc = _assemblyContext = new ScriptContext(!castName.empty() ? castName : Common::String::format("%d", _assemblyId), scriptType, _assemblyId);
 	}
 
 	// initialise each property
@@ -1075,12 +1078,17 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 		warning("Lscr properties store missing");
 		return nullptr;
 	}
-
-	debugC(5, kDebugLoading, "Lscr property list:");
 	stream.seek(propertiesOffset);
+	if (debugChannelSet(5, kDebugLoading)) {
+		debugC(5, kDebugLoading, "Lscr property list:");
+		stream.hexdump(propertiesCount * 2);
+	}
 	for (uint16 i = 0; i < propertiesCount; i++) {
 		int16 index = stream.readSint16();
-		if (0 <= index && index < (int16)archive->names.size()) {
+		if (index == -1) {
+			debugC(5, kDebugLoading, "[end of list]");
+			break;
+		} else if (0 <= index && index < (int16)archive->names.size()) {
 			const char *name = archive->names[index].c_str();
 			debugC(5, kDebugLoading, "%d: %s", i, name);
 			_assemblyContext->_properties[name] = Datum();
@@ -1095,8 +1103,11 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 		return nullptr;
 	}
 
-	debugC(5, kDebugLoading, "Lscr globals list:");
 	stream.seek(globalsOffset);
+	if (debugChannelSet(5, kDebugLoading)) {
+		debugC(5, kDebugLoading, "Lscr globals list:");
+		stream.hexdump(globalsCount * 2);
+	}
 	for (uint16 i = 0; i < globalsCount; i++) {
 		int16 index = stream.readSint16();
 		if (0 <= index && index < (int16)archive->names.size()) {
@@ -1241,7 +1252,7 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 		if (scriptFlags & kScriptFlagFactoryDef) {
 			buf = dumpFactoryName(encodePathForDump(archName).c_str(), factoryName.c_str(), "lscr");
 		} else {
-			buf = dumpScriptName(encodePathForDump(archName).c_str(), scriptType, castId, "lscr");
+			buf = dumpScriptName(encodePathForDump(archName).c_str(), scriptType, _assemblyId, "lscr");
 		}
 
 		if (!out.open(buf, true)) {
@@ -1593,13 +1604,15 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 	}
 
 	free(codeStore);
+	_assemblyArchive = nullptr;
 	_assemblyContext = nullptr;
+	_assemblyId = -1;
 
 	return sc;
 }
 
 void LingoArchive::addCodeV4(Common::SeekableReadStreamEndian &stream, uint16 lctxIndex, const Common::String &archName, uint16 version) {
-	ScriptContext *ctx = g_lingo->_compiler->compileLingoV4(stream, this, archName, version);
+	ScriptContext *ctx = g_lingo->_compiler->compileLingoV4(stream, lctxIndex, this, archName, version);
 	if (ctx) {
 		lctxContexts[lctxIndex] = ctx;
 		*ctx->_refCount += 1;

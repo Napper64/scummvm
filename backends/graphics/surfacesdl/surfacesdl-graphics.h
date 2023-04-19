@@ -100,6 +100,7 @@ protected:
 	// PaletteManager API
 	void setPalette(const byte *colors, uint start, uint num) override;
 	void grabPalette(byte *colors, uint start, uint num) const override;
+	virtual void initGraphicsSurface();
 
 	/**
 	 * Convert from the SDL pixel format to Graphics::PixelFormat
@@ -123,7 +124,7 @@ public:
 	int16 getOverlayHeight() const override { return _videoMode.overlayHeight; }
 	int16 getOverlayWidth() const override { return _videoMode.overlayWidth; }
 
-	void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale = false, const Graphics::PixelFormat *format = NULL) override;
+	void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale = false, const Graphics::PixelFormat *format = NULL, const byte *mask = NULL) override;
 	void setCursorPalette(const byte *colors, uint start, uint num) override;
 
 #ifdef USE_OSD
@@ -191,7 +192,6 @@ protected:
 	int SDL_SetColors(SDL_Surface *surface, SDL_Color *colors, int firstcolor, int ncolors);
 	int SDL_SetAlpha(SDL_Surface *surface, Uint32 flag, Uint8 alpha);
 	int SDL_SetColorKey(SDL_Surface *surface, Uint32 flag, Uint32 key);
-	bool _vsync;
 #endif
 
 	/** Unseen game screen */
@@ -216,6 +216,7 @@ protected:
 	SDL_Surface *_overlayscreen;
 	bool _useOldSrc;
 	Graphics::PixelFormat _overlayFormat;
+	bool _isDoubleBuf;
 
 	enum {
 		kTransactionNone = 0,
@@ -258,10 +259,12 @@ protected:
 		bool aspectRatioCorrection;
 		AspectRatio desiredAspectRatio;
 		bool filtering;
+		bool isHwPalette;
 
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 		int stretchMode;
 #endif
+		bool vsync;
 
 		uint scalerIndex;
 		int scaleFactor;
@@ -283,6 +286,7 @@ protected:
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 			stretchMode = 0;
 #endif
+			vsync = false;
 
 			scalerIndex = 0;
 			scaleFactor = 0;
@@ -324,7 +328,7 @@ protected:
 
 	const PluginList &_scalerPlugins;
 	ScalerPluginObject *_scalerPlugin;
-	Scaler *_scaler;
+	Scaler *_scaler, *_mouseScaler;
 	uint _maxExtraPixels;
 	uint _extraPixels;
 
@@ -339,8 +343,14 @@ protected:
 	};
 
 	// Dirty rect management
-	SDL_Rect _dirtyRectList[NUM_DIRTY_RECT];
+	// When double-buffering we need to redraw both updates from
+	// current frame and previous frame. For convenience we copy
+	// them here before traversing the list.
+	SDL_Rect _dirtyRectList[2 * NUM_DIRTY_RECT];
 	int _numDirtyRects;
+
+	SDL_Rect _prevDirtyRectList[NUM_DIRTY_RECT];
+	int _numPrevDirtyRects;
 
 	struct MousePos {
 		// The size and hotspot of the original cursor image.
@@ -363,21 +373,18 @@ protected:
 			{ }
 	};
 
-	byte *_mouseData;
-	SDL_Rect _mouseBackup;
+	SDL_Rect _mouseLastRect, _mouseNextRect;
 	MousePos _mouseCurState;
 #ifdef USE_RGB_COLOR
 	uint32 _mouseKeyColor;
 #else
 	byte _mouseKeyColor;
 #endif
+	byte _mappedMouseKeyColor;
 	bool _cursorDontScale;
 	bool _cursorPaletteDisabled;
 	SDL_Surface *_mouseOrigSurface;
 	SDL_Surface *_mouseSurface;
-	enum {
-		kMouseColorKey = 1
-	};
 
 	// Shake mode
 	// This is always set to 0 when building with SDL2.
@@ -387,6 +394,9 @@ protected:
 	// Palette data
 	SDL_Color *_currentPalette;
 	uint _paletteDirtyStart, _paletteDirtyEnd;
+
+	SDL_Color *_overlayPalette;
+	bool _isInOverlayPalette;
 
 	// Cursor palette data
 	SDL_Color *_cursorPalette;
@@ -410,6 +420,7 @@ protected:
 	virtual void blitCursor();
 
 	virtual void internUpdateScreen();
+	virtual void updateScreen(SDL_Rect *dirtyRectList, int actualDirtyRects);
 
 	virtual bool loadGFXMode();
 	virtual void unloadGFXMode();
@@ -417,9 +428,11 @@ protected:
 
 	virtual void setAspectRatioCorrection(bool enable);
 	void setFilteringMode(bool enable);
+	void setVSync(bool enable);
 
 	bool saveScreenshot(const Common::String &filename) const override;
 	virtual void setGraphicsModeIntern();
+	virtual void getDefaultResolution(uint &w, uint &h);
 
 private:
 	void setFullscreenMode(bool enable);
@@ -458,6 +471,8 @@ private:
 	 * can be triggered.
 	 */
 	bool _needRestoreAfterOverlay;
+	bool _prevForceRedraw;
+	bool _prevCursorNeedsRedraw;
 };
 
 #endif

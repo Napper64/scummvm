@@ -19,6 +19,8 @@
  *
  */
 
+#include "common/events.h"
+
 #include "ultima/ultima8/gumps/paged_gump.h"
 #include "ultima/ultima8/games/game_data.h"
 #include "ultima/ultima8/graphics/gump_shape_archive.h"
@@ -74,8 +76,7 @@ void PagedGump::InitGump(Gump *newparent, bool take_focus) {
 	_prevButton->HideGump();
 
 	Mouse *mouse = Mouse::get_instance();
-	mouse->pushMouseCursor();
-	mouse->setMouseCursor(Mouse::MOUSE_HAND); // default cursor
+	mouse->pushMouseCursor(Mouse::MOUSE_HAND);
 }
 
 void PagedGump::PaintThis(RenderSurface *surf, int32 lerp_factor, bool scaled) {
@@ -152,12 +153,12 @@ void PagedGump::addPage(Gump *g) {
 }
 
 bool PagedGump::loadData(Common::ReadStream *rs) {
-	CANT_HAPPEN_MSG("Trying to load ModalGump");
+	warning("Trying to load ModalGump");
 	return false;
 }
 
 void PagedGump::saveData(Common::WriteStream *ws) {
-	CANT_HAPPEN_MSG("Trying to save ModalGump");
+	warning("Trying to save ModalGump");
 }
 
 } // End of namespace Ultima8

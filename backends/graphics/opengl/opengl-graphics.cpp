@@ -34,6 +34,7 @@
 #include "common/translation.h"
 #include "common/algorithm.h"
 #include "common/file.h"
+#include "common/zip-set.h"
 #include "gui/debugger.h"
 #include "engines/engine.h"
 #ifdef USE_OSD
@@ -44,7 +45,7 @@
 #endif
 #endif
 
-#include "graphics/conversion.h"
+#include "graphics/blit.h"
 #ifdef USE_OSD
 #include "graphics/fontman.h"
 #include "graphics/font.h"
@@ -72,10 +73,10 @@ OpenGLGraphicsManager::OpenGLGraphicsManager()
 	  _pipeline(nullptr), _stretchMode(STRETCH_FIT),
 	  _defaultFormat(), _defaultFormatAlpha(),
 	  _gameScreen(nullptr), _overlay(nullptr),
-	  _cursor(nullptr),
+	  _cursor(nullptr), _cursorMask(nullptr),
 	  _cursorHotspotX(0), _cursorHotspotY(0),
 	  _cursorHotspotXScaled(0), _cursorHotspotYScaled(0), _cursorWidthScaled(0), _cursorHeightScaled(0),
-	  _cursorKeyColor(0), _cursorDontScale(false), _cursorPaletteEnabled(false), _shakeOffsetScaled()
+	  _cursorKeyColor(0), _cursorUseKey(true), _cursorDontScale(false), _cursorPaletteEnabled(false), _shakeOffsetScaled()
 #if !USE_FORCED_GLES
 	  , _libretroPipeline(nullptr)
 #endif
@@ -95,6 +96,7 @@ OpenGLGraphicsManager::~OpenGLGraphicsManager() {
 	delete _gameScreen;
 	delete _overlay;
 	delete _cursor;
+	delete _cursorMask;
 #ifdef USE_OSD
 	delete _osdMessageSurface;
 	delete _osdIconSurface;
@@ -102,6 +104,7 @@ OpenGLGraphicsManager::~OpenGLGraphicsManager() {
 #if !USE_FORCED_GLES
 	ShaderManager::destroy();
 #endif
+	delete _pipeline;
 }
 
 bool OpenGLGraphicsManager::hasFeature(OSystem::Feature f) const {
@@ -110,6 +113,8 @@ bool OpenGLGraphicsManager::hasFeature(OSystem::Feature f) const {
 	case OSystem::kFeatureCursorPalette:
 	case OSystem::kFeatureFilteringMode:
 	case OSystem::kFeatureStretchMode:
+	case OSystem::kFeatureCursorMask:
+	case OSystem::kFeatureCursorMaskInvert:
 #ifdef USE_SCALERS
 	case OSystem::kFeatureScalers:
 #endif
@@ -354,9 +359,13 @@ bool OpenGLGraphicsManager::loadShader(const Common::String &fileName) {
 		return true;
 	}
 
+	Common::SearchSet shaderSet;
+
+	Common::generateZipSet(shaderSet, "shaders.dat", "shaders*.dat");
+
 	// Load selected shader preset
 	if (!fileName.empty()) {
-		if (!_libretroPipeline->open(Common::FSNode(fileName))) {
+		if (!_libretroPipeline->open(fileName, shaderSet)) {
 			warning("Failed to load shader %s", fileName.c_str());
 			return false;
 		}
@@ -582,6 +591,41 @@ void OpenGLGraphicsManager::fillScreen(uint32 col) {
 	_gameScreen->fill(col);
 }
 
+void OpenGLGraphicsManager::renderCursor() {
+	/*
+	Windows and Mac cursor XOR works by drawing the cursor to the screen with the formula (Destination AND Mask XOR Color)
+
+	OpenGL does not have an XOR blend mode though.  Full inversions can be accomplished by using blend modes with
+	ONE_MINUS_DST_COLOR but the problem is how to do that in a way that handles linear filtering properly.
+
+	To avoid color fringing, we need to produce an output of 3 separately-modulated inputs: The framebuffer modulated by
+	(1 - inversion)*(1 - alpha), the inverted framebuffer modulated by inversion*(1 - alpha), and the cursor colors modulated by alpha.
+	The last part is additive and not framebuffer dependent so it can just be a separate draw call.  The first two are the problem
+	because we can't use the unmodified framebuffer value twice if we do it in two separate draw calls, and if we do it in a single
+	draw call, we can only supply one RGB input even though the inversion mask should be RGB.
+
+	If we only allow grayscale inversions though, then we can put inversion*(1 - alpha) in the RGB channel and
+	(1 - inversion)*(1 - alpha) in the alpha channel and use and use ((1-dstColor)*src+(1-srcAlpha)*dest) blend formula to do
+	the inversion and opacity mask at once.  We use 1-srcAlpha instead of srcAlpha so zero-fill is transparent.
+	*/
+	if (_cursorMask) {
+		_backBuffer.enableBlend(Framebuffer::kBlendModeMaskAlphaAndInvertByColor);
+
+		_pipeline->drawTexture(_cursorMask->getGLTexture(),
+							   _cursorX - _cursorHotspotXScaled + _shakeOffsetScaled.x,
+							   _cursorY - _cursorHotspotYScaled + _shakeOffsetScaled.y,
+							   _cursorWidthScaled, _cursorHeightScaled);
+
+		_backBuffer.enableBlend(Framebuffer::kBlendModeAdditive);
+	} else
+		_backBuffer.enableBlend(Framebuffer::kBlendModePremultipliedTransparency);
+
+	_pipeline->drawTexture(_cursor->getGLTexture(),
+						   _cursorX - _cursorHotspotXScaled + _shakeOffsetScaled.x,
+						   _cursorY - _cursorHotspotYScaled + _shakeOffsetScaled.y,
+						   _cursorWidthScaled, _cursorHeightScaled);
+}
+
 void OpenGLGraphicsManager::updateScreen() {
 	if (!_gameScreen) {
 		return;
@@ -610,7 +654,7 @@ void OpenGLGraphicsManager::updateScreen() {
 	    && !(_libretroPipeline && _libretroPipeline->isAnimated())
 #endif
 	    && !(_overlayVisible && _overlay->isDirty())
-	    && !(_cursorVisible && _cursor && _cursor->isDirty())
+	    && !(_cursorVisible && ((_cursor && _cursor->isDirty()) || (_cursorMask && _cursorMask->isDirty())))
 #ifdef USE_OSD
 	    && !_osdMessageSurface && !_osdIconSurface
 #endif
@@ -622,6 +666,9 @@ void OpenGLGraphicsManager::updateScreen() {
 	_gameScreen->updateGLTexture();
 	if (_cursorVisible && _cursor) {
 		_cursor->updateGLTexture();
+	}
+	if (_cursorVisible && _cursorMask) {
+		_cursorMask->updateGLTexture();
 	}
 	_overlay->updateGLTexture();
 
@@ -659,12 +706,7 @@ void OpenGLGraphicsManager::updateScreen() {
 		// This has the disadvantage of having overlay (subtitles) drawn above it
 		// but the cursor will look nicer
 		if (!_overlayInGUI && drawCursor) {
-			_backBuffer.enableBlend(Framebuffer::kBlendModePremultipliedTransparency);
-
-			_pipeline->drawTexture(_cursor->getGLTexture(),
-									 _cursorX - _cursorHotspotXScaled + _shakeOffsetScaled.x,
-									 _cursorY - _cursorHotspotYScaled + _shakeOffsetScaled.y,
-									 _cursorWidthScaled, _cursorHeightScaled);
+			renderCursor();
 			drawCursor = false;
 
 			// Everything we need to clip has been clipped
@@ -685,14 +727,8 @@ void OpenGLGraphicsManager::updateScreen() {
 	}
 
 	// Fourth step: Draw the cursor if we didn't before.
-	if (drawCursor) {
-		_backBuffer.enableBlend(Framebuffer::kBlendModePremultipliedTransparency);
-
-		_pipeline->drawTexture(_cursor->getGLTexture(),
-		                         _cursorX - _cursorHotspotXScaled + _shakeOffsetScaled.x,
-		                         _cursorY - _cursorHotspotYScaled + _shakeOffsetScaled.y,
-		                         _cursorWidthScaled, _cursorHeightScaled);
-	}
+	if (drawCursor)
+		renderCursor();
 
 	if (!_overlayVisible) {
 		_backBuffer.enableScissorTest(false);
@@ -813,12 +849,12 @@ namespace {
 template<typename SrcColor, typename DstColor>
 void multiplyColorWithAlpha(const byte *src, byte *dst, const uint w, const uint h,
 							const Graphics::PixelFormat &srcFmt, const Graphics::PixelFormat &dstFmt,
-							const uint srcPitch, const uint dstPitch, const SrcColor keyColor) {
+							const uint srcPitch, const uint dstPitch, const SrcColor keyColor, bool useKeyColor) {
 	for (uint y = 0; y < h; ++y) {
 		for (uint x = 0; x < w; ++x) {
 			const uint32 color = *(const SrcColor *)src;
 
-			if (color == keyColor) {
+			if (useKeyColor && color == keyColor) {
 				*(DstColor *)dst = 0;
 			} else {
 				byte a, r, g, b;
@@ -843,9 +879,12 @@ void multiplyColorWithAlpha(const byte *src, byte *dst, const uint w, const uint
 }
 } // End of anonymous namespace
 
-void OpenGLGraphicsManager::setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format) {
 
-	_cursorKeyColor = keycolor;
+void OpenGLGraphicsManager::setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format, const byte *mask) {
+	_cursorUseKey = (mask == nullptr);
+	if (_cursorUseKey)
+		_cursorKeyColor = keycolor;
+
 	_cursorHotspotX = hotspotX;
 	_cursorHotspotY = hotspotY;
 	_cursorDontScale = dontScale;
@@ -853,10 +892,13 @@ void OpenGLGraphicsManager::setMouseCursor(const void *buf, uint w, uint h, int 
 	if (!w || !h) {
 		delete _cursor;
 		_cursor = nullptr;
+		delete _cursorMask;
+		_cursorMask = nullptr;
 		return;
 	}
 
 	Graphics::PixelFormat inputFormat;
+	Graphics::PixelFormat maskFormat;
 #ifdef USE_RGB_COLOR
 	if (format) {
 		inputFormat = *format;
@@ -867,17 +909,19 @@ void OpenGLGraphicsManager::setMouseCursor(const void *buf, uint w, uint h, int 
 	inputFormat = Graphics::PixelFormat::createFormatCLUT8();
 #endif
 
+#ifdef USE_SCALERS
+	bool wantScaler = (_currentState.scaleFactor > 1) && !dontScale && _scalerPlugins[_currentState.scalerIndex]->get<ScalerPluginObject>().canDrawCursor();
+#else
+	bool wantScaler = false;
+#endif
+
+	bool wantMask = (mask != nullptr);
+	bool haveMask = (_cursorMask != nullptr);
+
 	// In case the color format has changed we will need to create the texture.
-	if (!_cursor || _cursor->getFormat() != inputFormat) {
+	if (!_cursor || _cursor->getFormat() != inputFormat || haveMask != wantMask) {
 		delete _cursor;
 		_cursor = nullptr;
-
-#ifdef USE_SCALERS
-		bool wantScaler = (_currentState.scaleFactor > 1) && !dontScale
-		                && _scalerPlugins[_currentState.scalerIndex]->get<ScalerPluginObject>().canDrawCursor();
-#else
-		bool wantScaler = false;
-#endif
 
 		GLenum glIntFormat, glFormat, glType;
 
@@ -893,9 +937,11 @@ void OpenGLGraphicsManager::setMouseCursor(const void *buf, uint w, uint h, int 
 		} else {
 			textureFormat = _defaultFormatAlpha;
 		}
-		_cursor = createSurface(textureFormat, true, wantScaler);
+		_cursor = createSurface(textureFormat, true, wantScaler, wantMask);
 		assert(_cursor);
+
 		updateLinearFiltering();
+
 #ifdef USE_SCALERS
 		if (wantScaler) {
 			_cursor->setScaler(_currentState.scalerIndex, _currentState.scaleFactor);
@@ -903,11 +949,67 @@ void OpenGLGraphicsManager::setMouseCursor(const void *buf, uint w, uint h, int 
 #endif
 	}
 
-	_cursor->allocate(w, h);
+	if (mask) {
+		if (!_cursorMask) {
+			maskFormat = _defaultFormatAlpha;
+			_cursorMask = createSurface(maskFormat, true, wantScaler);
+			assert(_cursorMask);
+
+			updateLinearFiltering();
+
+#ifdef USE_SCALERS
+			if (wantScaler) {
+				_cursorMask->setScaler(_currentState.scalerIndex, _currentState.scaleFactor);
+			}
+#endif
+		}
+	} else {
+		delete _cursorMask;
+		_cursorMask = nullptr;
+	}
+
+	Common::Point topLeftCoord(0, 0);
+	Common::Point cursorSurfaceSize(w, h);
+
+	// If the cursor is scalable, add a 1-texel transparent border.
+	// This ensures that linear filtering falloff from the edge pixels has room to completely fade out instead of
+	// being cut off at half-way.  Could use border clamp too, but GLES2 doesn't support that.
+	if (!_cursorDontScale) {
+		topLeftCoord = Common::Point(1, 1);
+		cursorSurfaceSize += Common::Point(2, 2);
+	}
+
+	_cursor->allocate(cursorSurfaceSize.x, cursorSurfaceSize.y);
+	if (_cursorMask)
+		_cursorMask->allocate(cursorSurfaceSize.x, cursorSurfaceSize.y);
+
+	_cursorHotspotX += topLeftCoord.x;
+	_cursorHotspotY += topLeftCoord.y;
+
 	if (inputFormat.bytesPerPixel == 1) {
 		// For CLUT8 cursors we can simply copy the input data into the
 		// texture.
-		_cursor->copyRectToTexture(0, 0, w, h, buf, w * inputFormat.bytesPerPixel);
+		if (!_cursorDontScale)
+			_cursor->fill(keycolor);
+		_cursor->copyRectToTexture(topLeftCoord.x, topLeftCoord.y, w, h, buf, w * inputFormat.bytesPerPixel);
+
+		if (mask) {
+			// Construct a mask of opaque pixels
+			Common::Array<byte> maskBytes;
+			maskBytes.resize(cursorSurfaceSize.x * cursorSurfaceSize.y, 0);
+
+			for (uint y = 0; y < h; y++) {
+				for (uint x = 0; x < w; x++) {
+					// The cursor pixels must be masked out for anything except opaque
+					if (mask[y * w + x] == kCursorMaskOpaque)
+						maskBytes[(y + topLeftCoord.y) * cursorSurfaceSize.x + topLeftCoord.x + x] = 1;
+				}
+			}
+
+			_cursor->setMask(&maskBytes[0]);
+		} else {
+			_cursor->setMask(nullptr);
+		}
 	} else {
 		// Otherwise it is a bit more ugly because we have to handle a key
 		// color properly.
@@ -922,26 +1024,90 @@ void OpenGLGraphicsManager::setMouseCursor(const void *buf, uint w, uint h, int 
 		// The pre-multiplication allows using a blend mode that prevents
 		// color fringes due to filtering.
 
+		if (!_cursorDontScale)
+			_cursor->fill(0);
+
+		byte *topLeftPixelPtr = static_cast<byte *>(dst->getBasePtr(topLeftCoord.x, topLeftCoord.y));
+
 		if (dst->format.bytesPerPixel == 2) {
 			if (inputFormat.bytesPerPixel == 2) {
-				multiplyColorWithAlpha<uint16, uint16>((const byte *) buf, (byte *) dst->getPixels(), w, h,
-				                                       inputFormat, dst->format, srcPitch, dst->pitch, keycolor);
+				multiplyColorWithAlpha<uint16, uint16>((const byte *)buf, topLeftPixelPtr, w, h,
+													   inputFormat, dst->format, srcPitch, dst->pitch, keycolor, _cursorUseKey);
 			} else if (inputFormat.bytesPerPixel == 4) {
-				multiplyColorWithAlpha<uint32, uint16>((const byte *) buf, (byte *) dst->getPixels(), w, h,
-				                                       inputFormat, dst->format, srcPitch, dst->pitch, keycolor);
+				multiplyColorWithAlpha<uint32, uint16>((const byte *)buf, topLeftPixelPtr, w, h,
+													   inputFormat, dst->format, srcPitch, dst->pitch, keycolor, _cursorUseKey);
 			}
-		} else {
+		} else if (dst->format.bytesPerPixel == 4) {
 			if (inputFormat.bytesPerPixel == 2) {
-				multiplyColorWithAlpha<uint16, uint32>((const byte *) buf, (byte *) dst->getPixels(), w, h,
-				                                       inputFormat, dst->format, srcPitch, dst->pitch, keycolor);
+				multiplyColorWithAlpha<uint16, uint32>((const byte *)buf, topLeftPixelPtr, w, h,
+													   inputFormat, dst->format, srcPitch, dst->pitch, keycolor, _cursorUseKey);
 			} else if (inputFormat.bytesPerPixel == 4) {
-				multiplyColorWithAlpha<uint32, uint32>((const byte *) buf, (byte *) dst->getPixels(), w, h,
-				                                       inputFormat, dst->format, srcPitch, dst->pitch, keycolor);
+				multiplyColorWithAlpha<uint32, uint32>((const byte *)buf, topLeftPixelPtr, w, h,
+													   inputFormat, dst->format, srcPitch, dst->pitch, keycolor, _cursorUseKey);
+			}
+		}
+
+		// Replace all non-opaque pixels with black pixels
+		if (mask) {
+			Graphics::Surface *cursorSurface = _cursor->getSurface();
+
+			for (uint x = 0; x < w; x++) {
+				for (uint y = 0; y < h; y++) {
+					uint8 maskByte = mask[y * w + x];
+
+					if (maskByte != kCursorMaskOpaque)
+						cursorSurface->setPixel(x + topLeftCoord.x, y + topLeftCoord.y, 0);
+				}
 			}
 		}
 
 		// Flag the texture as dirty.
 		_cursor->flagDirty();
+	}
+
+	if (_cursorMask && mask) {
+		// Generate the multiply+invert texture.
+		// We're generating this for a blend mode where source factor is ONE_MINUS_DST_COLOR and dest factor is ONE_MINUS_SRC_ALPHA
+		// In other words, positive RGB channel values will add inverted destination pixels, positive alpha values will modulate
+		// RGB+Alpha = Inverted   Alpha Only = Black   0 = No change
+
+		Graphics::Surface *cursorSurface = _cursor->getSurface();
+		Graphics::Surface *maskSurface = _cursorMask->getSurface();
+		maskFormat = _cursorMask->getFormat();
+
+		const Graphics::PixelFormat cursorFormat = cursorSurface->format;
+
+		_cursorMask->fill(0);
+		for (uint x = 0; x < w; x++) {
+			for (uint y = 0; y < h; y++) {
+				// See the description of renderCursor for an explanation of why this works the way it does.
+
+				uint8 maskOpacity = 0xff;
+
+				if (inputFormat.bytesPerPixel != 1) {
+					uint32 cursorPixel = cursorSurface->getPixel(x + topLeftCoord.x, y + topLeftCoord.y);
+
+					uint8 r, g, b;
+					cursorFormat.colorToARGB(cursorPixel, maskOpacity, r, g, b);
+				}
+
+				uint8 maskInversionAdd = 0;
+
+				uint8 maskByte = mask[y * w + x];
+				if (maskByte == kCursorMaskTransparent)
+					maskOpacity = 0;
+
+				if (maskByte == kCursorMaskInvert) {
+					maskOpacity = 0xff;
+					maskInversionAdd = 0xff;
+				}
+
+				uint32 encodedMaskPixel = maskFormat.ARGBToColor(maskOpacity, maskInversionAdd, maskInversionAdd, maskInversionAdd);
+				maskSurface->setPixel(x + topLeftCoord.x, y + topLeftCoord.y, encodedMaskPixel);
+			}
+		}
+
+		_cursorMask->flagDirty();
 	}
 
 	// In case we actually use a palette set that up properly.
@@ -1227,6 +1393,10 @@ void OpenGLGraphicsManager::notifyContextCreate(ContextType type,
 		_cursor->recreate();
 	}
 
+	if (_cursorMask) {
+		_cursorMask->recreate();
+	}
+
 #ifdef USE_OSD
 	if (_osdMessageSurface) {
 		_osdMessageSurface->recreate();
@@ -1249,6 +1419,10 @@ void OpenGLGraphicsManager::notifyContextDestroy() {
 
 	if (_cursor) {
 		_cursor->destroy();
+	}
+
+	if (_cursorMask) {
+		_cursorMask->destroy();
 	}
 
 #ifdef USE_OSD
@@ -1280,7 +1454,7 @@ void OpenGLGraphicsManager::notifyContextDestroy() {
 	OpenGLContext.reset();
 }
 
-Surface *OpenGLGraphicsManager::createSurface(const Graphics::PixelFormat &format, bool wantAlpha, bool wantScaler) {
+Surface *OpenGLGraphicsManager::createSurface(const Graphics::PixelFormat &format, bool wantAlpha, bool wantScaler, bool wantMask) {
 	GLenum glIntFormat, glFormat, glType;
 
 #ifdef USE_SCALERS
@@ -1300,7 +1474,7 @@ Surface *OpenGLGraphicsManager::createSurface(const Graphics::PixelFormat &forma
 
 	if (format.bytesPerPixel == 1) {
 #if !USE_FORCED_GLES
-		if (TextureCLUT8GPU::isSupportedByContext()) {
+		if (TextureCLUT8GPU::isSupportedByContext() && !wantMask) {
 			return new TextureCLUT8GPU();
 		}
 #endif
@@ -1463,8 +1637,8 @@ void OpenGLGraphicsManager::recalculateDisplayAreas() {
 	                          _gameDrawRect.width(),
 	                          _gameDrawRect.height());
 
-	_shakeOffsetScaled = Common::Point(_gameScreenShakeXOffset * _gameDrawRect.width() / _currentState.gameWidth,
-		_gameScreenShakeYOffset * _gameDrawRect.height() / _currentState.gameHeight);
+	_shakeOffsetScaled = Common::Point(_gameScreenShakeXOffset * _gameDrawRect.width() / (int)_currentState.gameWidth,
+		_gameScreenShakeYOffset * _gameDrawRect.height() / (int)_currentState.gameHeight);
 
 	// Update the cursor position to adjust for new display area.
 	setMousePosition(_cursorX, _cursorY);
@@ -1484,7 +1658,8 @@ void OpenGLGraphicsManager::updateCursorPalette() {
 		_cursor->setPalette(0, 256, _gamePalette);
 	}
 
-	_cursor->setColorKey(_cursorKeyColor);
+	if (_cursorUseKey)
+		_cursor->setColorKey(_cursorKeyColor);
 }
 
 void OpenGLGraphicsManager::recalculateCursorScaling() {
@@ -1492,11 +1667,14 @@ void OpenGLGraphicsManager::recalculateCursorScaling() {
 		return;
 	}
 
+	uint cursorWidth = _cursor->getWidth();
+	uint cursorHeight = _cursor->getHeight();
+
 	// By default we use the unscaled versions.
 	_cursorHotspotXScaled = _cursorHotspotX;
 	_cursorHotspotYScaled = _cursorHotspotY;
-	_cursorWidthScaled = _cursor->getWidth();
-	_cursorHeightScaled = _cursor->getHeight();
+	_cursorWidthScaled = cursorWidth;
+	_cursorHeightScaled = cursorHeight;
 
 	// In case scaling is actually enabled we will scale the cursor according
 	// to the game screen.
@@ -1505,10 +1683,10 @@ void OpenGLGraphicsManager::recalculateCursorScaling() {
 		const frac_t screenScaleFactorY = intToFrac(_gameDrawRect.height()) / _gameScreen->getHeight();
 
 		_cursorHotspotXScaled = fracToInt(_cursorHotspotXScaled * screenScaleFactorX);
-		_cursorWidthScaled    = fracToInt(_cursorWidthScaled    * screenScaleFactorX);
+		_cursorWidthScaled    = fracToDouble(cursorWidth        * screenScaleFactorX);
 
 		_cursorHotspotYScaled = fracToInt(_cursorHotspotYScaled * screenScaleFactorY);
-		_cursorHeightScaled   = fracToInt(_cursorHeightScaled   * screenScaleFactorY);
+		_cursorHeightScaled   = fracToDouble(cursorHeight       * screenScaleFactorY);
 	}
 }
 
@@ -1525,6 +1703,10 @@ void OpenGLGraphicsManager::updateLinearFiltering() {
 
 	if (_cursor) {
 		_cursor->enableLinearFiltering(_currentState.filtering);
+	}
+
+	if (_cursorMask) {
+		_cursorMask->enableLinearFiltering(_currentState.filtering);
 	}
 
 	// The overlay UI should also obey the filtering choice (managed via the Filter Graphics checkbox in Graphics Tab).
@@ -1546,14 +1728,10 @@ bool OpenGLGraphicsManager::saveScreenshot(const Common::String &filename) const
 	const uint width  = _windowWidth;
 	const uint height = _windowHeight;
 
-	// A line of a BMP image must have a size divisible by 4.
-	// We calculate the padding bytes needed here.
-	// Since we use a 4 byte per pixel mode, we can use 0 here, since it is
-	// equal to (4 - (width * 4)) % 4. (4 - (width * Bpp)) % 4, is the usual
-	// way of computing the padding bytes required).
-	// GL_PACK_ALIGNMENT is 4, so this line padding is required for PNG too
-	const uint linePaddingSize = 0;
-	const uint lineSize        = width * 4 + linePaddingSize;
+	// GL_PACK_ALIGNMENT is 4 so each row must be aligned to 4 bytes boundary
+	// A line of a BMP image must also have a size divisible by 4.
+	// Calculate lineSize as the next multiple of 4 after the real line size
+	const uint lineSize        = (width * 3 + 3) & ~3;
 
 	Common::DumpFile out;
 	if (!out.open(filename)) {
@@ -1562,12 +1740,12 @@ bool OpenGLGraphicsManager::saveScreenshot(const Common::String &filename) const
 
 	Common::Array<uint8> pixels;
 	pixels.resize(lineSize * height);
-	GL_CALL(glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, &pixels.front()));
+	GL_CALL(glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, &pixels.front()));
 
 #ifdef SCUMM_LITTLE_ENDIAN
-	const Graphics::PixelFormat format(4, 8, 8, 8, 8, 0, 8, 16, 24);
+	const Graphics::PixelFormat format(3, 8, 8, 8, 0, 0, 8, 16, 0);
 #else
-	const Graphics::PixelFormat format(4, 8, 8, 8, 8, 24, 16, 8, 0);
+	const Graphics::PixelFormat format(3, 8, 8, 8, 0, 16, 8, 0, 0);
 #endif
 	Graphics::Surface data;
 	data.init(width, height, lineSize, &pixels.front(), format);

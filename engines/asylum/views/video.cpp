@@ -109,7 +109,7 @@ bool VideoPlayer::handleEvent(const AsylumEvent &evt) {
 				getText()->draw(0, 99, kTextCenter, Common::Point(10, y), 20, 620, text);
 
 				if (_vm->checkGameVersion("Steam")) {
-					Graphics::Surface *st = getScreen()->getSurface().convertTo(g_system->getScreenFormat(), _subtitlePalette);
+					Graphics::Surface *st = getScreen()->getSurface()->convertTo(g_system->getScreenFormat(), _subtitlePalette);
 					g_system->copyRectToScreen((const byte *)st->getBasePtr(0, 400), st->pitch, 0, 400, 640, 80);
 					st->free();
 					delete st;
@@ -189,13 +189,15 @@ void VideoPlayer::play(const Common::String &filename, bool showSubtitles) {
 	int32 frameEnd = 0;
 	int32 currentSubtitle = 0;
 
-	_decoder->start();
-
 	if (_vm->checkGameVersion("Steam") || _vm->isAltDemo()) {
-		Graphics::PixelFormat decoderFormat = Graphics::PixelFormat(4, 8, 8, 8, 8, 24, 16, 8, 0);
-		_decoder->setDefaultHighColorFormat(decoderFormat);
+		Graphics::PixelFormat bestFormat = g_system->getSupportedFormats().front();
+		_decoder->setOutputPixelFormat(bestFormat);
+
+		Graphics::PixelFormat decoderFormat = _decoder->getPixelFormat();
 		initGraphics(640, 480, &decoderFormat);
 	}
+
+	_decoder->start();
 
 	while (!_done && !Engine::shouldQuit() && !_decoder->endOfVideo()) {
 		_vm->handleEvents();

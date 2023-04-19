@@ -41,6 +41,9 @@ Hacks::Hacks() {
 	midiVolumeScale = 256;
 	minTransitionDuration = 0;
 	ignoreMToonMaintainRateFlag = false;
+	allowAssetsFromOtherScenes = false;
+	mtiVariableReferencesHack = false;
+	mtiSceneReturnHack = false;
 }
 
 Hacks::~Hacks() {
@@ -431,7 +434,7 @@ void addObsidianImprovedWidescreen(const MTropolisGameDescription &desc, Hacks &
 			// Bureau documents
 			// 100 area (booths)
 			0x4e2d9e,
-			0x4de654,
+			0x4dfa22,
 
 			// 199 area (booths hint room)
 			0x4e2555,
@@ -528,7 +531,7 @@ void addObsidianImprovedWidescreen(const MTropolisGameDescription &desc, Hacks &
 			0x4e55cc,
 
 			// 500 area (Immediate Action)
-			0x4a2e7b,
+			0x4e2e7b,
 			0x4e0710,
 
 			// 800 area (bookshelves)
@@ -879,10 +882,10 @@ void ObsidianAutoSaveSceneTransitionHooks::onSceneTransitionEnded(Runtime *runti
 
 		if (saveVar && saveVar->isModifier()) {
 			Modifier *modifier = static_cast<Modifier *>(saveVar.get());
-			Common::SharedPtr<ModifierSaveLoad> saveLoad = modifier->getSaveLoad();
+			Common::SharedPtr<ModifierSaveLoad> saveLoad = modifier->getSaveLoad(runtime);
 
 			if (saveLoad) {
-				CompoundVarSaver saver(saveVar.get());
+				CompoundVarSaver saver(runtime, saveVar.get());
 				_autoSaveProvider->autoSave(&saver);
 
 				_varsState->resyncAllVars(runtime);
@@ -1008,8 +1011,8 @@ Common::SharedPtr<ISaveWriter> ObsidianSaveLoadMechanism::createSaveWriter(Runti
 	if (!cgstCompoundVar)
 		return nullptr;
 
-	if (cgstCompoundVar->getSaveLoad())
-		return Common::SharedPtr<CompoundVarSaver>(new CompoundVarSaver(cgstCompoundVar));
+	if (cgstCompoundVar->getSaveLoad(runtime))
+		return Common::SharedPtr<CompoundVarSaver>(new CompoundVarSaver(runtime, cgstCompoundVar));
 
 	return nullptr;
 }
@@ -1028,6 +1031,29 @@ void addMTIQuirks(const MTropolisGameDescription &desc, Hacks &hacks) {
 	// Anyway, there are two possible solutions to this: Lock the clock to 60Hz, or ignore the flag.
 	// Given that the flag should not be set, we ignore the flag.
 	hacks.ignoreMToonMaintainRateFlag = true;
+
+	// Needed for piano, the sound assets are in B10 : Notes but the piano is in B10 : Piano
+	hacks.allowAssetsFromOtherScenes = true;
+
+	// MTI initializes variables in a way that doesn't seem to match mTropolis behavior in any explicable way:
+	//
+	// For example, 0010cb0e "Scene Started => init Benbow" looks like this internally, decompiled:
+	// set local:a.billystate to 0
+	//
+	// In this case "a" is a compound variable and "billyState" is a NON-ALIASED integer variable contained in
+	// the compound.  Later, 0009fc9a "Scene Started => play intro" checks local 00007f83 00 'billyState'
+	// to determine if the Benbow intro needs to be played.  Since the GUID doesn't match (?) we check by name,
+	// which resolves to the GUID-less (?) alias in the Benbow subsection, which references 00097cf4, a different
+	// variable also named "billyState"
+	//
+	// Haven't figured out anything that would explain why it would reference the variables in the compound
+	// modifier.  Probably some quirk of early-version mTropolis.
+	hacks.mtiVariableReferencesHack = true;
+
+	// MTI returns from the menu by transitioning to a "return" scene that sends a return message to the target
+	// scene, which is supposed to activate a scene transtion modifier in the scene that transitions to itself.
+	// This doesn't work because the modifier is gone when the scene is unloaded.
+	hacks.mtiSceneReturnHack = true;
 }
 
 } // End of namespace HackSuites

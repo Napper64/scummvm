@@ -20,6 +20,7 @@
  */
 
 #include "ags/shared/util/compress.h"
+#include "ags/lib/std/vector.h"
 #include "ags/shared/ac/common.h"   // quit, update_polled_stuff
 #include "ags/shared/gfx/bitmap.h"
 #include "ags/shared/util/file.h"
@@ -318,8 +319,12 @@ Shared::Bitmap *load_rle_bitmap8(Stream *in, RGB(*pal)[256]) {
 void skip_rle_bitmap8(Stream *in) {
 	int w = in->ReadInt16();
 	int h = in->ReadInt16();
-	// Skip 8-bit pixel data + RGB palette
-	in->Seek((w * h) + (3 * 256));
+	// Unpack the pixels into temp buf
+	std::vector<uint8_t> buf;
+	buf.resize(w * h);
+	cunpackbitl(&buf[0], w * h, in);
+	// Skip RGB palette
+	in->Seek(3 * 256);
 }
 
 //-----------------------------------------------------------------------------
@@ -336,14 +341,15 @@ void lzw_compress(const uint8_t *data, size_t data_sz, int /*image_bpp*/, Shared
 	lzwcompress(&mem_in, out);
 }
 
-void lzw_decompress(uint8_t *data, size_t data_sz, int /*image_bpp*/, Shared::Stream *in) {
+void lzw_decompress(uint8_t *data, size_t data_sz, int /*image_bpp*/, Shared::Stream *in, size_t in_sz) {
 	// LZW algorithm that we use fails on sequence less than 16 bytes.
 	if (data_sz < 16) {
 		in->Read(data, data_sz);
 		return;
 	}
-	MemoryStream ms(data, data_sz, kStream_Write);
-	lzwexpand(in, &ms, data_sz);
+	std::vector<uint8_t> in_buf(in_sz);
+	in->Read(in_buf.data(), in_sz);
+	lzwexpand(in_buf.data(), in_sz, data, data_sz);
 }
 
 void save_lzw(Stream *out, const Bitmap *bmpp, const RGB(*pal)[256]) {
@@ -396,11 +402,10 @@ Bitmap *load_lzw(Stream *in, int dst_bpp, RGB(*pal)[256]) {
 	const soff_t end_pos = in->GetPosition() + comp_sz;
 
 	// First decompress data into the memory buffer
-	std::vector<uint8_t> membuf;
-	{
-		VectorStream memws(membuf, kStream_Write);
-		lzwexpand(in, &memws, uncomp_sz);
-	}
+	std::vector<uint8_t> inbuf(comp_sz);
+	std::vector<uint8_t> membuf(uncomp_sz);
+	in->Read(inbuf.data(), comp_sz);
+	lzwexpand(inbuf.data(), comp_sz, membuf.data(), uncomp_sz);
 
 	// Open same buffer for reading and get params and pixels
 	VectorStream mem_in(membuf);

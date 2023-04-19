@@ -27,6 +27,7 @@
 #include "engines/nancy/resource.h"
 #include "engines/nancy/decompress.h"
 #include "engines/nancy/graphics.h"
+#include "engines/nancy/util.h"
 
 namespace Nancy {
 
@@ -122,7 +123,8 @@ protected:
 };
 
 void CifFile21::readCifInfo(Common::File &f) {
-	f.skip(32);
+	readRect(f, _cifInfo.src);
+	readRect(f, _cifInfo.dest);
 	readCifInfo20(f, _cifInfo);
 }
 
@@ -415,7 +417,8 @@ void CifTree21::readCifInfo(Common::File &f, CifInfoChain &chain) {
 		chain.next = f.readUint16LE();
 	}
 
-	f.skip(32); // TODO
+	readRect(f, info.src);
+	readRect(f, info.dest);
 
 	readCifInfo20(f, info, (_hasOffsetFirst ? nullptr : &chain.dataOffset));
 
@@ -625,7 +628,9 @@ const CifTree *ResourceManager::findCifTree(const Common::String &name) const {
 }
 
 void ResourceManager::initialize() {
-	loadCifTree("ciftree", "dat");
+	if (g_nancy->getGameType() != kGameTypeVampire) {
+		loadCifTree("ciftree", "dat");
+	}
 }
 
 bool ResourceManager::getCifInfo(const Common::String &name, CifInfo &info) const {
@@ -727,7 +732,7 @@ byte *ResourceManager::loadData(const Common::String &name, uint &size) {
 		// Data was not found inside a cif tree or a cif file, try to open an .iff file
 		// This is used by The Vampire Diaries
 		Common::File f;
-		if (f.open(name + ".iff")) {
+		if (f.open(name.hasSuffixIgnoreCase(".iff") ? name : name + ".iff")) {
 			size = f.size();
 			buf = new byte[size];
 			f.read(buf, size);
@@ -743,13 +748,19 @@ byte *ResourceManager::loadData(const Common::String &name, uint &size) {
 	return buf;
 }
 
-bool ResourceManager::loadImage(const Common::String &name, Graphics::Surface &surf) {
+bool ResourceManager::loadImage(const Common::String &name, Graphics::Surface &surf, const Common::String treeName, Common::Rect *outSrc, Common::Rect *outDest) {
 	CifInfo info;
 	surf.free();
 
-	byte *buf = getCifData(name, info);
+	byte *buf = nullptr;
 
-	if (!buf)  {
+	if (treeName.size()) {
+		buf = getCifData(treeName, name, info);
+	} else {
+		buf = getCifData(name, info);
+	}
+
+	if (!buf && treeName.size() > 0) {
 		// Couldn't find image in a cif tree, try to open a .bmp file
 		// This is used by The Vampire Diaries
 		Common::File f;
@@ -778,6 +789,14 @@ bool ResourceManager::loadImage(const Common::String &name, Graphics::Surface &s
 		}
 	}
 
+	if (outSrc) {
+		*outSrc = info.src;
+	}
+
+	if (outDest) {
+		*outDest = info.dest;
+	}
+
 	surf.w = info.width;
 	surf.h = info.height;
 	surf.pitch = info.pitch;
@@ -786,19 +805,23 @@ bool ResourceManager::loadImage(const Common::String &name, Graphics::Surface &s
 	return true;
 }
 
-bool ResourceManager::loadImage(const Common::String &name, Graphics::ManagedSurface &surf) {
+bool ResourceManager::loadImage(const Common::String &name, Graphics::ManagedSurface &surf, const Common::String treeName, Common::Rect *outSrc, Common::Rect *outDest) {
 	CifInfo info;
-	bool loadedFromBitmapFile = false;
 	surf.free();
 
-	byte *buf = getCifData(name, info);
+	byte *buf = nullptr;
 
-	if (!buf)  {
+	if (treeName.size()) {
+		buf = getCifData(treeName, name, info);
+	} else {
+		buf = getCifData(name, info);
+	}
+
+	if (!buf) {
 		// Couldn't find image in a cif tree, try to open a .bmp file
 		// This is used by The Vampire Diaries
 		Common::File f;
-		loadedFromBitmapFile = f.open(name + ".bmp");
-		if (loadedFromBitmapFile) {
+		if (treeName.size() == 0 && f.open(name + ".bmp")) {
 			Image::BitmapDecoder dec;
 			if (dec.loadStream(f)) {
 				GraphicsManager::copyToManaged(*dec.getSurface(), surf);
@@ -823,6 +846,14 @@ bool ResourceManager::loadImage(const Common::String &name, Graphics::ManagedSur
 			return false;
 		}
 
+		if (outSrc) {
+			*outSrc = info.src;
+		}
+
+		if (outDest) {
+			*outDest = info.dest;
+		}
+
 		GraphicsManager::copyToManaged(buf, surf, info.width, info.height, g_nancy->_graphicsManager->getInputPixelFormat());
 		return true;
 	}
@@ -831,10 +862,24 @@ bool ResourceManager::loadImage(const Common::String &name, Graphics::ManagedSur
 void ResourceManager::list(const Common::String &treeName, Common::Array<Common::String> &nameList, uint type) const {
 	const CifTree *cifTree = findCifTree(treeName);
 
-	if (!cifTree)
-		return;
+	if (!cifTree) {
+		Common::ArchiveMemberList list;
+		if (type == ResourceManager::kResTypeAny || type == ResourceManager::kResTypeImage) {
+			SearchMan.listMatchingMembers(list, Common::Path("*.bmp"));
+		}
 
-	cifTree->list(nameList, type);
+		if (type == ResourceManager::kResTypeAny || type == ResourceManager::kResTypeScript) {
+			SearchMan.listMatchingMembers(list, Common::Path("*.iff"));
+		}
+
+		for (auto &i : list) {
+			nameList.push_back(i.get()->getDisplayName());
+		}
+	} else {
+		cifTree->list(nameList, type);
+	}
+
+	Common::sort(nameList.begin(), nameList.end());
 }
 
 Common::String ResourceManager::getCifDescription(const Common::String &treeName, const Common::String &name) const {

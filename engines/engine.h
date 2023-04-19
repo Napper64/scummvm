@@ -78,11 +78,18 @@ void GUIErrorMessageWithURL(const Common::String &msg, const char *url);
 /**
  * Initialize graphics and show an error message.
  */
-void GUIErrorMessageFormat(Common::U32String fmt, ...);
+void GUIErrorMessageFormatU32StringPtr(const Common::U32String *fmt, ...);
 /**
  * Initialize graphics and show an error message.
  */
-void GUIErrorMessageFormat(const char *fmt, ...) GCC_PRINTF(1, 2);
+template<class... TParam>
+inline void GUIErrorMessageFormat(const Common::U32String &fmt, TParam... param) {
+	GUIErrorMessageFormatU32StringPtr(&fmt, Common::forward<TParam>(param)...);
+}
+/**
+ * Initialize graphics and show an error message.
+ */
+void GUIErrorMessageFormat(MSVC_PRINTF const char *fmt, ...) GCC_PRINTF(1, 2);
 
 
 class Engine;
@@ -293,7 +300,12 @@ public:
 		 *
 		 * This enables the help button in the main menu.
 		 */
-		 kSupportsHelp
+		 kSupportsHelp,
+
+		/**
+		 * The engine provides overrides to the quit and exit to launcher dialogs.
+		 */
+		kSupportsQuitDialogOverride,
 	};
 
 
@@ -645,6 +657,12 @@ public:
 	virtual int getAutosaveSlot() const {
 		return 0;
 	}
+
+protected:
+	/**
+	 * Syncs the engine's mixer using the default volume syncing behavior.
+	 */
+	void defaultSyncSoundSettings();
 };
 
 
@@ -676,6 +694,8 @@ public:
 	void push(const Common::String target, const int slot = -1);
 	/** Pop the last game loaded into the chained games manager. */
 	bool pop(Common::String &target, int &slot);
+	/** Returns true if the chained games manager has no elements in the queue. */
+	bool empty() { return _chainedGames.empty(); }
 };
 
 /** Convenience shortcut for accessing the chained games manager. */

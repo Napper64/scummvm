@@ -25,6 +25,7 @@
 #include "common/bitarray.h"
 #include "common/events.h"
 #include "engines/advancedDetector.h"
+#include "graphics/managed_surface.h"
 #include "graphics/surface.h"
 
 #include "audio/decoders/wave.h"
@@ -36,6 +37,7 @@
 #include "freescape/gfx.h"
 #include "freescape/objects/entrance.h"
 #include "freescape/objects/geometricobject.h"
+#include "freescape/objects/sensor.h"
 
 namespace Common {
 class RandomSource;
@@ -77,10 +79,12 @@ struct soundFx {
 	byte *data;
 };
 
+class SizedPCSpeaker : public Audio::PCSpeaker {
+public:
+	bool endOfStream() const override { return !isPlaying(); }
+};
+
 class FreescapeEngine : public Engine {
-private:
-	// We need random numbers
-	Common::RandomSource *_rnd;
 
 public:
 	FreescapeEngine(OSystem *syst, const ADGameDescription *gd);
@@ -98,6 +102,9 @@ public:
 	bool isAmiga() { return _gameDescription->platform == Common::kPlatformAmiga; }
 	bool isAtariST() { return _gameDescription->platform == Common::kPlatformAtariST; }
 	bool isDOS() { return _gameDescription->platform == Common::kPlatformDOS; }
+	bool isSpectrum() { return _gameDescription->platform == Common::kPlatformZX; }
+	bool isCPC() { return _gameDescription->platform == Common::kPlatformAmstradCPC; }
+	bool isC64() { return _gameDescription->platform == Common::kPlatformC64; }
 
 	Common::Error run() override;
 
@@ -106,25 +113,62 @@ public:
 	Common::Rect _fullscreenViewArea;
 	void centerCrossair();
 
-	void convertBorder();
+	virtual void borderScreen();
+	virtual void titleScreen();
+
+	virtual void loadBorder();
+	virtual void processBorder();
 	void drawBorder();
 	void drawTitle();
+	void drawBackground();
 	virtual void drawUI();
+	virtual void drawInfoMenu();
+
 	virtual void drawCrossair(Graphics::Surface *surface);
-	Graphics::Surface *_border;
-	Graphics::Surface *_title;
+	Graphics::ManagedSurface *_border;
+	Graphics::ManagedSurface *_title;
 	Texture *_borderTexture;
 	Texture *_titleTexture;
 	Texture *_uiTexture;
+	Common::HashMap<uint16, Texture *> _borderCGAByArea;
+	Common::HashMap<uint16, byte *> _paletteCGAByArea;
 
 	// Parsing assets
 	uint8 _binaryBits;
-	virtual void loadAssets();
+	void loadAssets();
+	virtual void loadAssetsDemo();
+	virtual void loadAssetsFullGame();
+
+	virtual void loadAssetsAtariFullGame();
+	virtual void loadAssetsAtariDemo();
+
+	virtual void loadAssetsAmigaFullGame();
+	virtual void loadAssetsAmigaDemo();
+
+	virtual void loadAssetsDOSFullGame();
+	virtual void loadAssetsDOSDemo();
+
+	virtual void loadAssetsZXFullGame();
+	virtual void loadAssetsZXDemo();
+
+	virtual void loadAssetsCPCFullGame();
+	virtual void loadAssetsCPCDemo();
+
+	virtual void loadAssetsC64FullGame();
+	virtual void loadAssetsC64Demo();
+
+	virtual void drawDOSUI(Graphics::Surface *surface);
+	virtual void drawZXUI(Graphics::Surface *surface);
+	virtual void drawCPCUI(Graphics::Surface *surface);
+	virtual void drawC64UI(Graphics::Surface *surface);
+	virtual void drawAmigaAtariSTUI(Graphics::Surface *surface);
+
 	Common::Archive *_dataBundle;
 	void loadDataBundle();
 	void loadBundledImages();
 	byte *getPaletteFromNeoImage(Common::SeekableReadStream *stream, int offset);
-	Graphics::Surface *loadAndConvertNeoImage(Common::SeekableReadStream *stream, int offset, byte *palette = nullptr);
+	Graphics::ManagedSurface *loadAndConvertNeoImage(Common::SeekableReadStream *stream, int offset, byte *palette = nullptr);
+	Graphics::ManagedSurface *loadAndCenterScrImage(Common::SeekableReadStream *stream);
 	void loadPalettes(Common::SeekableReadStream *file, int offset);
 	void swapPalette(uint16 areaID);
 	Common::HashMap<uint16, byte *> _paletteByArea;
@@ -149,6 +193,13 @@ public:
 	void load8bitBinary(Common::SeekableReadStream *file, int offset, int ncolors);
 	Area *load8bitArea(Common::SeekableReadStream *file, uint16 ncolors);
 	Object *load8bitObject(Common::SeekableReadStream *file);
+	void loadGlobalObjects(Common::SeekableReadStream *file, int offset, int size);
+	void renderPixels8bitBinImage(Graphics::ManagedSurface *surface, int &i, int &j, uint8 pixels, int color);
+
+	void renderPixels8bitBinCGAImage(Graphics::ManagedSurface *surface, int &i, int &j, uint8 pixels, int color);
+	void renderPixels8bitBinEGAImage(Graphics::ManagedSurface *surface, int &i, int &j, uint8 pixels, int color);
+
+	Graphics::ManagedSurface *load8bitBinImage(Common::SeekableReadStream *file, int offset);
 
 	// Areas
 	uint16 _startArea;
@@ -163,13 +214,17 @@ public:
 
 	// Input
 	bool _demoMode;
+	bool _disableDemoMode;
 	bool _flyMode;
 	bool _shootMode;
 	bool _noClipMode;
 	void processInput();
-	void generateInput();
+	void resetInput();
+	void generateDemoInput();
 	virtual void pressedKey(const int keycode);
+	virtual bool onScreenControls(Common::Point mouse);
 	void move(CameraMovement direction, uint8 scale, float deltaTime);
+	virtual void checkIfStillInArea();
 	void changePlayerHeight(int index);
 	void increaseStepSize();
 	void decreaseStepSize();
@@ -178,12 +233,11 @@ public:
 	bool checkFloor(Math::Vector3d currentPosition);
 	bool tryStepUp(Math::Vector3d currentPosition);
 	bool tryStepDown(Math::Vector3d currentPosition);
+	bool _hasFallen;
 
-	void rotate(Common::Point lastMousePos, Common::Point mousePos);
 	void rotate(float xoffset, float yoffset);
 	// Input state
 	float _lastFrame;
-	Common::Point _lastMousePos;
 
 	// Interaction
 	void shoot();
@@ -201,7 +255,6 @@ public:
 	// Camera options
 	Common::Point _crossairPosition;
 	float _mouseSensitivity;
-	float _movementSpeed;
 	Math::Vector3d _upVector; // const
 	Math::Vector3d _cameraFront, _cameraRight;
 	// Spacial attributes
@@ -221,13 +274,16 @@ public:
 	Common::Array<FCLInstructionVector> _conditions;
 
 	bool checkCollisions(bool executeCode);
+	Math::Vector3d _objExecutingCodeSize;
+	virtual void executeMovementConditions();
 	void executeObjectConditions(GeometricObject *obj, bool shot, bool collided);
-	void executeLocalGlobalConditions(bool shot, bool collided);
-	void executeCode(FCLInstructionVector &code, bool shot, bool collided);
+	void executeLocalGlobalConditions(bool shot, bool collided, bool timer);
+	void executeCode(FCLInstructionVector &code, bool shot, bool collided, bool timer);
 
 	// Instructions
 	void executeIncrementVariable(FCLInstruction &instruction);
 	void executeDecrementVariable(FCLInstruction &instruction);
+	void executeSetVariable(FCLInstruction &instruction);
 	void executeGoto(FCLInstruction &instruction);
 	void executeIfThenElse(FCLInstruction &instruction);
 	void executeMakeInvisible(FCLInstruction &instruction);
@@ -244,15 +300,25 @@ public:
 	bool executeEndIfBitNotEqual(FCLInstruction &instruction);
 	bool executeEndIfVisibilityIsEqual(FCLInstruction &instruction);
 	void executeSwapJet(FCLInstruction &instruction);
-	void executePrint(FCLInstruction &instruction);
+	virtual void executePrint(FCLInstruction &instruction);
+	void executeSPFX(FCLInstruction &instruction);
 
 	// Sound
 	Audio::SoundHandle _soundFxHandle;
 	Audio::SoundHandle _musicHandle;
+	Freescape::SizedPCSpeaker *_speaker;
+
+	bool _syncSound;
+	bool _firstSound;
 	bool _usePrerecordedSounds;
+	void waitForSounds();
+	void stopAllSounds();
+	bool isPlayingSound();
 	void playSound(int index, bool sync);
 	void playWav(const Common::String filename);
 	void playMusic(const Common::String filename);
+	void queueSoundConst(double hzFreq, int duration);
+	void playSilence(int duration, bool sync);
 	void playSoundConst(double hzFreq, int duration, bool sync);
 	void playSoundSweepIncWL(double hzFreq1, double hzFreq2, double wlStepPerMS, int resolution, bool sync);
 	void playTeleporter(int totalIters, bool sync);
@@ -265,9 +331,13 @@ public:
 	int _screenW, _screenH;
 	Renderer *_gfx;
 	Graphics::FrameLimiter *_frameLimiter;
+	bool _vsyncEnabled;
 	Common::RenderMode _renderMode;
 	ColorMap _colorMap;
+	int _underFireFrames;
+	int _shootingFrames;
 	void drawFrame();
+	void flashScreen(int backgroundColor);
 	uint8 _colorNumber;
 	Math::Vector3d _scaleVector;
 	float _nearClipPlane;
@@ -276,6 +346,7 @@ public:
 	// Text messages and Fonts
 	void insertTemporaryMessage(const Common::String message, int deadline);
 	void getLatestMessages(Common::String &message, int &deadline);
+	void clearTemporalMessages();
 	Common::StringArray _temporaryMessages;
 	Common::Array<int> _temporaryMessageDeadlines;
 	Common::StringArray _messagesList;
@@ -288,16 +359,22 @@ public:
 	Common::StringArray _currentEphymeralMessages;
 	Common::BitArray _font;
 	bool _fontLoaded;
-	void drawStringInSurface(const Common::String &str, int x, int y, uint32 fontColor, uint32 backColor, Graphics::Surface *surface);
+	void drawStringInSurface(const Common::String &str, int x, int y, uint32 fontColor, uint32 backColor, Graphics::Surface *surface, int offset = 0);
 
 	// Game state
 	virtual void initGameState();
+	void setGameBit(int index);
+	void clearGameBit(int index);
+	void toggleGameBit(int index);
+
 	StateVars _gameStateVars;
 	StateBits _gameStateBits;
 	virtual bool checkIfGameEnded();
+	bool _forceEndGame;
 	ObjectArray _sensors;
 	void checkSensors();
-
+	void drawSensorShoot(Sensor *sensor);
+	void takeDamageFromSensor();
 
 	bool hasFeature(EngineFeature f) const override;
 	bool canLoadGameStateCurrently() override { return true; }
@@ -307,23 +384,48 @@ public:
 	Common::Error saveGameStream(Common::WriteStream *stream, bool isAutosave = false) override;
 	virtual Common::Error saveGameStreamExtended(Common::WriteStream *stream, bool isAutosave = false);
 	virtual Common::Error loadGameStreamExtended(Common::SeekableReadStream *stream);
+	Graphics::Surface *_savedScreen;
+
+	void pauseEngineIntern(bool pause) override;
 
 	// Timers
 	bool startCountdown(uint32 delay);
 	void removeTimers();
 	bool _timerStarted;
+	int _initialCountdown;
 	int _countdown;
 	int _ticks;
+	int _lastTick;
+	int _lastMinute;
+
+	void getTimeFromCountdown(int &seconds, int &minutes, int &hours);
+	virtual void updateTimeVariables();
+
+	// Cheats
+	bool _useExtendedTimer;
+	bool _disableSensors;
+	bool _disableFalling;
+
+	// Random
+	Common::RandomSource *_rnd;
 };
 
 enum DrillerReleaseFlags {
-		ADGF_AMIGA_RETAIL = (1 << 0),
-		ADGF_AMIGA_BUDGET = (1 << 1),
+		GF_AMIGA_RETAIL = (1 << 0),
+		GF_AMIGA_BUDGET = (1 << 1),
+		GF_ZX_RETAIL = (1 << 2),
+		GF_ZX_BUDGET = (1 << 3),
+		GF_ZX_DISC = (1 << 4),
+		GF_CPC_RETAIL = (1 << 5),
+		GF_CPC_RETAIL2 = (1 << 6),
+		GF_CPC_BUDGET = (1 << 7),
+		GF_CPC_VIRTUALWORLDS = (1 << 8),
 };
 
 class DrillerEngine : public FreescapeEngine {
 public:
 	DrillerEngine(OSystem *syst, const ADGameDescription *gd);
+	~DrillerEngine();
 
 	uint32 _initialJetEnergy;
 	uint32 _initialJetShield;
@@ -333,54 +435,117 @@ public:
 
 	bool _useAutomaticDrilling;
 
+	Common::HashMap<uint16, uint32> _drillStatusByArea;
+	Common::HashMap<uint16, uint32> _drillMaxScoreByArea;
+	Common::HashMap<uint16, uint32> _drillSuccessByArea;
+
 	void initGameState() override;
 	bool checkIfGameEnded() override;
 
 	void gotoArea(uint16 areaID, int entranceID) override;
 
-	void loadAssets() override;
-	void drawUI() override;
+	void borderScreen() override;
+	void titleScreen() override;
+
+	void processBorder() override;
+	void drawInfoMenu() override;
 
 	void pressedKey(const int keycode) override;
 	Common::Error saveGameStreamExtended(Common::WriteStream *stream, bool isAutosave = false) override;
 	Common::Error loadGameStreamExtended(Common::SeekableReadStream *stream) override;
 
 private:
-	void loadGlobalObjects(Common::SeekableReadStream *file, int offset);
 	bool drillDeployed(Area *area);
+	GeometricObject *_drillBase;
 	Math::Vector3d drillPosition();
 	void addDrill(const Math::Vector3d position, bool gasFound);
 	bool checkDrill(const Math::Vector3d position);
 	void removeDrill(Area *area);
-	StateBits _drilledAreas;
+	void addSkanner(Area *area);
 
-	void loadAssetsDemo();
-	void loadAssetsFullGame();
+	void loadAssetsFullGame() override;
+	void loadAssetsAtariFullGame() override;
+	void loadAssetsAtariDemo() override;
+	void loadAssetsAmigaFullGame() override;
+	void loadAssetsAmigaDemo() override;
+	void loadAssetsDOSFullGame() override;
+	void loadAssetsDOSDemo() override;
+	void loadAssetsZXFullGame() override;
+	void loadAssetsCPCFullGame() override;
+	void loadAssetsC64FullGame() override;
 
-	void drawDOSUI(Graphics::Surface *surface);
-	void drawAmigaAtariSTUI(Graphics::Surface *surface);
+	void drawDOSUI(Graphics::Surface *surface) override;
+	void drawZXUI(Graphics::Surface *surface) override;
+	void drawCPCUI(Graphics::Surface *surface) override;
+	void drawC64UI(Graphics::Surface *surface) override;
+	void drawAmigaAtariSTUI(Graphics::Surface *surface) override;
+	bool onScreenControls(Common::Point mouse) override;
+	void initAmigaAtari();
+	void initDOS();
+	void initZX();
+	void initCPC();
+	void initC64();
+
+	Common::Rect _moveFowardArea;
+	Common::Rect _moveLeftArea;
+	Common::Rect _moveRightArea;
+	Common::Rect _moveBackArea;
+	Common::Rect _moveUpArea;
+	Common::Rect _moveDownArea;
+	Common::Rect _deployDrillArea;
+	Common::Rect _infoScreenArea;
+	Common::Rect _saveGameArea;
+	Common::Rect _loadGameArea;
+
+	Graphics::ManagedSurface *load8bitTitleImage(Common::SeekableReadStream *file, int offset);
+	Graphics::ManagedSurface *load8bitDemoImage(Common::SeekableReadStream *file, int offset);
+
+	uint32 getPixel8bitTitleImage(int index);
+	void renderPixels8bitTitleImage(Graphics::ManagedSurface *surface, int &i, int &j, int pixels);
 };
 
 class DarkEngine : public FreescapeEngine {
 public:
 	DarkEngine(OSystem *syst, const ADGameDescription *gd);
 
-	void loadAssets() override;
+	uint32 _initialFuel;
+	uint32 _initialShield;
+
+	void initGameState() override;
+	void borderScreen() override;
+	void titleScreen() override;
+
 	void gotoArea(uint16 areaID, int entranceID) override;
-	void drawUI() override;
+	void pressedKey(const int keycode) override;
+	void executePrint(FCLInstruction &instruction) override;
+
+	void loadAssetsDOSFullGame() override;
+	void loadAssetsDOSDemo() override;
+
+	int _lastTenSeconds;
+	void updateTimeVariables() override;
+
+	void drawDOSUI(Graphics::Surface *surface) override;
+	void drawFullscreenMessage(Common::String message);
 	Common::Error saveGameStreamExtended(Common::WriteStream *stream, bool isAutosave = false) override;
 	Common::Error loadGameStreamExtended(Common::SeekableReadStream *stream) override;
+
+private:
+	void addECDs(Area *area);
+	void addECD(Area *area, const Math::Vector3d position, int index);
+	void addWalls(Area *area);
 };
 
 class EclipseEngine : public FreescapeEngine {
 public:
 	EclipseEngine(OSystem *syst, const ADGameDescription *gd);
 
-	void loadAssets() override;
-
+	void titleScreen() override;
 	void gotoArea(uint16 areaID, int entranceID) override;
 
+	void loadAssetsDOSFullGame() override;
 	void drawUI() override;
+
 	Common::Error saveGameStreamExtended(Common::WriteStream *stream, bool isAutosave = false) override;
 	Common::Error loadGameStreamExtended(Common::SeekableReadStream *stream) override;
 };
@@ -389,7 +554,9 @@ class CastleEngine : public FreescapeEngine {
 public:
 	CastleEngine(OSystem *syst, const ADGameDescription *gd);
 
-	void loadAssets() override;
+	void titleScreen() override;
+	void loadAssetsDOSFullGame() override;
+	void drawUI() override;
 
 	void gotoArea(uint16 areaID, int entranceID) override;
 	Common::Error saveGameStreamExtended(Common::WriteStream *stream, bool isAutosave = false) override;

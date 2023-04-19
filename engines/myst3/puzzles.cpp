@@ -228,7 +228,7 @@ void Puzzles::leversBall(int16 var) {
 
 	const NewPosition *position = nullptr;
 	for (uint i = 0; i < ARRAYSIZE(move->p); i++)
-		if (move->p[i].newLeft == newLeverLeft && move->p[i].newRight == newLeverRight) {
+		if (move->p[i].newLeft == (newLeverLeft != 0) && move->p[i].newRight == (newLeverRight != 0)) {
 			position = &move->p[i];
 			break;
 		}
@@ -1527,8 +1527,8 @@ void Puzzles::projectorLoadBitmap(uint16 bitmap) {
 	// Rebuild the complete background image from the frames of the bink movie
 	Common::SeekableReadStream *movieStream = movieDesc.getData();
 	Video::BinkDecoder bink;
-	bink.setDefaultHighColorFormat(Texture::getRGBAPixelFormat());
 	bink.loadStream(movieStream);
+	bink.setOutputPixelFormat(Texture::getRGBAPixelFormat());
 	bink.start();
 
 	for (uint i = 0; i < 1024; i += 256) {
@@ -1554,8 +1554,8 @@ void Puzzles::projectorAddSpotItem(uint16 bitmap, uint16 x, uint16 y) {
 	// Rebuild the complete background image from the frames of the bink movie
 	Common::SeekableReadStream *movieStream = movieDesc.getData();
 	Video::BinkDecoder bink;
-	bink.setDefaultHighColorFormat(Texture::getRGBAPixelFormat());
 	bink.loadStream(movieStream);
+	bink.setOutputPixelFormat(Texture::getRGBAPixelFormat());
 	bink.start();
 
 	const Graphics::Surface *frame = bink.decodeNextFrame();

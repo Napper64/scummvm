@@ -20,6 +20,7 @@
  */
 
 #include "common/config-manager.h"
+#include "common/gui_options.h"
 #include "common/savefile.h"
 #include "common/system.h"
 #include "common/events.h"
@@ -31,6 +32,7 @@
 
 #include "gui/gui-manager.h"
 #include "gui/widget.h"
+#include "gui/widgets/edittext.h"
 #include "gui/ThemeEval.h"
 
 #include "scumm/dialogs.h"
@@ -84,7 +86,8 @@ static const ResString string_map_table_v8[] = {
 	{0, "/NEW.24/Music Volume  Low  =========  High"},
 	{0, "/NEW.25/Voice Volume  Low  =========  High"},
 	{0, "/NEW.26/Sfx Volume  Low  =========  High"},
-	{0, "Heap %dK"} // Non-translatable string
+	{0, "Heap %dK"}, // Non-translatable string
+	{0, "Are you sure you want to restart?  (Y-N)Y"} // Not in the original
 };
 
 static const ResString string_map_table_v7[] = {
@@ -171,7 +174,7 @@ static const ResString string_map_table_v6[] = {
 	{108, "Name your SAVE game"},
 	{109, "Select a game to LOAD"},
 	{117, "How may I serve you?"},
-	{80, "Text Speed"},
+	{80, "Text Speed"}, // see also fixedDottMenuStrings[]
 	{81, "Display Text"},
 	{113, "Music"},
 	{114, "Voice"},
@@ -184,7 +187,11 @@ static const ResString string_map_table_v6[] = {
 	{0, "Music Volume    Low  =========  High"},
 	{0, "Voice Volume    Low  =========  High"},
 	{0, "SFX Volume    Low  =========  High"},
-	{0, "Heap %dK"}
+	{0, "Heap %dK"},
+	{0, "Recalibrating Joystick"},
+	{0, "Joystick Mode"}, // SAMNMAX Floppy
+	{0, "Mouse Mode"},
+	{0, "Heap %dK, ems %dK"} // Floppy versions
 };
 
 #pragma mark -
@@ -429,8 +436,8 @@ void InfoDialog::reflowLayout() {
 	_text->setSize(_w, _h);
 }
 
-const char *InfoDialog::getPlainEngineString(int stringno) {
-	const char *result;
+const char *InfoDialog::getPlainEngineString(int stringno, bool forceHardcodedString) {
+	const char *result = nullptr;
 
 	if (stringno == 0)
 		return nullptr;
@@ -447,10 +454,17 @@ const char *InfoDialog::getPlainEngineString(int stringno) {
 		result = (const char *)_vm->getStringAddressVar(string_map_table_v6[stringno - 1].num);
 
 		if (!result) {
-			result = string_map_table_v6[stringno - 1].string;
+			if (stringno >= 22 && stringno <= 27 && _vm->_game.id == GID_TENTACLE && _vm->_enableEnhancements && strcmp(_vm->_game.variant, "Floppy")) {
+				result = getStaticResString(_vm->_language, stringno - 1).string;
+			} else {
+				result = string_map_table_v6[stringno - 1].string;
+			}
 		}
 	} else if (_vm->_game.version >= 3) {
-		result = (const char *)_vm->getStringAddress(getStaticResString(_vm->_language, stringno - 1).num);
+		if (_vm->_game.platform == Common::kPlatformSegaCD)
+			result = (const char *)_vm->getStringAddress(stringno);
+		else if (!forceHardcodedString)
+			result = (const char *)_vm->getStringAddress(getStaticResString(_vm->_language, stringno - 1).num);
 
 		if (!result) {
 			result = getStaticResString(_vm->_language, stringno - 1).string;
@@ -559,7 +573,7 @@ const Common::U32String InfoDialog::queryResString(int stringno) {
 
 const ResString &InfoDialog::getStaticResString(Common::Language lang, int stringno) {
 	// The string parts are only needed for v1/2. So we need to provide only the
-	// language varieties that exist for these. I have added the langugage I found
+	// language varieties that exist for these. I have added the languages I found
 	// in scumm-md5.h. I guess we could actually ditch the first 3 lines...
 	static const ResString strMap1[][6] = {
 		{	// English
@@ -587,12 +601,12 @@ const ResString &InfoDialog::getStaticResString(Common::Language lang, int strin
 			{6, "Wollen Sie wirklich beenden? (j/n)j"}				// (matching the previous sentence)
 		},
 		{	// Italian
-			{1, "Inserisci il disco %c e premi un pulsante per continuare."},
-			{2, "Impossibile trovare %s, (%c%d) Premere un pulsante."},
-			{3, "Errore nella lettura del disco %c, (%c%d) Premere un pulsante."},
-			{4, "Gioco in pausa. Premi SPAZIO per continuare."},
-			{5, "Sei sicuro di voler ricominciare?  (S/N)S"},
-			{6, "Sei sicuro di voler uscire?  (S/N)S"}
+			{1, "Inserisci il Disk n. Premi ENTER."},			// Original DOS Italian v2
+			{2, "Non trovato il file nn.lfl. Premi ENTER."},	// Original DOS Italian v2
+			{3, "ERROR READING %d type %d"},					// As found on the Italian v2 executable...
+			{4, "PAUSA - Premere SPAZIO per continuare."},		// Original DOS Italian v2
+			{5, "Sei sicuro di voler ricominciare? (s/n)s"},	// Original DOS Italian v2
+			{6, "Sei sicuro di voler uscire? (s/n)s"}			// (matching the previous sentence)
 		},
 		{	// Spanish
 			{1, "Introduce el disco %c y pulsa un bot""\xa2""n para continuar."},
@@ -622,7 +636,7 @@ const ResString &InfoDialog::getStaticResString(Common::Language lang, int strin
 
 	// Added in SCUMM4. Only the numbers are used, so there
 	// is no need to provide language specific strings; there are
-	// some exceptions for which there's only an hardcoded English
+	// some exceptions for which there's only a hardcoded English
 	// string.
 	static const ResString strMap2[] = {
 		{7, ("Save")},
@@ -647,16 +661,99 @@ const ResString &InfoDialog::getStaticResString(Common::Language lang, int strin
 		{0, "Text Display Only"},
 		{0, "Text Speed   Slow  ==========  Fast"},
 		{0, "Roland Volume    Low  =========  High"},
-		{0, "Heap %dK"}
+		{0, "Heap %dK"},
+		// Snap scroll messages
+		{0, "Snap Scroll On"}, // v2
+		{0, "Snap Scroll Off"},
+		{0, "Screen reposition instantly"}, // v3
+		{0, "Screen reposition by Scrolling"},
+		{0, "Horizontal Screen Snap"}, // v4
+		{0, "Horizontal Screen Scroll"},
+		// Miscellaneous input messages
+		{0, "Recalibrating Joystick"},
+		{0, "Mouse Mode"},
+		{0, "Mouse On"},
+		{0, "Mouse Off"},
+		{0, "Joystick On"},
+		{0, "Joystick Off"},
+		{0, "Sounds On"},
+		{0, "Sounds Off"},
+		// V1-2 graphic modes
+		{0, "VGA Graphics"},
+		{0, "EGA Graphics"},
+		{0, "CGA Graphics"},
+		{0, "Hercules Graphics"},
+		{0, "TANDY Graphics"}
 	};
 
-	if (stringno + 1 >= ARRAYSIZE(strMap1)) {
-		stringno -= ARRAYSIZE(strMap1) - 1;
-		assert(stringno + 1 < ARRAYSIZE(strMap2));
-		return strMap2[stringno];
-	}
+	// V3 games (except LOOM) do not have a quit prompt message set in the scripts:
+	// we use this table to hardcode one for each language...
+	static const ResString hardcodedV3QuitPrompt[] = {
+		{0, "Are you sure you want to quit? (Y/N)Y"}, // EN
+		{0, "Etes vous s\x96r de vouloir quitter (O/N)O"}, // FR
+		{0, "Wollen Sie wirklich aufh\x94ren? (J/N)J"}, // DE
+		{0, "Sei sicuro di voler uscire? (S/N)S"}, // IT
+		{0, """\xc2\xa8""Est""\xc2\xa0""s seguro de querer abandonar? (S/N)S"}, // ES
+		{0, "(Y/N)Y"}, // RU - Placeholder: I don't know of any RU version of v3 games
+		{0, "(Y/N)Y"}, // SE - Placeholder: I don't know of any SE version of v3 games
+		{0, "\x96{\x93\x96\x82\xC9\x8FI\x97\xB9\x82\xB5\x82\xC4\x82\xE0\x82\xA2\x82\xA2\x82\xC5\x82\xB7\x82\xA9\x81H  (Y/N)Y"} // JA
+	};
 
-	// I have added the langugages I found in scumm-md5.h for v1/2 games...
+	// DOTT (CD) doesn't have translations for some menu options, but this was
+	// fixed in Sam & Max (CD) which uses the same menu, so we just borrow its
+	// official translations (from script 1-1) for better language accessibility.
+	static const ResString fixedDottMenuStrings[][6] = {
+		{
+			// English
+			{0, "Text Speed"},
+			{0, "Display Text"},
+			{0, "Music"},
+			{0, "Voice"},
+			{0, "Sfx"},
+			{0, "disabled"},
+		},
+		{
+			// French
+			{0, "Vitesse Txt"},
+			{0, "Affich. texte"},
+			{0, "Musique"},
+			{0, "Voix"},
+			{0, "Effets son."},
+			{0, "off"}
+		},
+		{
+			// German
+			{0, "Textflu\xE1"},
+			{0, "Textanzeige"},
+			{0, "Musik"},
+			{0, "Sprache"},
+			{0, "Sfx"},
+			{0, "ausgeschaltet"}
+		},
+		{
+			// Italian
+			{0, "Velocit\x85"},
+			{0, "MostraTesto"},
+			{0, "Musica"},
+			{0, "Voce"},
+			{0, "Sonoro"},
+			{0, "disabil."}
+		},
+		{
+			// Spanish
+			{0, "Veloc. Texto"},
+			{0, "Ver Texto"},
+			{0, "M\xA3sica"},
+			{0, "Voz"},
+			{0, "Sfx"},
+			{0, "inv\xA0lido"}
+		}
+	};
+
+	bool useHardcodedV3QuitPrompt = stringno == 5 && _vm->_game.version == 3 && _vm->_game.id != GID_LOOM;
+	bool useFixedDottMenuStrings = stringno >= 21 && stringno <= 26 && _vm->_game.id == GID_TENTACLE;
+
+	// I have added the languages I found in scumm-md5.h for v1/2 games...
 	int langIndex = 0;
 	switch (lang) {
 	case Common::FR_FRA:
@@ -672,16 +769,48 @@ const ResString &InfoDialog::getStaticResString(Common::Language lang, int strin
 		langIndex = 4;
 		break;
 	case Common::RU_RUS:
-		langIndex = 5;
+		langIndex = useFixedDottMenuStrings ? 0 : 5;
 		break;
 	case Common::SE_SWE:
-		langIndex = 6;
+		langIndex = useFixedDottMenuStrings ? 0 : 6;
+		break;
+	case Common::JA_JPN:
+		langIndex = useHardcodedV3QuitPrompt ? 7 : 0;
 		break;
 	default:
 		// Just stick with English.
 		break;
 	}
 
+	if (useHardcodedV3QuitPrompt) {
+		return hardcodedV3QuitPrompt[langIndex];
+	}
+
+	if (useFixedDottMenuStrings) {
+		stringno -= 21;
+		return fixedDottMenuStrings[langIndex][stringno];
+	}
+
+	if (stringno + 1 >= ARRAYSIZE(strMap1)) {
+		stringno -= ARRAYSIZE(strMap1) - 1;
+		assert(stringno < ARRAYSIZE(strMap2));
+		return strMap2[stringno];
+	}
+
+	// Special case for ZAK v2 ITA, which has a different string both for the pause
+	// message and for the restart message.
+	// If it can be verified that other languages have different strings for this game
+	// we can refactor strMap1 to contain both a MM string and a ZAK string; but with
+	// currently only one language doing this, it seems overkill...
+	if (_vm->_game.version == 2 && _vm->_game.id == GID_ZAK && langIndex == 3) {
+		if (stringno == 3) {
+			static const ResString altStr = {4, "PAUSE - Premere SPACE per continuare."};
+			return altStr;
+		} else if (stringno == 4) {
+			static const ResString altStr = {5, "Sei sicuro che vuoi ricominciare? (s/n)s"};
+			return altStr;
+		}
+	}
 	return strMap1[langIndex][stringno];
 }
 
@@ -922,7 +1051,10 @@ GUI::CheckboxWidget *ScummOptionsContainerWidget::createEnhancementsCheckbox(Gui
 }
 
 GUI::CheckboxWidget *ScummOptionsContainerWidget::createOriginalGUICheckbox(GuiObject *boss, const Common::String &name) {
-	return new GUI::CheckboxWidget(boss, name, _("Enable the original GUI and Menu"), _("Allow the game to use the in-engine graphical interface and the original save/load menu."));
+	return new GUI::CheckboxWidget(boss, name,
+		_("Enable the original GUI and Menu"),
+		_("Allow the game to use the in-engine graphical interface and the original save/load menu. Use it together with the \"Ask for confirmation on exit\" for a more complete experience.")
+	);
 }
 
 void ScummOptionsContainerWidget::updateAdjustmentSlider(GUI::SliderWidget *slider, GUI::StaticTextWidget *value) {
@@ -967,7 +1099,6 @@ LoomEgaGameOptionsWidget::LoomEgaGameOptionsWidget(GuiObject *boss, const Common
 
 	_enableEnhancementsCheckbox = createEnhancementsCheckbox(widgetsBoss(), "LoomEgaGameOptionsDialog.EnableEnhancements");
 	_enableOriginalGUICheckbox = createOriginalGUICheckbox(widgetsBoss(), "LoomEgaGameOptionsDialog.EnableOriginalGUI");
-	_enableOriginalGUICheckbox->setVisible(false);  // TODO: remove when implemented
 }
 
 void LoomEgaGameOptionsWidget::load() {
@@ -1218,5 +1349,153 @@ void MI1CdGameOptionsWidget::updateIntroAdjustmentValue() {
 void MI1CdGameOptionsWidget::updateOutlookAdjustmentValue() {
 	updateAdjustmentSlider(_outlookAdjustmentSlider, _outlookAdjustmentValue);
 }
+
+#ifdef USE_ENET
+// HE Network Play Adjustment settings
+
+HENetworkGameOptionsWidget::HENetworkGameOptionsWidget(GuiObject *boss, const Common::String &name, const Common::String &domain, Common::String gameid) :
+		ScummOptionsContainerWidget(boss, name, "HENetworkGameOptionsDialog", domain), _gameid(gameid) {
+	Common::String extra = ConfMan.get("extra", domain);
+
+	// Add back the "Load modded audio" option.
+	_audioOverride = nullptr;
+	const Common::String guiOptionsString = ConfMan.get("guioptions", domain);
+	const Common::String guiOptions = parseGameGUIOptions(guiOptionsString);
+	if (guiOptions.contains(GUIO_AUDIO_OVERRIDE))
+		_audioOverride = new GUI::CheckboxWidget(widgetsBoss(), "HENetworkGameOptionsDialog.AudioOverride", _("Load modded audio"), _("Replace music, sound effects, and speech clips with modded audio files, if available."));
+
+	GUI::StaticTextWidget *text = new GUI::StaticTextWidget(widgetsBoss(), "HENetworkGameOptionsDialog.SessionServerLabel", _("Multiplayer Server:"));
+	text->setAlign(Graphics::TextAlign::kTextAlignEnd);
+
+	if (_gameid == "football" || _gameid == "baseball2001") {
+		// Lobby configuration (Do not include LAN settings)
+#ifdef USE_LIBCURL
+		text->setLabel(_("Online Server:"));
+		_lobbyServerAddr = new GUI::EditTextWidget(widgetsBoss(), "HENetworkGameOptionsDialog.LobbyServerAddress", Common::U32String(""), _("Address of the server to connect to for online play.  It must start with either \"https://\" or \"http://\" schemas."));
+		_serverResetButton = addClearButton(widgetsBoss(), "HENetworkGameOptionsDialog.ServerReset", kResetServersCmd);
+		_enableCompetitiveMods = new GUI::CheckboxWidget(widgetsBoss(), "HENetworkGameOptionsDialog.EnableCompetitiveMods", _("Enable online competitive mods"), _("Enables custom-made modifications intented for online competitive play."));
+#endif
+	} else {
+		// Network configuration (Include LAN settings)
+		_enableSessionServer = new GUI::CheckboxWidget(widgetsBoss(), "HENetworkGameOptionsDialog.EnableSessionServer", _("Enable connection to Multiplayer Server"), _("Toggles the connection to the server that allows hosting and joining online multiplayer games over the Internet."), kEnableSessionCmd);
+		_enableLANBroadcast = new GUI::CheckboxWidget(widgetsBoss(), "HENetworkGameOptionsDialog.EnableLANBroadcast", _("Host games over LAN"), _("Allows the game sessions to be discovered over your local area network."));
+
+		_sessionServerAddr = new GUI::EditTextWidget(widgetsBoss(), "HENetworkGameOptionsDialog.SessionServerAddress", Common::U32String(""), _("Address of the server to connect to for hosting and joining online game sessions."));
+
+		_serverResetButton = addClearButton(widgetsBoss(), "HENetworkGameOptionsDialog.ServerReset", kResetServersCmd);
+	}
+}
+
+void HENetworkGameOptionsWidget::load() {
+	if (_audioOverride) {
+		bool audioOverride = true;
+		if (ConfMan.hasKey("audio_override", _domain))
+			audioOverride = ConfMan.getBool("audio_override", _domain);
+		_audioOverride->setState(audioOverride);
+	}
+	if (_gameid == "football" || _gameid == "baseball2001") {
+#ifdef USE_LIBCURL
+		Common::String lobbyServerAddr = "https://multiplayer.scummvm.org:9130";
+		bool enableCompetitiveMods = false;
+
+		if (ConfMan.hasKey("lobby_server", _domain))
+			lobbyServerAddr = ConfMan.get("lobby_server", _domain);
+		_lobbyServerAddr->setEditString(lobbyServerAddr);
+		if (ConfMan.hasKey("enable_competitive_mods", _domain))
+			enableCompetitiveMods = ConfMan.getBool("enable_competitive_mods", _domain);
+		_enableCompetitiveMods->setState(enableCompetitiveMods);
+#endif
+	} else {
+		bool enableSessionServer = true;
+		bool enableLANBroadcast = true;
+		Common::String sessionServerAddr = "multiplayer.scummvm.org";
+
+		if (ConfMan.hasKey("enable_session_server", _domain))
+			enableSessionServer = ConfMan.getBool("enable_session_server", _domain);
+		_enableSessionServer->setState(enableSessionServer);
+
+		if (ConfMan.hasKey("enable_lan_broadcast", _domain))
+			enableLANBroadcast = ConfMan.getBool("enable_lan_broadcast", _domain);
+		_enableLANBroadcast->setState(enableLANBroadcast);
+
+		if (ConfMan.hasKey("session_server", _domain))
+			sessionServerAddr = ConfMan.get("session_server", _domain);
+		_sessionServerAddr->setEditString(sessionServerAddr);
+		_sessionServerAddr->setEnabled(enableSessionServer);
+	}
+}
+
+bool HENetworkGameOptionsWidget::save() {
+	if (_audioOverride)
+		ConfMan.setBool("audio_override", _audioOverride->getState(), _domain);
+	if (_gameid == "football" || _gameid == "baseball2001") {
+#ifdef USE_LIBCURL
+		ConfMan.set("lobby_server", _lobbyServerAddr->getEditString(), _domain);
+		ConfMan.setBool("enable_competitive_mods", _enableCompetitiveMods->getState(), _domain);
+#endif
+	} else {
+		ConfMan.setBool("enable_session_server", _enableSessionServer->getState(), _domain);
+		ConfMan.setBool("enable_lan_broadcast", _enableLANBroadcast->getState(), _domain);
+		ConfMan.set("session_server", _sessionServerAddr->getEditString(), _domain);
+	}
+	return true;
+}
+
+void HENetworkGameOptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const {
+	if (_gameid == "football" || _gameid == "baseball2001") {
+#ifdef USE_LIBCURL
+		layouts.addDialog(layoutName, overlayedLayout)
+			.addLayout(GUI::ThemeLayout::kLayoutVertical, 5)
+				.addPadding(0, 0, 12, 0)
+				.addWidget("AudioOverride", "Checkbox")
+				.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
+					.addPadding(0, 0, 12, 0)
+					.addWidget("SessionServerLabel", "OptionsLabel")
+					.addWidget("LobbyServerAddress", "EditTextWidget")
+					.addWidget("ServerReset", "", 15, 15)
+				.closeLayout()
+				.addWidget("EnableCompetitiveMods", "Checkbox")
+			.closeLayout()
+		.closeDialog();
+#endif
+	} else {
+		layouts.addDialog(layoutName, overlayedLayout)
+			.addLayout(GUI::ThemeLayout::kLayoutVertical, 5)
+				.addPadding(0, 0, 12, 0)
+				.addWidget("EnableSessionServer", "Checkbox")
+				.addWidget("EnableLANBroadcast", "Checkbox")
+				.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
+					.addPadding(0, 0, 12, 0)
+					.addWidget("SessionServerLabel", "OptionsLabel")
+					.addWidget("SessionServerAddress", "EditTextWidget")
+					.addWidget("ServerReset", "", 15, 15)
+				.closeLayout()
+			.closeLayout()
+		.closeDialog();
+	}
+}
+
+void HENetworkGameOptionsWidget::handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) {
+
+	switch (cmd) {
+	case kEnableSessionCmd:
+		_sessionServerAddr->setEnabled(_enableSessionServer->getState());
+		g_gui.scheduleTopDialogRedraw();
+		break;
+	case kResetServersCmd:
+		if (_gameid == "football" || _gameid == "baseball2001") {
+			_lobbyServerAddr->setEditString(Common::U32String("https://multiplayer.scummvm.org:9130"));
+		} else {
+			_enableSessionServer->setState(true);
+			_sessionServerAddr->setEditString(Common::U32String("multiplayer.scummvm.org"));
+		}
+		g_gui.scheduleTopDialogRedraw();
+		break;
+	default:
+		GUI::OptionsContainerWidget::handleCommand(sender, cmd, data);
+		break;
+	}
+}
+#endif
 
 } // End of namespace Scumm

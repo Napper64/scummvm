@@ -235,7 +235,7 @@ void MacText::init() {
 	if (!colorFontRun.text.empty()) {
 		_fgcolor = colorFontRun.fgcolor;
 		colorFontRun.text.clear();
-		debug(9, "Reading fg color though text, instead of the argument, read %x", _fgcolor);
+		debug(9, "Reading fg color though text, instead of the argument, read %d", _fgcolor);
 		_defaultFormatting = colorFontRun;
 		_defaultFormatting.wm = _wm;
 	}
@@ -1380,7 +1380,7 @@ bool MacText::draw(bool forceRedraw) {
 
 	for (int bb = 0; bb < _border; bb++) {
 		Common::Rect borderRect(bb, bb, _composeSurface->w - bb, _composeSurface->h - bb);
-		_composeSurface->frameRect(borderRect, 0);
+		_composeSurface->frameRect(borderRect, 0xff);
 	}
 
 	if (_selectedText.endY != -1)
@@ -1996,7 +1996,9 @@ int MacText::getMouseWord(int x, int y) {
 		if (_textLines[row].chunks[j].text.empty())
 			continue;
 		cur += _textLines[row].chunks[j].text.size();
-		if (cur <= col)
+		// Avoid overflowing the word index if we run out of line;
+		// it should count as part of the last chunk
+		if ((cur <= col) && (j < _textLines[row].chunks.size() - 1))
 			index++;
 		else
 			break;
@@ -2066,7 +2068,7 @@ int MacText::getAlignOffset(int row) {
 }
 
 void MacText::getRowCol(int x, int y, int *sx, int *sy, int *row, int *col) {
-	int nsx, nsy, nrow, ncol;
+	int nsx = 0, nsy = 0, nrow = 0, ncol = 0;
 
 	if (y > _textMaxHeight) {
 		x = _surface->w;
@@ -2089,30 +2091,28 @@ void MacText::getRowCol(int x, int y, int *sx, int *sy, int *row, int *col) {
 
 	nsy = _textLines[nrow].y;
 
-	ncol = 0;
+	if (_textLines[nrow].chunks.size() > 0) {
+		int alignOffset = getAlignOffset(nrow);
 
-	int alignOffset = getAlignOffset(nrow);
+		int width = 0, pwidth = 0;
+		int mcol = 0, pmcol = 0;
 
-	int width = 0, pwidth = 0;
-	int mcol = 0, pmcol = 0;
-	uint chunk;
-	for (chunk = 0; chunk < _textLines[nrow].chunks.size(); chunk++) {
-		pwidth = width;
-		pmcol = mcol;
-		if (!_textLines[nrow].chunks[chunk].text.empty()) {
-			width += getStringWidth(_textLines[nrow].chunks[chunk], _textLines[nrow].chunks[chunk].text);
-			mcol += _textLines[nrow].chunks[chunk].text.size();
+		uint chunk;
+		for (chunk = 0; chunk < _textLines[nrow].chunks.size(); chunk++) {
+			pwidth = width;
+			pmcol = mcol;
+			if (!_textLines[nrow].chunks[chunk].text.empty()) {
+				width += getStringWidth(_textLines[nrow].chunks[chunk], _textLines[nrow].chunks[chunk].text);
+				mcol += _textLines[nrow].chunks[chunk].text.size();
+			}
+
+			if (width + alignOffset > x)
+				break;
 		}
 
-		if (width + alignOffset > x)
-			break;
-	}
+		if (chunk == _textLines[nrow].chunks.size())
+			chunk--;
 
-	if (chunk == _textLines[nrow].chunks.size())
-		chunk--;
-
-	// prevent out bounding error, because sometimes chunk.size() is 0, thus we don't have correct chunk number.
-	if (chunk < _textLines[nrow].chunks.size()) {
 		Common::U32String str = _textLines[nrow].chunks[chunk].text;
 
 		ncol = mcol;
@@ -2172,8 +2172,12 @@ Common::U32String MacText::getTextChunk(int startRow, int startCol, int endRow, 
 		// We requested only part of one line
 		if (i == startRow && i == endRow) {
 			for (uint chunk = 0; chunk < _textLines[i].chunks.size(); chunk++) {
-				if (_textLines[i].chunks[chunk].text.empty()) // skip empty chunks
+				if (_textLines[i].chunks[chunk].text.empty()) {
+					// skip empty chunks, but keep them formatted,
+					// a text input box needs to keep the formatting even when all text is removed.
+					ADDFORMATTING();
 					continue;
+				}
 
 				if (startCol <= 0) {
 					ADDFORMATTING();

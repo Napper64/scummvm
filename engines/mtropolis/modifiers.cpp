@@ -37,15 +37,16 @@ namespace MTropolis {
 
 class CompoundVarLoader : public ISaveReader {
 public:
-	explicit CompoundVarLoader(RuntimeObject *object);
+	CompoundVarLoader(Runtime *runtime, RuntimeObject *object);
 
 	bool readSave(Common::ReadStream *stream, uint32 saveFileVersion) override;
 
 private:
+	Runtime *_runtime;
 	RuntimeObject *_object;
 };
 
-CompoundVarLoader::CompoundVarLoader(RuntimeObject *object) : _object(object) {
+CompoundVarLoader::CompoundVarLoader(Runtime *runtime, RuntimeObject *object) : _runtime(runtime), _object(object) {
 }
 
 bool CompoundVarLoader::readSave(Common::ReadStream *stream, uint32 saveFileVersion) {
@@ -53,7 +54,7 @@ bool CompoundVarLoader::readSave(Common::ReadStream *stream, uint32 saveFileVers
 		return false;
 
 	Modifier *modifier = static_cast<Modifier *>(_object);
-	Common::SharedPtr<ModifierSaveLoad> saveLoad = modifier->getSaveLoad();
+	Common::SharedPtr<ModifierSaveLoad> saveLoad = modifier->getSaveLoad(_runtime);
 	if (!saveLoad)
 		return false;
 
@@ -138,10 +139,10 @@ VThreadState BehaviorModifier::consumeMessage(Runtime *runtime, const Common::Sh
 			DisableTaskData *disableTask = runtime->getVThread().pushTask("BehaviorModifier::disableTask", this, &BehaviorModifier::disableTask);
 			disableTask->runtime = runtime;
 
-			SwitchTaskData *taskData = runtime->getVThread().pushTask("BehaviorModifier::switchTask", this, &BehaviorModifier::switchTask);
-			taskData->targetState = false;
-			taskData->eventID = EventIDs::kParentDisabled;
-			taskData->runtime = runtime;
+			SwitchTaskData *switchTask = runtime->getVThread().pushTask("BehaviorModifier::switchTask", this, &BehaviorModifier::switchTask);
+			switchTask->targetState = false;
+			switchTask->eventID = EventIDs::kParentDisabled;
+			switchTask->runtime = runtime;
 		}
 		if (_enableWhen.respondsTo(msg->getEvent())) {
 			SwitchTaskData *taskData = runtime->getVThread().pushTask("BehaviorModifier::switchTask", this, &BehaviorModifier::switchTask);
@@ -403,7 +404,7 @@ VThreadState SaveAndRestoreModifier::consumeMessage(Runtime *runtime, const Comm
 	bool isPrompt = (_filePath == "Ask User");
 
 	if (_saveWhen.respondsTo(msg->getEvent())) {
-		CompoundVarSaver saver(obj);
+		CompoundVarSaver saver(runtime, obj);
 
 		const Graphics::ManagedSurface *screenshotOverrideManaged = runtime->getSaveScreenshotOverride().get();
 		const Graphics::Surface *screenshotOverride = nullptr;
@@ -423,7 +424,7 @@ VThreadState SaveAndRestoreModifier::consumeMessage(Runtime *runtime, const Comm
 		}
 		return kVThreadReturn;
 	} else if (_restoreWhen.respondsTo(msg->getEvent())) {
-		CompoundVarLoader loader(obj);
+		CompoundVarLoader loader(runtime, obj);
 
 		bool succeeded = false;
 		if (isPrompt)
@@ -824,7 +825,14 @@ PathMotionModifier::PointDef::PointDef() : frame(0), useFrame(false) {
 
 PathMotionModifier::PathMotionModifier()
 	: _reverse(false), _loop(false), _alternate(false),
-	  _startAtBeginning(false), _frameDurationTimes10Million(0) {
+	  _startAtBeginning(false), _frameDurationDUSec(1), _isAlternatingDirection(false), _lastPointTimeDUSec(0), _currentPointIndex(0) {
+}
+
+PathMotionModifier::~PathMotionModifier() {
+	if (_scheduledEvent) {
+		_scheduledEvent->cancel();
+		_scheduledEvent.reset();
+	}
 }
 
 bool PathMotionModifier::load(ModifierLoaderContext &context, const Data::PathMotionModifier &data) {
@@ -839,7 +847,10 @@ bool PathMotionModifier::load(ModifierLoaderContext &context, const Data::PathMo
 	_alternate = ((data.flags & Data::PathMotionModifier::kFlagAlternate) != 0);
 	_startAtBeginning = ((data.flags & Data::PathMotionModifier::kFlagStartAtBeginning) != 0);
 
-	_frameDurationTimes10Million = data.frameDurationTimes10Million;
+	_frameDurationDUSec = data.frameDurationTimes10Million;
+
+	if (_frameDurationDUSec == 0)
+		_frameDurationDUSec = 1; // Maybe set this to 1/60?  It seems like subframe movement is possible though.
 
 	_points.resize(data.numPoints);
 
@@ -848,7 +859,7 @@ bool PathMotionModifier::load(ModifierLoaderContext &context, const Data::PathMo
 		PointDef &outPoint = _points[i];
 
 		outPoint.frame = inPoint.frame;
-		outPoint.useFrame = ((inPoint.frameFlags & Data::PathMotionModifier::PointDef::kFrameFlagPlaySequentially) != 0);
+		outPoint.useFrame = ((inPoint.frameFlags & Data::PathMotionModifier::PointDef::kFrameFlagPlaySequentially) == 0);
 		if (!inPoint.point.toScummVMPoint(outPoint.point))
 			return false;
 
@@ -869,17 +880,19 @@ bool PathMotionModifier::respondsToEvent(const Event &evt) const {
 }
 
 VThreadState PathMotionModifier::consumeMessage(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) {
-	if (_executeWhen.respondsTo(msg->getEvent())) {
-#ifdef MTROPOLIS_DEBUG_ENABLE
-		if (Debugger *debugger = runtime->debugGetDebugger())
-			debugger->notify(kDebugSeverityWarning, "Path motion modifier was supposed to execute, but this isn't implemented yet");
-#endif
-		_incomingData = msg->getValue();
+	if (_terminateWhen.respondsTo(msg->getEvent())) {
+		TerminateTaskData *terminateTask = runtime->getVThread().pushTask("PathMotionModifier::terminateTask", this, &PathMotionModifier::terminateTask);
+		terminateTask->runtime = runtime;
 
 		return kVThreadReturn;
 	}
-	if (_terminateWhen.respondsTo(msg->getEvent())) {
-		disable(runtime);
+	if (_executeWhen.respondsTo(msg->getEvent())) {
+		ExecuteTaskData *executeTask = runtime->getVThread().pushTask("PathMotionModifier::executeTask", this, &PathMotionModifier::executeTask);
+		executeTask->runtime = runtime;
+
+		_incomingData = msg->getValue();
+		_triggerSource = msg->getSource();
+
 		return kVThreadReturn;
 	}
 
@@ -887,20 +900,307 @@ VThreadState PathMotionModifier::consumeMessage(Runtime *runtime, const Common::
 }
 
 void PathMotionModifier::disable(Runtime *runtime) {
-#ifdef MTROPOLIS_DEBUG_ENABLE
-	if (Debugger *debugger = runtime->debugGetDebugger())
-		debugger->notify(kDebugSeverityWarning, "Path motion modifier was supposed to terminate, but this isn't implemented yet");
-#endif
+	if (_scheduledEvent) {
+		_scheduledEvent->cancel();
+		_scheduledEvent.reset();
+	}
+}
+
+void PathMotionModifier::linkInternalReferences(ObjectLinkingScope *scope) {
+	for (PointDef &point : _points)
+		point.sendSpec.linkInternalReferences(scope);
+}
+
+void PathMotionModifier::visitInternalReferences(IStructuralReferenceVisitor *visitor) {
+	for (PointDef &point : _points)
+		point.sendSpec.visitInternalReferences(visitor);
+}
+
+VThreadState PathMotionModifier::executeTask(const ExecuteTaskData &taskData) {
+	if (_points.size() == 0)
+		return kVThreadError;
+
+	Runtime *runtime = taskData.runtime;
+
+	uint64 timeMSec = runtime->getPlayTime();
+
+	uint prevPointIndex = _currentPointIndex;
+	uint newPointIndex = _reverse ? _points.size() - 1 : 0;
+
+	_lastPointTimeDUSec = timeMSec * 10000u;
+	_isAlternatingDirection = false;
+
+	if (_scheduledEvent) {
+		_scheduledEvent->cancel();
+		_scheduledEvent.reset();
+	}
+
+	scheduleNextAdvance(runtime, _lastPointTimeDUSec);
+
+	ChangePointsTaskData *changePointsTask = runtime->getVThread().pushTask("PathMotionModifier::changePoints", this, &PathMotionModifier::changePointsTask);
+	changePointsTask->runtime = runtime;
+	changePointsTask->prevPoint = (_startAtBeginning ? prevPointIndex : newPointIndex);
+	changePointsTask->newPoint = newPointIndex;
+	changePointsTask->isTerminal = (_loop == false && _points.size() == 1);
+
+	SendMessageToParentTaskData *sendMessageToParentTask = runtime->getVThread().pushTask("PathMotionModifier::sendMessageToParent", this, &PathMotionModifier::sendMessageToParentTask);
+	sendMessageToParentTask->runtime = runtime;
+	sendMessageToParentTask->eventID = EventIDs::kMotionStarted;
+
+	return kVThreadReturn;
+}
+
+VThreadState PathMotionModifier::changePointsTask(const ChangePointsTaskData &taskData) {
+	Runtime *runtime = taskData.runtime;
+
+	_currentPointIndex = taskData.newPoint;
+
+	// TODO: Figure out if this is the correct order.  These are pushed tasks so order is reversed: We set position first,
+	// then set cel, then fire the message if any.  I don't think the cel or position change have side effects.
+	if (_points[_currentPointIndex].sendSpec.destination != kMessageDestNone) {
+		TriggerMessageTaskData *triggerMessageTask = runtime->getVThread().pushTask("PathMotionModifier::triggerMessage", this, &PathMotionModifier::triggerMessageTask);
+		triggerMessageTask->runtime = runtime;
+		triggerMessageTask->pointIndex = _currentPointIndex;
+	}
+
+	// However, we DO need to fire Motion Ended events BEFORE we fire the last point's message.
+	if (taskData.isTerminal) {
+		SendMessageToParentTaskData *sendToParentTask = runtime->getVThread().pushTask("PathMotionModifier::sendMessageToParent", this, &PathMotionModifier::sendMessageToParentTask);
+		sendToParentTask->runtime = runtime;
+		sendToParentTask->eventID = EventIDs::kMotionEnded;
+	}
+
+	if (_points[_currentPointIndex].useFrame) {
+		ChangeCelTaskData *changeCelTask = runtime->getVThread().pushTask("PathMotionModifier::changeCel", this, &PathMotionModifier::changeCelTask);
+		changeCelTask->runtime = runtime;
+		changeCelTask->pointIndex = _currentPointIndex;
+	}
+
+	Common::Point positionDelta = _points[taskData.newPoint].point - _points[taskData.prevPoint].point;
+	if (positionDelta != Common::Point(0, 0)) {
+		ChangePositionTaskData *changePositionTask = runtime->getVThread().pushTask("PathMotionModifier::changePosition", this, &PathMotionModifier::changePositionTask);
+		changePositionTask->runtime = runtime;
+		changePositionTask->positionDelta = positionDelta;
+	}
+
+	return kVThreadReturn;
+}
+
+VThreadState PathMotionModifier::triggerMessageTask(const TriggerMessageTaskData &taskData) {
+	_points[taskData.pointIndex].sendSpec.sendFromMessenger(taskData.runtime, this, _triggerSource.lock().get(), _incomingData, nullptr);
+
+	return kVThreadReturn;
+}
+
+VThreadState PathMotionModifier::sendMessageToParentTask(const SendMessageToParentTaskData &taskData) {
+	Structural *owner = this->findStructuralOwner();
+
+	if (owner) {
+		Common::SharedPtr<MessageProperties> props(new MessageProperties(Event(taskData.eventID, 0), DynamicValue(), this->getSelfReference()));
+		Common::SharedPtr<MessageDispatch> dispatch(new MessageDispatch(props, owner, true, true, false));
+
+		// Send immediately
+		taskData.runtime->sendMessageOnVThread(dispatch);
+	}
+
+	return kVThreadReturn;
+}
+
+VThreadState PathMotionModifier::changeCelTask(const ChangeCelTaskData &taskData) {
+	if (_points[taskData.pointIndex].useFrame) {
+		Structural *structural = findStructuralOwner();
+
+		if (structural) {
+			MiniscriptThread thread(taskData.runtime, nullptr, nullptr, nullptr, this);
+			DynamicValueWriteProxy proxy;
+
+			MiniscriptInstructionOutcome writeRefOutcome = structural->writeRefAttribute(&thread, proxy, "cel");
+			if (writeRefOutcome == kMiniscriptInstructionOutcomeContinue) {
+				DynamicValue cel;
+				cel.setInt(_points[taskData.pointIndex].frame + 1);
+				(void) proxy.pod.ifc->write(&thread, cel, proxy.pod.objectRef, proxy.pod.ptrOrOffset);
+			}
+		}
+	}
+
+	return kVThreadReturn;
+}
+
+VThreadState PathMotionModifier::changePositionTask(const ChangePositionTaskData &taskData) {
+	Structural *structural = findStructuralOwner();
+
+	if (structural && structural->isElement() && static_cast<Element *>(structural)->isVisual()) {
+		VisualElement *visual = static_cast<VisualElement *>(structural);
+		VisualElement::OffsetTranslateTaskData *offsetTranslateTask = taskData.runtime->getVThread().pushTask("VisualElement::offsetTranslate", visual, &VisualElement::offsetTranslateTask);
+		offsetTranslateTask->dx = taskData.positionDelta.x;
+		offsetTranslateTask->dy = taskData.positionDelta.y;
+	}
+
+	return kVThreadReturn;
+}
+
+VThreadState PathMotionModifier::advanceFrameTask(const AdvanceFrameTaskData &taskData) {
+	// Check what the new time will be and if it's in the future.  This also handles the case where the current time was changed
+	// due to a triggered message re-executing the modifier: In that case, this will prevent any subframe advances that would have happened.
+	uint64 newTime = _lastPointTimeDUSec + _frameDurationDUSec;
+	if (newTime >= taskData.terminationTimeDUSec)
+		return kVThreadReturn;
+
+	_lastPointTimeDUSec = newTime;
+
+	bool isPlayingForward = (_reverse == _isAlternatingDirection);
+	bool isAtLastPoint = isPlayingForward ? (_currentPointIndex == _points.size() - 1) : (_currentPointIndex == 0);
+
+	if (isAtLastPoint) {
+		// If this isn't looping, we're done
+		if (_loop == false) {
+			if (_scheduledEvent) {
+				_scheduledEvent->cancel();
+				_scheduledEvent.reset();
+			}
+			return kVThreadReturn;
+		}
+
+		// Otherwise, check for alternation and trigger it
+		if (_alternate) {
+			isPlayingForward = !isPlayingForward;
+			_isAlternatingDirection = !_isAlternatingDirection;
+		}
+	}
+
+	uint prevPointIndex = _currentPointIndex;
+
+	// If the path only has one point, we still act like it's advancing, messages
+	uint nextPointIndex = 0;
+	if (isPlayingForward) {
+		nextPointIndex = _currentPointIndex + 1;
+		if (nextPointIndex > _points.size())
+			nextPointIndex = 0;
+	} else {
+		if (_currentPointIndex == 0)
+			nextPointIndex = _points.size() - 1;
+		else
+			nextPointIndex = _currentPointIndex - 1;
+	}
+
+	bool isTerminal = false;
+	if (!_loop) {
+		isTerminal = isPlayingForward ? (nextPointIndex == _points.size() - 1) : (nextPointIndex == 0);
+		if (isTerminal && _scheduledEvent) {
+			_scheduledEvent->cancel();
+			_scheduledEvent.reset();
+		}
+	}
+
+	// Push the next frame advance for this advancement
+	AdvanceFrameTaskData *advanceFrameTask = taskData.runtime->getVThread().pushTask("PathMotionModifier::advanceFrame", this, &PathMotionModifier::advanceFrameTask);
+	advanceFrameTask->runtime = taskData.runtime;
+	advanceFrameTask->terminationTimeDUSec = taskData.terminationTimeDUSec;
+
+	// Push this frame advance
+	ChangePointsTaskData *changePointsTask = taskData.runtime->getVThread().pushTask("PathMotionModifier::changePoints", this, &PathMotionModifier::changePointsTask);
+	changePointsTask->runtime = taskData.runtime;
+	changePointsTask->prevPoint = prevPointIndex;
+	changePointsTask->newPoint = nextPointIndex;
+	changePointsTask->isTerminal = isTerminal;
+
+	return kVThreadReturn;
+}
+
+void PathMotionModifier::scheduleNextAdvance(Runtime *runtime, uint64 startingFromTimeDUSec) {
+	assert(_scheduledEvent.get() == nullptr);
+
+	uint64 nextFrameTimeMSec = (startingFromTimeDUSec + _frameDurationDUSec + 9999u) / 10000u;
+	_scheduledEvent = runtime->getScheduler().scheduleMethod<PathMotionModifier, &PathMotionModifier::advance>(nextFrameTimeMSec, this);
+}
+
+void PathMotionModifier::advance(Runtime *runtime) {
+	_scheduledEvent.reset();
+
+	uint64 currentTimeDUSec = runtime->getPlayTime() * 10000u;
+
+	uint64 framesToAdvance = (currentTimeDUSec - _lastPointTimeDUSec) / _frameDurationDUSec;
+	uint64 nextFrameDUSec = _lastPointTimeDUSec + framesToAdvance * _frameDurationDUSec;
+
+	// Schedule the next advance now, since the advance may be cancelled by a message triggered by one of the advances
+	scheduleNextAdvance(runtime, nextFrameDUSec);
+
+	AdvanceFrameTaskData *advanceFrameTask = runtime->getVThread().pushTask("PathMotionModifier::advanceFrame", this, &PathMotionModifier::advanceFrameTask);
+	advanceFrameTask->runtime = runtime;
+	advanceFrameTask->terminationTimeDUSec = currentTimeDUSec;
+}
+
+VThreadState PathMotionModifier::terminateTask(const TerminateTaskData &taskData) {
+	if (_scheduledEvent) {
+		SendMessageToParentTaskData *sendToParentTask = taskData.runtime->getVThread().pushTask("PathMotionModifier::endMotion", this, &PathMotionModifier::sendMessageToParentTask);
+		sendToParentTask->runtime = taskData.runtime;
+		sendToParentTask->eventID = EventIDs::kMotionEnded;
+	}
+
+	disable(taskData.runtime);
+
+	return kVThreadReturn;
 }
 
 Common::SharedPtr<Modifier> PathMotionModifier::shallowClone() const {
 	Common::SharedPtr<PathMotionModifier> clone(new PathMotionModifier(*this));
 	clone->_incomingData = DynamicValue();
+	clone->_scheduledEvent.reset();
 	return clone;
 }
 
 const char *PathMotionModifier::getDefaultName() const {
 	return "Path Motion Modifier";
+}
+
+SimpleMotionModifier::SimpleMotionModifier() : _motionType(kMotionTypeIntoScene), _directionFlags(0), _steps(0)/*, _delayMSecTimes4800(0)*/ {
+}
+
+bool SimpleMotionModifier::load(ModifierLoaderContext &context, const Data::SimpleMotionModifier &data) {
+	if (!loadTypicalHeader(data.modHeader))
+		return false;
+
+	if (!_executeWhen.load(data.executeWhen) || !_terminateWhen.load(data.terminateWhen))
+		return false;
+
+	_directionFlags = data.directionFlags;
+	_steps = data.steps;
+	_motionType = static_cast<MotionType>(data.motionType);
+
+	return true;
+}
+
+bool SimpleMotionModifier::respondsToEvent(const Event &evt) const {
+	return _executeWhen.respondsTo(evt) || _terminateWhen.respondsTo(evt);
+}
+
+VThreadState SimpleMotionModifier::consumeMessage(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) {
+	if (_executeWhen.respondsTo(msg->getEvent())) {
+#ifdef MTROPOLIS_DEBUG_ENABLE
+		if (Debugger *debugger = runtime->debugGetDebugger())
+			debugger->notify(kDebugSeverityError, "Simple Motion Modifier was supposed to execute, but is not implemented");
+#endif
+		return kVThreadReturn;
+	}
+	if (_terminateWhen.respondsTo(msg->getEvent())) {
+#ifdef MTROPOLIS_DEBUG_ENABLE
+		if (Debugger *debugger = runtime->debugGetDebugger())
+			debugger->notify(kDebugSeverityError, "Simple Motion Modifier was supposed to terminate, but is not implemented");
+#endif
+		return kVThreadReturn;
+	}
+	return kVThreadReturn;
+}
+
+void SimpleMotionModifier::disable(Runtime *runtime) {
+}
+
+Common::SharedPtr<Modifier> SimpleMotionModifier::shallowClone() const {
+	return Common::SharedPtr<Modifier>(new SimpleMotionModifier(*this));
+}
+
+const char *SimpleMotionModifier::getDefaultName() const {
+	return "Simple Motion Modifier";
 }
 
 bool DragMotionModifier::load(ModifierLoaderContext &context, const Data::DragMotionModifier &data) {
@@ -1734,22 +2034,37 @@ bool CollisionDetectionMessengerModifier::respondsToEvent(const Event &evt) cons
 }
 
 VThreadState CollisionDetectionMessengerModifier::consumeMessage(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) {
-	if (_enableWhen.respondsTo(msg->getEvent())) {
-		if (!_isActive) {
-			_isActive = true;
-			_runtime = runtime;
+	// If we get a message that enables AND disables this at the same time, then we need to detect collisions and fire them,
+	// then disable this element.
+	// MTI depends on this behavior for the save game menu.
 
-			runtime->addCollider(this);
-		}
+	if (_disableWhen.respondsTo(msg->getEvent())) {
+		runtime->getVThread().pushTask("CollisionDetectionModifier::disableTask", this, &CollisionDetectionMessengerModifier::disableTask);
+	}
+	if (_enableWhen.respondsTo(msg->getEvent())) {
+		runtime->getVThread().pushTask("CollisionDetectionModifier::enableTask", this, &CollisionDetectionMessengerModifier::enableTask);
+
 		_incomingData = msg->getValue();
 		if (_incomingData.getType() == DynamicValueTypes::kList)
 			_incomingData.setList(_incomingData.getList()->clone());
 		_triggerSource = msg->getSource();
-	}
-	if (_disableWhen.respondsTo(msg->getEvent())) {
-		disable(runtime);
+		_runtime = runtime;
 	}
 
+	return kVThreadReturn;
+}
+
+VThreadState CollisionDetectionMessengerModifier::enableTask(const EnableTaskData &taskData) {
+	if (!_isActive) {
+		_isActive = true;
+		_runtime->addCollider(this);
+		_runtime->checkCollisions(this);
+	}
+	return kVThreadReturn;
+}
+
+VThreadState CollisionDetectionMessengerModifier::disableTask(const DisableTaskData &taskData) {
+	disable(_runtime);
 	return kVThreadReturn;
 }
 
@@ -2247,7 +2562,7 @@ bool ReturnModifier::respondsToEvent(const Event &evt) const {
 }
 
 VThreadState ReturnModifier::consumeMessage(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) {
-	warning("Return modifier not implemented");
+	runtime->addSceneStateTransition(HighLevelSceneTransition(nullptr, HighLevelSceneTransition::kTypeReturn, false, false));
 	return kVThreadReturn;
 }
 
@@ -2319,11 +2634,11 @@ bool CompoundVariableModifier::load(ModifierLoaderContext &context, const Data::
 }
 
 void CompoundVariableModifier::disable(Runtime *runtime) {
-	// Do nothing I guess, no variables can be disdabled
+	// Do nothing I guess, no variables can be disabled
 }
 
-Common::SharedPtr<ModifierSaveLoad> CompoundVariableModifier::getSaveLoad() {
-	return Common::SharedPtr<ModifierSaveLoad>(new SaveLoad(this));
+Common::SharedPtr<ModifierSaveLoad> CompoundVariableModifier::getSaveLoad(Runtime *runtime) {
+	return Common::SharedPtr<ModifierSaveLoad>(new SaveLoad(runtime, this));
 }
 
 IModifierContainer *CompoundVariableModifier::getChildContainer() {
@@ -2346,7 +2661,7 @@ void CompoundVariableModifier::visitInternalReferences(IStructuralReferenceVisit
 }
 
 bool CompoundVariableModifier::readAttribute(MiniscriptThread *thread, DynamicValue &result, const Common::String &attrib) {
-	Modifier *var = findChildByName(attrib);
+	Modifier *var = findChildByName(thread->getRuntime(), attrib);
 	if (var) {
 		// Shouldn't dereference the value here, some scripts (e.g. "<go dest> on MUI" in Obsidian) depend on it not being dereferenced
 		result.setObject(var->getSelfReference());
@@ -2356,7 +2671,7 @@ bool CompoundVariableModifier::readAttribute(MiniscriptThread *thread, DynamicVa
 }
 
 bool CompoundVariableModifier::readAttributeIndexed(MiniscriptThread *thread, DynamicValue &result, const Common::String &attrib, const DynamicValue &index) {
-	Modifier *var = findChildByName(attrib);
+	Modifier *var = findChildByName(thread->getRuntime(), attrib);
 	if (!var || !var->isVariable())
 		return false;
 
@@ -2364,7 +2679,7 @@ bool CompoundVariableModifier::readAttributeIndexed(MiniscriptThread *thread, Dy
 }
 
 MiniscriptInstructionOutcome CompoundVariableModifier::writeRefAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &writeProxy, const Common::String &attrib) {
-	Modifier *var = findChildByName(attrib);
+	Modifier *var = findChildByName(thread->getRuntime(), attrib);
 	if (!var)
 		return kMiniscriptInstructionOutcomeFailed;
 
@@ -2379,14 +2694,26 @@ MiniscriptInstructionOutcome CompoundVariableModifier::writeRefAttribute(Miniscr
 }
 
 MiniscriptInstructionOutcome CompoundVariableModifier::writeRefAttributeIndexed(MiniscriptThread *thread, DynamicValueWriteProxy &writeProxy, const Common::String &attrib, const DynamicValue &index) {
-	Modifier *var = findChildByName(attrib);
+	Modifier *var = findChildByName(thread->getRuntime(), attrib);
 	if (!var || !var->isModifier())
 		return kMiniscriptInstructionOutcomeFailed;
 
 	return var->writeRefAttributeIndexed(thread, writeProxy, "value", index);
 }
 
-Modifier *CompoundVariableModifier::findChildByName(const Common::String &name) const {
+Modifier *CompoundVariableModifier::findChildByName(Runtime *runtime, const Common::String &name) const {
+	if (runtime->getHacks().mtiVariableReferencesHack) {
+		const Common::String &myName = getName();
+
+		if (myName.size() == 1 && (myName == "a" || myName == "b" || myName == "c" || myName == "d")) {
+			Project *project = runtime->getProject();
+			Modifier *modifier = project->findGlobalVarWithName(MTropolis::toCaseInsensitive(name)).get();
+
+			if (modifier)
+				return modifier;
+		}
+	}
+
 	for (Common::Array<Common::SharedPtr<Modifier> >::const_iterator it = _children.begin(), itEnd = _children.end(); it != itEnd; ++it) {
 		Modifier *modifier = it->get();
 		if (caseInsensitiveEqual(name, modifier->getName()))
@@ -2399,9 +2726,55 @@ Modifier *CompoundVariableModifier::findChildByName(const Common::String &name) 
 CompoundVariableModifier::SaveLoad::ChildSaveLoad::ChildSaveLoad() : modifier(nullptr) {
 }
 
-CompoundVariableModifier::SaveLoad::SaveLoad(CompoundVariableModifier *modifier) /* : _modifier(modifier) */ {
+CompoundVariableModifier::SaveLoad::SaveLoad(Runtime *runtime, CompoundVariableModifier *modifier) /* : _modifier(modifier) */ {
+	// Gross hacks for MTI save games.
+	//
+	// This looks like it's due to some kind of divergence between mTropolis 1.1 and whatever
+	// MTI shipped with.  MTI's saves are done using a compound variable named "MTI" in the Load/Save scene
+	// which contains aliases to compound vars a, b, c, d, and g.  While these are aliases to the same globals
+	// as are used elsewhere (unlike the "billyState" hack), mTropolis 1.1 will DUPLICATE compound variables children
+	// unless the children themselves are aliases, which is not the case in MTI.
+	//
+	// Consequently, the default behavior here is that the compounds in the Load/Save menu will not reference the
+	// children of the aliases compound.  So, we need to patch those references here.
+	bool isMTIHackG = false;
+	bool isMTIHackGlobalContainer = false;
+	if (runtime->getHacks().mtiVariableReferencesHack) {
+		const Common::String &name = modifier->getName();
+		if (name == "g") {
+			isMTIHackG = true;
+		} else if (name == "a" || name == "b" || name == "c" || name == "d") {
+			isMTIHackGlobalContainer = true;
+		}
+	}
+
+	if (isMTIHackG) {
+		// For "g" use the "g" in the project instead
+		for (const Common::SharedPtr<Modifier> &projChild : runtime->getProject()->getModifiers()) {
+			if (projChild->getName() == "g" && projChild->isCompoundVariable()) {
+				modifier = static_cast<CompoundVariableModifier *>(projChild.get());
+				break;
+			}
+		}
+	}
+
 	for (const Common::SharedPtr<Modifier> &child : modifier->_children) {
-		Common::SharedPtr<ModifierSaveLoad> childSL = child->getSaveLoad();
+		if (isMTIHackGlobalContainer) {
+			Common::SharedPtr<Modifier> globalVarModifier = runtime->getProject()->findGlobalVarWithName(child->getName());
+
+			if (globalVarModifier) {
+				Common::SharedPtr<ModifierSaveLoad> childSL = globalVarModifier->getSaveLoad(runtime);
+
+				ChildSaveLoad childSaveLoad;
+				childSaveLoad.saveLoad = childSL;
+				childSaveLoad.modifier = globalVarModifier.get();
+				_childrenSaveLoad.push_back(childSaveLoad);
+
+				continue;
+			}
+		}
+
+		Common::SharedPtr<ModifierSaveLoad> childSL = child->getSaveLoad(runtime);
 		if (childSL) {
 			ChildSaveLoad childSaveLoad;
 			childSaveLoad.saveLoad = childSL;
@@ -2446,20 +2819,16 @@ const char *CompoundVariableModifier::getDefaultName() const {
 	return "Compound Variable";
 }
 
-BooleanVariableModifier::BooleanVariableModifier() : _value(false) {
+BooleanVariableModifier::BooleanVariableModifier() : VariableModifier(Common::SharedPtr<VariableStorage>(new BooleanVariableStorage())) {
 }
 
 bool BooleanVariableModifier::load(ModifierLoaderContext &context, const Data::BooleanVariableModifier &data) {
 	if (!loadTypicalHeader(data.modHeader))
 		return false;
 
-	_value = (data.value != 0);
+	static_cast<BooleanVariableStorage *>(_storage.get())->_value = (data.value != 0);
 
 	return true;
-}
-
-Common::SharedPtr<ModifierSaveLoad> BooleanVariableModifier::getSaveLoad() {
-	return Common::SharedPtr<ModifierSaveLoad>(new SaveLoad(this));
 }
 
 bool BooleanVariableModifier::varSetValue(MiniscriptThread *thread, const DynamicValue &value) {
@@ -2467,20 +2836,20 @@ bool BooleanVariableModifier::varSetValue(MiniscriptThread *thread, const Dynami
 	if (!value.convertToType(DynamicValueTypes::kBoolean, boolValue))
 		return false;
 
-	_value = boolValue.getBool();
+	static_cast<BooleanVariableStorage *>(_storage.get())->_value = boolValue.getBool();
 
 	return true;
 }
 
 void BooleanVariableModifier::varGetValue(DynamicValue &dest) const {
-	dest.setBool(_value);
+	dest.setBool(static_cast<BooleanVariableStorage *>(_storage.get())->_value);
 }
 
 #ifdef MTROPOLIS_DEBUG_ENABLE
 void BooleanVariableModifier::debugInspect(IDebugInspectionReport *report) const {
 	VariableModifier::debugInspect(report);
 
-	report->declareDynamic("value", _value ? "true" : "false");
+	report->declareDynamic("value", static_cast<BooleanVariableStorage *>(_storage.get())->_value ? "true" : "false");
 }
 #endif
 
@@ -2492,19 +2861,30 @@ const char *BooleanVariableModifier::getDefaultName() const {
 	return "Boolean Variable";
 }
 
-BooleanVariableModifier::SaveLoad::SaveLoad(BooleanVariableModifier *modifier) : _modifier(modifier) {
-	_value = _modifier->_value;
+BooleanVariableStorage::BooleanVariableStorage() : _value(false) {
 }
 
-void BooleanVariableModifier::SaveLoad::commitLoad() const {
-	_modifier->_value = _value;
+Common::SharedPtr<ModifierSaveLoad> BooleanVariableStorage::getSaveLoad(Runtime *runtime) {
+	return Common::SharedPtr<ModifierSaveLoad>(new SaveLoad(this));
 }
 
-void BooleanVariableModifier::SaveLoad::saveInternal(Common::WriteStream *stream) const {
+Common::SharedPtr<VariableStorage> BooleanVariableStorage::clone() const {
+	return Common::SharedPtr<VariableStorage>(new BooleanVariableStorage(*this));
+}
+
+BooleanVariableStorage::SaveLoad::SaveLoad(BooleanVariableStorage *storage) : _storage(storage) {
+	_value = _storage->_value;
+}
+
+void BooleanVariableStorage::SaveLoad::commitLoad() const {
+	_storage->_value = _value;
+}
+
+void BooleanVariableStorage::SaveLoad::saveInternal(Common::WriteStream *stream) const {
 	stream->writeByte(_value ? 1 : 0);
 }
 
-bool BooleanVariableModifier::SaveLoad::loadInternal(Common::ReadStream *stream, uint32 saveFileVersion) {
+bool BooleanVariableStorage::SaveLoad::loadInternal(Common::ReadStream *stream, uint32 saveFileVersion) {
 	byte b = stream->readByte();
 	if (stream->err())
 		return false;
@@ -2513,20 +2893,27 @@ bool BooleanVariableModifier::SaveLoad::loadInternal(Common::ReadStream *stream,
 	return true;
 }
 
-IntegerVariableModifier::IntegerVariableModifier() : _value(0) {
+IntegerVariableModifier::IntegerVariableModifier() : VariableModifier(Common::SharedPtr<VariableStorage>(new IntegerVariableStorage())) {
 }
 
 bool IntegerVariableModifier::load(ModifierLoaderContext& context, const Data::IntegerVariableModifier& data) {
 	if (!loadTypicalHeader(data.modHeader))
 		return false;
 
-	_value = data.value;
+	static_cast<IntegerVariableStorage *>(_storage.get())->_value = data.value;
 
 	return true;
 }
 
-Common::SharedPtr<ModifierSaveLoad> IntegerVariableModifier::getSaveLoad() {
+IntegerVariableStorage::IntegerVariableStorage() : _value(0) {
+}
+
+Common::SharedPtr<ModifierSaveLoad> IntegerVariableStorage::getSaveLoad(Runtime *runtime) {
 	return Common::SharedPtr<ModifierSaveLoad>(new SaveLoad(this));
+}
+
+Common::SharedPtr<VariableStorage> IntegerVariableStorage::clone() const {
+	return Common::SharedPtr<VariableStorage>(new IntegerVariableStorage(*this));
 }
 
 bool IntegerVariableModifier::varSetValue(MiniscriptThread *thread, const DynamicValue &value) {
@@ -2534,20 +2921,20 @@ bool IntegerVariableModifier::varSetValue(MiniscriptThread *thread, const Dynami
 	if (!value.convertToType(DynamicValueTypes::kInteger, intValue))
 		return false;
 
-	_value = intValue.getInt();
+	static_cast<IntegerVariableStorage *>(_storage.get())->_value = intValue.getInt();
 
 	return true;
 }
 
 void IntegerVariableModifier::varGetValue(DynamicValue &dest) const {
-	dest.setInt(_value);
+	dest.setInt(static_cast<IntegerVariableStorage *>(_storage.get())->_value);
 }
 
 #ifdef MTROPOLIS_DEBUG_ENABLE
 void IntegerVariableModifier::debugInspect(IDebugInspectionReport *report) const {
 	VariableModifier::debugInspect(report);
 
-	report->declareDynamic("value", Common::String::format("%i", _value));
+	report->declareDynamic("value", Common::String::format("%i", static_cast<IntegerVariableStorage *>(_storage.get())->_value));
 }
 #endif
 
@@ -2559,19 +2946,19 @@ const char *IntegerVariableModifier::getDefaultName() const {
 	return "Integer Variable";
 }
 
-IntegerVariableModifier::SaveLoad::SaveLoad(IntegerVariableModifier *modifier) : _modifier(modifier) {
-	_value = _modifier->_value;
+IntegerVariableStorage::SaveLoad::SaveLoad(IntegerVariableStorage *storage) : _storage(storage) {
+	_value = _storage->_value;
 }
 
-void IntegerVariableModifier::SaveLoad::commitLoad() const {
-	_modifier->_value = _value;
+void IntegerVariableStorage::SaveLoad::commitLoad() const {
+	_storage->_value = _value;
 }
 
-void IntegerVariableModifier::SaveLoad::saveInternal(Common::WriteStream *stream) const {
+void IntegerVariableStorage::SaveLoad::saveInternal(Common::WriteStream *stream) const {
 	stream->writeSint32BE(_value);
 }
 
-bool IntegerVariableModifier::SaveLoad::loadInternal(Common::ReadStream *stream, uint32 saveFileVersion) {
+bool IntegerVariableStorage::SaveLoad::loadInternal(Common::ReadStream *stream, uint32 saveFileVersion) {
 	_value = stream->readSint32BE();
 
 	if (stream->err())
@@ -2580,18 +2967,18 @@ bool IntegerVariableModifier::SaveLoad::loadInternal(Common::ReadStream *stream,
 	return true;
 }
 
+
+IntegerRangeVariableModifier::IntegerRangeVariableModifier() : VariableModifier(Common::SharedPtr<VariableStorage>(new IntegerRangeVariableStorage())) {
+}
+
 bool IntegerRangeVariableModifier::load(ModifierLoaderContext& context, const Data::IntegerRangeVariableModifier& data) {
 	if (!loadTypicalHeader(data.modHeader))
 		return false;
 
-	if (!_range.load(data.range))
+	if (!static_cast<IntegerRangeVariableStorage *>(_storage.get())->_range.load(data.range))
 		return false;
 
 	return true;
-}
-
-Common::SharedPtr<ModifierSaveLoad> IntegerRangeVariableModifier::getSaveLoad() {
-	return Common::SharedPtr<ModifierSaveLoad>(new SaveLoad(this));
 }
 
 bool IntegerRangeVariableModifier::varSetValue(MiniscriptThread *thread, const DynamicValue &value) {
@@ -2599,34 +2986,38 @@ bool IntegerRangeVariableModifier::varSetValue(MiniscriptThread *thread, const D
 	if (!value.convertToType(DynamicValueTypes::kIntegerRange, intRangeValue))
 		return false;
 
-	_range = intRangeValue.getIntRange();
+	static_cast<IntegerRangeVariableStorage *>(_storage.get())->_range = intRangeValue.getIntRange();
 
 	return true;
 }
 
 void IntegerRangeVariableModifier::varGetValue(DynamicValue &dest) const {
-	dest.setIntRange(_range);
+	dest.setIntRange(static_cast<IntegerRangeVariableStorage *>(_storage.get())->_range);
 }
 
 bool IntegerRangeVariableModifier::readAttribute(MiniscriptThread *thread, DynamicValue &result, const Common::String &attrib) {
+	IntegerRangeVariableStorage *storage = static_cast<IntegerRangeVariableStorage *>(_storage.get());
+
 	if (attrib == "start") {
-		result.setInt(_range.min);
+		result.setInt(storage->_range.min);
 		return true;
 	}
 	if (attrib == "end") {
-		result.setInt(_range.max);
+		result.setInt(storage->_range.max);
 		return true;
 	}
 	return Modifier::readAttribute(thread, result, attrib);
 }
 
 MiniscriptInstructionOutcome IntegerRangeVariableModifier::writeRefAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &result, const Common::String &attrib) {
+	IntegerRangeVariableStorage *storage = static_cast<IntegerRangeVariableStorage *>(_storage.get());
+
 	if (attrib == "start") {
-		DynamicValueWriteIntegerHelper<int32>::create(&_range.min, result);
+		DynamicValueWriteIntegerHelper<int32>::create(&storage->_range.min, result);
 		return kMiniscriptInstructionOutcomeContinue;
 	}
 	if (attrib == "end") {
-		DynamicValueWriteIntegerHelper<int32>::create(&_range.max, result);
+		DynamicValueWriteIntegerHelper<int32>::create(&storage->_range.max, result);
 		return kMiniscriptInstructionOutcomeContinue;
 	}
 	return Modifier::writeRefAttribute(thread, result, attrib);
@@ -2634,9 +3025,11 @@ MiniscriptInstructionOutcome IntegerRangeVariableModifier::writeRefAttribute(Min
 
 #ifdef MTROPOLIS_DEBUG_ENABLE
 void IntegerRangeVariableModifier::debugInspect(IDebugInspectionReport *report) const {
+	IntegerRangeVariableStorage *storage = static_cast<IntegerRangeVariableStorage *>(_storage.get());
+
 	VariableModifier::debugInspect(report);
 
-	report->declareDynamic("value", _range.toString());
+	report->declareDynamic("value", storage->_range.toString());
 }
 #endif
 
@@ -2648,22 +3041,33 @@ const char *IntegerRangeVariableModifier::getDefaultName() const {
 	return "Integer Range Variable";
 }
 
-IntegerRangeVariableModifier::SaveLoad::SaveLoad(IntegerRangeVariableModifier *modifier) : _modifier(modifier) {
-	_range = _modifier->_range;
+IntegerRangeVariableStorage::IntegerRangeVariableStorage() {
 }
 
-void IntegerRangeVariableModifier::SaveLoad::commitLoad() const {
-	_modifier->_range = _range;
+Common::SharedPtr<ModifierSaveLoad> IntegerRangeVariableStorage::getSaveLoad(Runtime *runtime) {
+	return Common::SharedPtr<ModifierSaveLoad>(new SaveLoad(this));
 }
 
-void IntegerRangeVariableModifier::SaveLoad::saveInternal(Common::WriteStream *stream) const {
-	stream->writeSint32BE(_range.min);
-	stream->writeSint32BE(_range.max);
+Common::SharedPtr<VariableStorage> IntegerRangeVariableStorage::clone() const {
+	return Common::SharedPtr<VariableStorage>(new IntegerRangeVariableStorage(*this));
 }
 
-bool IntegerRangeVariableModifier::SaveLoad::loadInternal(Common::ReadStream *stream, uint32 saveFileVersion) {
-	_range.min = stream->readSint32BE();
-	_range.max = stream->readSint32BE();
+IntegerRangeVariableStorage::SaveLoad::SaveLoad(IntegerRangeVariableStorage *storage) : _storage(storage) {
+	_range = _storage->_range;
+}
+
+void IntegerRangeVariableStorage::SaveLoad::commitLoad() const {
+	_storage->_range = _range;
+}
+
+void IntegerRangeVariableStorage::SaveLoad::saveInternal(Common::WriteStream *stream) const {
+	stream->writeSint32BE(_storage->_range.min);
+	stream->writeSint32BE(_storage->_range.max);
+}
+
+bool IntegerRangeVariableStorage::SaveLoad::loadInternal(Common::ReadStream *stream, uint32 saveFileVersion) {
+	_storage->_range.min = stream->readSint32BE();
+	_storage->_range.max = stream->readSint32BE();
 
 	if (stream->err())
 		return false;
@@ -2671,18 +3075,19 @@ bool IntegerRangeVariableModifier::SaveLoad::loadInternal(Common::ReadStream *st
 	return true;
 }
 
+VectorVariableModifier::VectorVariableModifier() : VariableModifier(Common::SharedPtr<VariableStorage>(new VectorVariableStorage())) {
+}
+
 bool VectorVariableModifier::load(ModifierLoaderContext &context, const Data::VectorVariableModifier &data) {
 	if (!loadTypicalHeader(data.modHeader))
 		return false;
 
-	_vector.angleDegrees = data.vector.angleRadians.toDouble() * (180 / M_PI);
-	_vector.magnitude = data.vector.magnitude.toDouble();
+	VectorVariableStorage *storage = static_cast<VectorVariableStorage *>(_storage.get());
+
+	storage->_vector.angleDegrees = data.vector.angleRadians.toDouble() * (180 / M_PI);
+	storage->_vector.magnitude = data.vector.magnitude.toDouble();
 
 	return true;
-}
-
-Common::SharedPtr<ModifierSaveLoad> VectorVariableModifier::getSaveLoad() {
-	return Common::SharedPtr<ModifierSaveLoad>(new SaveLoad(this));
 }
 
 bool VectorVariableModifier::varSetValue(MiniscriptThread *thread, const DynamicValue &value) {
@@ -2690,21 +3095,27 @@ bool VectorVariableModifier::varSetValue(MiniscriptThread *thread, const Dynamic
 	if (!value.convertToType(DynamicValueTypes::kVector, vectorValue))
 		return false;
 
-	_vector = vectorValue.getVector();
+	VectorVariableStorage *storage = static_cast<VectorVariableStorage *>(_storage.get());
+
+	storage->_vector = vectorValue.getVector();
 
 	return true;
 }
 
 void VectorVariableModifier::varGetValue(DynamicValue &dest) const {
-	dest.setVector(_vector);
+	VectorVariableStorage *storage = static_cast<VectorVariableStorage *>(_storage.get());
+
+	dest.setVector(storage->_vector);
 }
 
 bool VectorVariableModifier::readAttribute(MiniscriptThread *thread, DynamicValue &result, const Common::String &attrib) {
+	VectorVariableStorage *storage = static_cast<VectorVariableStorage *>(_storage.get());
+
 	if (attrib == "magnitude") {
-		result.setFloat(_vector.magnitude);
+		result.setFloat(storage->_vector.magnitude);
 		return true;
 	} else if (attrib == "angle") {
-		result.setFloat(_vector.angleDegrees);
+		result.setFloat(storage->_vector.angleDegrees);
 		return true;
 	}
 
@@ -2712,11 +3123,13 @@ bool VectorVariableModifier::readAttribute(MiniscriptThread *thread, DynamicValu
 }
 
 MiniscriptInstructionOutcome VectorVariableModifier::writeRefAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &result, const Common::String &attrib) {
+	VectorVariableStorage *storage = static_cast<VectorVariableStorage *>(_storage.get());
+
 	if (attrib == "magnitude") {
-		DynamicValueWriteFloatHelper<double>::create(&_vector.magnitude, result);
+		DynamicValueWriteFloatHelper<double>::create(&storage->_vector.magnitude, result);
 		return kMiniscriptInstructionOutcomeContinue;
 	} else if (attrib == "angle") {
-		DynamicValueWriteFloatHelper<double>::create(&_vector.angleDegrees, result);
+		DynamicValueWriteFloatHelper<double>::create(&storage->_vector.angleDegrees, result);
 		return kMiniscriptInstructionOutcomeContinue;
 	}
 
@@ -2727,7 +3140,9 @@ MiniscriptInstructionOutcome VectorVariableModifier::writeRefAttribute(Miniscrip
 void VectorVariableModifier::debugInspect(IDebugInspectionReport *report) const {
 	VariableModifier::debugInspect(report);
 
-	report->declareDynamic("value", _vector.toString());
+	VectorVariableStorage *storage = static_cast<VectorVariableStorage *>(_storage.get());
+
+	report->declareDynamic("value", storage->_vector.toString());
 }
 #endif
 
@@ -2739,20 +3154,31 @@ const char *VectorVariableModifier::getDefaultName() const {
 	return "Vector Variable";
 }
 
-VectorVariableModifier::SaveLoad::SaveLoad(VectorVariableModifier *modifier) : _modifier(modifier) {
-	_vector = _modifier->_vector;
+VectorVariableStorage::VectorVariableStorage() {
 }
 
-void VectorVariableModifier::SaveLoad::commitLoad() const {
-	_modifier->_vector = _vector;
+Common::SharedPtr<ModifierSaveLoad> VectorVariableStorage::getSaveLoad(Runtime *runtime) {
+	return Common::SharedPtr<ModifierSaveLoad>(new SaveLoad(this));
 }
 
-void VectorVariableModifier::SaveLoad::saveInternal(Common::WriteStream *stream) const {
+Common::SharedPtr<VariableStorage> VectorVariableStorage::clone() const {
+	return Common::SharedPtr<VariableStorage>(new VectorVariableStorage(*this));
+}
+
+VectorVariableStorage::SaveLoad::SaveLoad(VectorVariableStorage *storage) : _storage(storage) {
+	_vector = _storage->_vector;
+}
+
+void VectorVariableStorage::SaveLoad::commitLoad() const {
+	_storage->_vector = _vector;
+}
+
+void VectorVariableStorage::SaveLoad::saveInternal(Common::WriteStream *stream) const {
 	stream->writeDoubleBE(_vector.angleDegrees);
 	stream->writeDoubleBE(_vector.magnitude);
 }
 
-bool VectorVariableModifier::SaveLoad::loadInternal(Common::ReadStream *stream, uint32 saveFileVersion) {
+bool VectorVariableStorage::SaveLoad::loadInternal(Common::ReadStream *stream, uint32 saveFileVersion) {
 	_vector.angleDegrees = stream->readDoubleBE();
 	_vector.magnitude = stream->readDoubleBE();
 
@@ -2762,18 +3188,19 @@ bool VectorVariableModifier::SaveLoad::loadInternal(Common::ReadStream *stream, 
 	return true;
 }
 
+PointVariableModifier::PointVariableModifier() : VariableModifier(Common::SharedPtr<VariableStorage>(new PointVariableStorage())) {
+}
+
 bool PointVariableModifier::load(ModifierLoaderContext &context, const Data::PointVariableModifier &data) {
 	if (!loadTypicalHeader(data.modHeader))
 		return false;
 
-	_value.x = data.value.x;
-	_value.y = data.value.y;
+	PointVariableStorage *storage = static_cast<PointVariableStorage *>(_storage.get());
+
+	if (!data.value.toScummVMPoint(storage->_value))
+		return false;
 
 	return true;
-}
-
-Common::SharedPtr<ModifierSaveLoad> PointVariableModifier::getSaveLoad() {
-	return Common::SharedPtr<ModifierSaveLoad>(new SaveLoad(this));
 }
 
 bool PointVariableModifier::varSetValue(MiniscriptThread *thread, const DynamicValue &value) {
@@ -2781,22 +3208,28 @@ bool PointVariableModifier::varSetValue(MiniscriptThread *thread, const DynamicV
 	if (!value.convertToType(DynamicValueTypes::kPoint, pointValue))
 		return false;
 
-	_value = pointValue.getPoint();
+	PointVariableStorage *storage = static_cast<PointVariableStorage *>(_storage.get());
+
+	storage->_value = pointValue.getPoint();
 
 	return true;
 }
 
 void PointVariableModifier::varGetValue(DynamicValue &dest) const {
-	dest.setPoint(_value);
+	PointVariableStorage *storage = static_cast<PointVariableStorage *>(_storage.get());
+
+	dest.setPoint(storage->_value);
 }
 
 bool PointVariableModifier::readAttribute(MiniscriptThread *thread, DynamicValue &result, const Common::String &attrib) {
+	PointVariableStorage *storage = static_cast<PointVariableStorage *>(_storage.get());
+
 	if (attrib == "x") {
-		result.setInt(_value.x);
+		result.setInt(storage->_value.x);
 		return true;
 	}
 	if (attrib == "y") {
-		result.setInt(_value.y);
+		result.setInt(storage->_value.y);
 		return true;
 	}
 
@@ -2804,12 +3237,14 @@ bool PointVariableModifier::readAttribute(MiniscriptThread *thread, DynamicValue
 }
 
 MiniscriptInstructionOutcome PointVariableModifier::writeRefAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &writeProxy, const Common::String &attrib) {
+	PointVariableStorage *storage = static_cast<PointVariableStorage *>(_storage.get());
+
 	if (attrib == "x") {
-		DynamicValueWriteIntegerHelper<int16>::create(&_value.x, writeProxy);
+		DynamicValueWriteIntegerHelper<int16>::create(&storage->_value.x, writeProxy);
 		return kMiniscriptInstructionOutcomeContinue;
 	}
 	if (attrib == "y") {
-		DynamicValueWriteIntegerHelper<int16>::create(&_value.y, writeProxy);
+		DynamicValueWriteIntegerHelper<int16>::create(&storage->_value.y, writeProxy);
 		return kMiniscriptInstructionOutcomeContinue;
 	}
 
@@ -2820,7 +3255,9 @@ MiniscriptInstructionOutcome PointVariableModifier::writeRefAttribute(Miniscript
 void PointVariableModifier::debugInspect(IDebugInspectionReport *report) const {
 	VariableModifier::debugInspect(report);
 
-	report->declareDynamic("value", pointToString(_value));
+	PointVariableStorage *storage = static_cast<PointVariableStorage *>(_storage.get());
+
+	report->declareDynamic("value", pointToString(storage->_value));
 }
 #endif
 
@@ -2832,20 +3269,31 @@ const char *PointVariableModifier::getDefaultName() const {
 	return "Point Variable";
 }
 
-PointVariableModifier::SaveLoad::SaveLoad(PointVariableModifier *modifier) : _modifier(modifier) {
-	_value = _modifier->_value;
+PointVariableStorage::PointVariableStorage() {
 }
 
-void PointVariableModifier::SaveLoad::commitLoad() const {
-	_modifier->_value = _value;
+Common::SharedPtr<ModifierSaveLoad> PointVariableStorage::getSaveLoad(Runtime *runtime) {
+	return Common::SharedPtr<ModifierSaveLoad>(new SaveLoad(this));
 }
 
-void PointVariableModifier::SaveLoad::saveInternal(Common::WriteStream *stream) const {
+Common::SharedPtr<VariableStorage> PointVariableStorage::clone() const {
+	return Common::SharedPtr<VariableStorage>(new PointVariableStorage(*this));
+}
+
+PointVariableStorage::SaveLoad::SaveLoad(PointVariableStorage *storage) : _storage(storage) {
+	_value = storage->_value;
+}
+
+void PointVariableStorage::SaveLoad::commitLoad() const {
+	_storage->_value = _value;
+}
+
+void PointVariableStorage::SaveLoad::saveInternal(Common::WriteStream *stream) const {
 	stream->writeSint16BE(_value.x);
 	stream->writeSint16BE(_value.y);
 }
 
-bool PointVariableModifier::SaveLoad::loadInternal(Common::ReadStream *stream, uint32 saveFileVersion) {
+bool PointVariableStorage::SaveLoad::loadInternal(Common::ReadStream *stream, uint32 saveFileVersion) {
 	_value.x = stream->readSint16BE();
 	_value.y = stream->readSint16BE();
 
@@ -2855,20 +3303,18 @@ bool PointVariableModifier::SaveLoad::loadInternal(Common::ReadStream *stream, u
 	return true;
 }
 
-FloatingPointVariableModifier::FloatingPointVariableModifier() : _value(0.0) {
+FloatingPointVariableModifier::FloatingPointVariableModifier() : VariableModifier(Common::SharedPtr<FloatingPointVariableStorage>(new FloatingPointVariableStorage())) {
 }
 
 bool FloatingPointVariableModifier::load(ModifierLoaderContext &context, const Data::FloatingPointVariableModifier &data) {
 	if (!loadTypicalHeader(data.modHeader))
 		return false;
 
-	_value = data.value.toDouble();
+	FloatingPointVariableStorage *storage = static_cast<FloatingPointVariableStorage *>(_storage.get());
+
+	storage->_value = data.value.toDouble();
 
 	return true;
-}
-
-Common::SharedPtr<ModifierSaveLoad> FloatingPointVariableModifier::getSaveLoad() {
-	return Common::SharedPtr<ModifierSaveLoad>(new SaveLoad(this));
 }
 
 bool FloatingPointVariableModifier::varSetValue(MiniscriptThread *thread, const DynamicValue &value) {
@@ -2876,20 +3322,26 @@ bool FloatingPointVariableModifier::varSetValue(MiniscriptThread *thread, const 
 	if (!value.convertToType(DynamicValueTypes::kFloat, floatValue))
 		return false;
 
-	_value = floatValue.getFloat();
+	FloatingPointVariableStorage *storage = static_cast<FloatingPointVariableStorage *>(_storage.get());
+
+	storage->_value = floatValue.getFloat();
 
 	return true;
 }
 
 void FloatingPointVariableModifier::varGetValue(DynamicValue &dest) const {
-	dest.setFloat(_value);
+	FloatingPointVariableStorage *storage = static_cast<FloatingPointVariableStorage *>(_storage.get());
+
+	dest.setFloat(storage->_value);
 }
 
 #ifdef MTROPOLIS_DEBUG_ENABLE
 void FloatingPointVariableModifier::debugInspect(IDebugInspectionReport *report) const {
 	VariableModifier::debugInspect(report);
 
-	report->declareDynamic("value", Common::String::format("%g", _value));
+	FloatingPointVariableStorage *storage = static_cast<FloatingPointVariableStorage *>(_storage.get());
+
+	report->declareDynamic("value", Common::String::format("%g", storage->_value));
 }
 #endif
 
@@ -2901,20 +3353,31 @@ const char *FloatingPointVariableModifier::getDefaultName() const {
 	return "Floating Point Variable";
 }
 
-FloatingPointVariableModifier::SaveLoad::SaveLoad(FloatingPointVariableModifier *modifier) : _modifier(modifier) {
-	_value = _modifier->_value;
+FloatingPointVariableStorage::FloatingPointVariableStorage() : _value(0.0) {
 }
 
-void FloatingPointVariableModifier::SaveLoad::commitLoad() const {
-	_modifier->_value = _value;
+Common::SharedPtr<ModifierSaveLoad> FloatingPointVariableStorage::getSaveLoad(Runtime *runtime) {
+	return Common::SharedPtr<ModifierSaveLoad>(new SaveLoad(this));
 }
 
-void FloatingPointVariableModifier::SaveLoad::saveInternal(Common::WriteStream *stream) const {
-	stream->writeDoubleBE(_value);
+Common::SharedPtr<VariableStorage> FloatingPointVariableStorage::clone() const {
+	return Common::SharedPtr<VariableStorage>(new FloatingPointVariableStorage(*this));
 }
 
-bool FloatingPointVariableModifier::SaveLoad::loadInternal(Common::ReadStream *stream, uint32 saveFileVersion) {
-	_value = stream->readDoubleBE();
+FloatingPointVariableStorage::SaveLoad::SaveLoad(FloatingPointVariableStorage *storage) : _storage(storage) {
+	_value = _storage->_value;
+}
+
+void FloatingPointVariableStorage::SaveLoad::commitLoad() const {
+	_storage->_value = _value;
+}
+
+void FloatingPointVariableStorage::SaveLoad::saveInternal(Common::WriteStream *stream) const {
+	stream->writeDoubleBE(_storage->_value);
+}
+
+bool FloatingPointVariableStorage::SaveLoad::loadInternal(Common::ReadStream *stream, uint32 saveFileVersion) {
+	_storage->_value = stream->readDoubleBE();
 
 	if (stream->err())
 		return false;
@@ -2922,17 +3385,18 @@ bool FloatingPointVariableModifier::SaveLoad::loadInternal(Common::ReadStream *s
 	return true;
 }
 
+StringVariableModifier::StringVariableModifier() : VariableModifier(Common::SharedPtr<VariableStorage>(new StringVariableStorage())) {
+}
+
 bool StringVariableModifier::load(ModifierLoaderContext &context, const Data::StringVariableModifier &data) {
 	if (!loadTypicalHeader(data.modHeader))
 		return false;
 
-	_value = data.value;
+	StringVariableStorage *storage = static_cast<StringVariableStorage *>(_storage.get());
+
+	storage->_value = data.value;
 
 	return true;
-}
-
-Common::SharedPtr<ModifierSaveLoad> StringVariableModifier::getSaveLoad() {
-	return Common::SharedPtr<ModifierSaveLoad>(new SaveLoad(this));
 }
 
 bool StringVariableModifier::varSetValue(MiniscriptThread *thread, const DynamicValue &value) {
@@ -2940,20 +3404,26 @@ bool StringVariableModifier::varSetValue(MiniscriptThread *thread, const Dynamic
 	if (!value.convertToType(DynamicValueTypes::kString, stringValue))
 		return false;
 
-	_value = stringValue.getString();
+	StringVariableStorage *storage = static_cast<StringVariableStorage *>(_storage.get());
+
+	storage->_value = stringValue.getString();
 
 	return true;
 }
 
 void StringVariableModifier::varGetValue(DynamicValue &dest) const {
-	dest.setString(_value);
+	StringVariableStorage *storage = static_cast<StringVariableStorage *>(_storage.get());
+
+	dest.setString(storage->_value);
 }
 
 #ifdef MTROPOLIS_DEBUG_ENABLE
 void StringVariableModifier::debugInspect(IDebugInspectionReport *report) const {
 	VariableModifier::debugInspect(report);
 
-	report->declareDynamic("value", _value);
+	StringVariableStorage *storage = static_cast<StringVariableStorage *>(_storage.get());
+
+	report->declareDynamic("value", storage->_value);
 }
 #endif
 
@@ -2965,20 +3435,31 @@ const char *StringVariableModifier::getDefaultName() const {
 	return "String Variable";
 }
 
-StringVariableModifier::SaveLoad::SaveLoad(StringVariableModifier *modifier) : _modifier(modifier) {
-	_value = _modifier->_value;
+StringVariableStorage::StringVariableStorage() {
 }
 
-void StringVariableModifier::SaveLoad::commitLoad() const {
-	_modifier->_value = _value;
+Common::SharedPtr<ModifierSaveLoad> StringVariableStorage::getSaveLoad(Runtime *runtime) {
+	return Common::SharedPtr<ModifierSaveLoad>(new SaveLoad(this));
 }
 
-void StringVariableModifier::SaveLoad::saveInternal(Common::WriteStream *stream) const {
+Common::SharedPtr<VariableStorage> StringVariableStorage::clone() const {
+	return Common::SharedPtr<VariableStorage>(new StringVariableStorage(*this));
+}
+
+StringVariableStorage::SaveLoad::SaveLoad(StringVariableStorage *storage) : _storage(storage) {
+	_value = _storage->_value;
+}
+
+void StringVariableStorage::SaveLoad::commitLoad() const {
+	_storage->_value = _value;
+}
+
+void StringVariableStorage::SaveLoad::saveInternal(Common::WriteStream *stream) const {
 	stream->writeUint32BE(_value.size());
 	stream->writeString(_value);
 }
 
-bool StringVariableModifier::SaveLoad::loadInternal(Common::ReadStream *stream, uint32 saveFileVersion) {
+bool StringVariableStorage::SaveLoad::loadInternal(Common::ReadStream *stream, uint32 saveFileVersion) {
 	uint32 size = stream->readUint32BE();
 
 	if (stream->err())
@@ -2999,7 +3480,8 @@ bool StringVariableModifier::SaveLoad::loadInternal(Common::ReadStream *stream, 
 	return true;
 }
 
-
+ObjectReferenceVariableModifierV1::ObjectReferenceVariableModifierV1() : VariableModifier(Common::SharedPtr<VariableStorage>(new ObjectReferenceVariableV1Storage())) {
+}
 
 bool ObjectReferenceVariableModifierV1::load(ModifierLoaderContext &context, const Data::ObjectReferenceVariableModifierV1 &data) {
 	if (!loadTypicalHeader(data.modHeader))
@@ -3022,17 +3504,15 @@ VThreadState ObjectReferenceVariableModifierV1::consumeMessage(Runtime *runtime,
 	return kVThreadError;
 }
 
-Common::SharedPtr<ModifierSaveLoad> ObjectReferenceVariableModifierV1::getSaveLoad() {
-	return Common::SharedPtr<ModifierSaveLoad>(new SaveLoad(this));
-}
-
 bool ObjectReferenceVariableModifierV1::varSetValue(MiniscriptThread *thread, const DynamicValue &value) {
+	ObjectReferenceVariableV1Storage *storage = static_cast<ObjectReferenceVariableV1Storage *>(_storage.get());
+
 	// Somewhat tricky aspect: If this is set to another object reference variable modifier, then this will reference
 	// the other object variable modifier, it will NOT copy it.
 	if (value.getType() == DynamicValueTypes::kNull)
-		_value.reset();
+		storage->_value.reset();
 	else if (value.getType() == DynamicValueTypes::kObject)
-		_value = value.getObject().object;
+		storage->_value = value.getObject().object;
 	else
 		return false;
 
@@ -3051,18 +3531,29 @@ const char *ObjectReferenceVariableModifierV1::getDefaultName() const {
 	return "Object Reference Variable";
 }
 
-ObjectReferenceVariableModifierV1::SaveLoad::SaveLoad(ObjectReferenceVariableModifierV1 *modifier) : _modifier(modifier) {
+ObjectReferenceVariableV1Storage::ObjectReferenceVariableV1Storage() {
 }
 
-void ObjectReferenceVariableModifierV1::SaveLoad::commitLoad() const {
-	_modifier->_value = _value;
+Common::SharedPtr<ModifierSaveLoad> ObjectReferenceVariableV1Storage::getSaveLoad(Runtime *runtime) {
+	return Common::SharedPtr<ModifierSaveLoad>(new SaveLoad(this));
 }
 
-void ObjectReferenceVariableModifierV1::SaveLoad::saveInternal(Common::WriteStream *stream) const {
+Common::SharedPtr<VariableStorage> ObjectReferenceVariableV1Storage::clone() const {
+	return Common::SharedPtr<VariableStorage>(new ObjectReferenceVariableV1Storage(*this));
+}
+
+ObjectReferenceVariableV1Storage::SaveLoad::SaveLoad(ObjectReferenceVariableV1Storage *storage) : _storage(storage) {
+}
+
+void ObjectReferenceVariableV1Storage::SaveLoad::commitLoad() const {
+	_storage->_value = _value;
+}
+
+void ObjectReferenceVariableV1Storage::SaveLoad::saveInternal(Common::WriteStream *stream) const {
 	error("Saving version 1 object reference variables is not currently supported");
 }
 
-bool ObjectReferenceVariableModifierV1::SaveLoad::loadInternal(Common::ReadStream *stream, uint32 saveFileVersion) {
+bool ObjectReferenceVariableV1Storage::SaveLoad::loadInternal(Common::ReadStream *stream, uint32 saveFileVersion) {
 	return true;
 }
 

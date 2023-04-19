@@ -238,6 +238,18 @@ public:
 	void copyFrom(const Surface &surf);
 
 	/**
+	 * Convert the data from another surface to the specified format.
+	 *
+	 * This calls @ref free on the current surface to assure that it is
+	 * clean. Make sure that the current data was created using @ref create.
+	 * Otherwise, the results are undefined.
+	 *
+	 * @param surf    The surface to convert from.
+	 * @param format  The pixel format to convert to.
+	 */
+	void convertFrom(const Surface &surf, const PixelFormat &format);
+
+	/**
 	 * Create a surface that represents a sub-area of this Surface object.
 	 *
 	 * The pixel (0, 0) of the returned Surface will be the same as pixel
@@ -361,7 +373,7 @@ public:
 	Graphics::Surface *convertTo(const PixelFormat &dstFormat, const byte *srcPalette = 0, int srcPaletteCount = 0, const byte *dstPalette = 0, int dstPaletteCount = 0, DitherMethod method = kDitherFloyd) const;
 
 private:
-	void ditherFloyd(const byte *srcPalette, int srcPaletteCount, Surface *dstSurf, const byte *dstPalette, int dstPaletteCount, DitherMethod method) const;
+	void ditherFloyd(const byte *srcPalette, int srcPaletteCount, Surface *dstSurf, const byte *dstPalette, int dstPaletteCount, DitherMethod method, const PixelFormat &dstFormat) const;
 
 public:
 
@@ -445,6 +457,42 @@ public:
 	 * @param r  The rectangle to flip.
 	 */
 	void flipVertical(const Common::Rect &r);
+
+	/**
+	 * Flip the specified rect horizontally.
+	 *
+	 * @param r  The rectangle to flip.
+	 */
+	void flipHorizontal(const Common::Rect &r);
+
+	/**
+	 * Writes a color key to the alpha channel of the surface
+	 * @param rKey  the red component of the color key
+	 * @param gKey  the green component of the color key
+	 * @param bKey  the blue component of the color key
+	 * @param overwriteAlpha if true, all other alpha will be set fully opaque
+	 */
+	bool applyColorKey(uint8 rKey, uint8 gKey, uint8 bKey, bool overwriteAlpha = false);
+
+	/**
+	 * Writes a color key to the alpha channel of the surface
+	 * @param rKey  the red component of the color key
+	 * @param gKey  the green component of the color key
+	 * @param bKey  the blue component of the color key
+	 * @param overwriteAlpha if true, all other alpha will be set fully opaque
+	 * @param rNew  the red component to replace the color key with
+	 * @param gNew  the green component to replace the color key with
+	 * @param bNew  the blue component to replace the color key with
+	 */
+	bool applyColorKey(uint8 rKey, uint8 gKey, uint8 bKey, bool overwriteAlpha,
+	                   uint8 rNew, uint8 gNew, uint8 bNew);
+
+	/**
+	 * Sets alpha channel for all pixels to specified value
+	 * @param alpha  value of the alpha channel to set
+	 * @param skipTransparent  if set to true, then do not touch pixels with alpha=0
+	 */
+	bool setAlpha(uint8 alpha, bool skipTransparent = false);
 
 	/**
 	 * Scale the data to the given size.

@@ -118,8 +118,9 @@ Common::SeekableReadStreamEndian *Archive::getResource(uint32 tag, uint16 id) {
 		error("Archive::getResource(): Archive does not contain '%s' %d", tag2str(tag), id);
 
 	const Resource &res = resMap[id];
+	auto stream = new Common::SeekableSubReadStream(_stream, res.offset, res.offset + res.size, DisposeAfterUse::NO);
 
-	return new Common::SeekableSubReadStreamEndian(_stream, res.offset, res.offset + res.size, _isBigEndian, DisposeAfterUse::NO);
+	return new Common::SeekableReadStreamEndianWrapper(stream, _isBigEndian, DisposeAfterUse::YES);
 }
 
 Resource Archive::getResourceDetail(uint32 tag, uint16 id) {
@@ -245,6 +246,15 @@ void Archive::dumpChunk(Resource &res, Common::DumpFile &out) {
 	free(data);
 }
 
+Common::String Archive::formatArchiveInfo() {
+	Common::String result = "unknown, ";
+	if (_isBigEndian)
+		result += "big endian,";
+	else
+		result += "little endian, ";
+	return result;
+}
+
 // Mac Archive code
 
 MacArchive::MacArchive() : Archive(), _resFork(nullptr) {
@@ -349,7 +359,16 @@ Common::SeekableReadStreamEndian *MacArchive::getResource(uint32 tag, uint16 id)
 		error("MacArchive::getResource(): Archive does not contain '%s' %d", tag2str(tag), id);
 	}
 
-	return new Common::SeekableSubReadStreamEndian(stream, 0, stream->size(), true, DisposeAfterUse::YES);
+	return new Common::SeekableReadStreamEndianWrapper(stream, true, DisposeAfterUse::YES);
+}
+
+Common::String MacArchive::formatArchiveInfo() {
+	Common::String result = "Mac resource fork, ";
+	if (_isBigEndian)
+		result += "big endian";
+	else
+		result += "little endian";
+	return result;
 }
 
 // RIFF Archive code
@@ -382,6 +401,10 @@ bool RIFFArchive::openStream(Common::SeekableReadStream *stream, uint32 startOff
 	uint32 startPos = stream->pos();
 	stream->readUint32LE(); // unknown (always 0?)
 
+	Common::DumpFile out;
+
+	_stream = stream;
+
 	while ((uint32)stream->pos() < startPos + cftcSize) {
 		uint32 tag = convertTagToUppercase(stream->readUint32BE());
 
@@ -411,19 +434,21 @@ bool RIFFArchive::openStream(Common::SeekableReadStream *stream, uint32 startOff
 			}
 		}
 
-		stream->seek(startResPos);
-
 		debug(3, "Found RIFF resource '%s' %d: %d @ 0x%08x (0x%08x)", tag2str(tag), id, size, offset, startOffset + offset);
 
-		ResourceMap &resMap = _types[tag];
-		Resource &res = resMap[id];
+		Resource &res = _types[tag][id];
+		res.index = id;
 		res.offset = offset;
 		res.size = size;
 		res.name = name;
 		res.tag = tag;
+
+		if (ConfMan.getBool("dump_scripts"))
+			dumpChunk(res, out);
+
+		stream->seek(startResPos);
 	}
 
-	_stream = stream;
 	return true;
 }
 
@@ -460,7 +485,18 @@ Common::SeekableReadStreamEndian *RIFFArchive::getResource(uint32 tag, uint16 id
 	}
 
 	debugC(4, kDebugLoading, "RIFFArchive::getResource() tag: %s id: %i offset: %i size: %i", tag2str(tag), id, res.offset, res.size);
-	return new Common::SeekableSubReadStreamEndian(_stream, _startOffset + offset, _startOffset + offset + size, true, DisposeAfterUse::NO);
+
+	auto stream = new Common::SeekableSubReadStream(_stream, _startOffset + offset, _startOffset + offset + size, DisposeAfterUse::NO);
+	return new Common::SeekableReadStreamEndianWrapper(stream, true, DisposeAfterUse::YES);
+}
+
+Common::String RIFFArchive::formatArchiveInfo() {
+	Common::String result = "RIFF, ";
+	if (_isBigEndian)
+		result += "big endian";
+	else
+		result += "little endian";
+	return result;
 }
 
 // RIFX Archive code
@@ -524,10 +560,10 @@ bool RIFXArchive::openStream(Common::SeekableReadStream *stream, uint32 startOff
 		return false;
 	}
 
-	Common::SeekableSubReadStreamEndian endianStream(stream, 0, stream->size(), _isBigEndian, DisposeAfterUse::NO);
+	Common::SeekableReadStreamEndianWrapper endianStream(stream, _isBigEndian, DisposeAfterUse::NO);
 	endianStream.seek(startOffset + moreOffset + 4);
 
-	uint32 sz = endianStream.readUint32(); // size
+	uint32 sz = endianStream.readUint32() + 8; // size
 
 	// If it is an embedded file, dump it if requested.
 	// Start by copying the movie data to a new buffer.
@@ -539,6 +575,16 @@ bool RIFXArchive::openStream(Common::SeekableReadStream *stream, uint32 startOff
 		stream->seek(startOffset);
 		stream->read(dumpData, sz);
 		stream->seek(startOffset + 8);
+
+		// Add the padding data to match the file size
+		endianStream.seek(sz - 4);
+		uint32 _junk = endianStream.readUint32();
+		if (_junk != 0) {
+			dumpStream->seek(sz - 4);
+			dumpStream->writeUint32BE(0);
+		}
+
+		endianStream.seek(startOffset + moreOffset + 8);
 	}
 
 	_rifxType = endianStream.readUint32();
@@ -943,8 +989,9 @@ Common::SeekableReadStreamEndian *RIFXArchive::getResource(uint32 tag, uint16 id
 
 	uint32 offset = res.offset + 8;
 	uint32 size = res.size;
+	auto stream = new Common::SeekableSubReadStream(_stream, offset, offset + size, DisposeAfterUse::NO);
 
-	return new Common::SeekableSubReadStreamEndian(_stream, offset, offset + size, bigEndian, DisposeAfterUse::NO);
+	return new Common::SeekableReadStreamEndianWrapper(stream, bigEndian, DisposeAfterUse::YES);
 }
 
 Resource RIFXArchive::getResourceDetail(uint32 tag, uint16 id) {
@@ -957,6 +1004,17 @@ Resource RIFXArchive::getResourceDetail(uint32 tag, uint16 id) {
 		error("RIFXArchive::getResourceDetail(): Archive does not contain '%s' %d", tag2str(tag), id);
 
 	return resMap[id];
+}
+
+Common::String RIFXArchive::formatArchiveInfo() {
+	Common::String result = "RIFX, ";
+	if (_isBigEndian)
+		result += "big endian, ";
+	else
+		result += "little endian, ";
+	result += "type ";
+	result += tag2str(_rifxType);
+	return result;
 }
 
 } // End of namespace Director

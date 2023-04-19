@@ -19,7 +19,7 @@
  *
  */
 
-#include "ultima/ultima8/misc/pent_include.h"
+#include "ultima/ultima8/misc/debugger.h"
 
 #include "ultima/ultima8/graphics/raw_shape_frame.h"
 #include "ultima/ultima8/convert/u8/convert_shape_u8.h"
@@ -58,10 +58,10 @@ void RawShapeFrame::loadU8Format(const uint8 *data, uint32 size) {
 	stream.skip(8); // skip header
 	_compressed = stream.readByte();
 	stream.skip(1);
-	_width = stream.readUint16LE();
-	_height = stream.readUint16LE();
-	_xoff = stream.readUint16LE();
-	_yoff = stream.readUint16LE();
+	_width = stream.readSint16LE();
+	_height = stream.readSint16LE();
+	_xoff = stream.readSint16LE();
+	_yoff = stream.readSint16LE();
 
 	if (_height == 0)
 		return;
@@ -112,7 +112,7 @@ void RawShapeFrame::loadGenericFormat(const uint8 *data, uint32 size, const Conv
 		return;
 
 	// Fairly arbitrary sanity check
-	if (_height > 4096 || _width > 4096 || _xoff > 4096 || _yoff > 4096) {
+	if (_height < 0 || _height > 4096 || _width < 0 || _width > 4096 || _xoff > 4096 || _yoff > 4096) {
 		warning("got some invalid data loading shape");
 		_width = _height = _xoff = _yoff = 0;
 		return;

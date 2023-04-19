@@ -34,8 +34,8 @@ class TwinEEngine;
 class Animations {
 private:
 	TwinEEngine *_engine;
-	int16 applyAnimStepRotation(int32 deltaTime, int32 keyFrameLength, int16 newAngle1, int16 lastAngle1) const;
-	int16 applyAnimStepTranslation(int32 deltaTime, int32 keyFrameLength, int16 newPos, int16 lastPos) const;
+	int16 patchInterAngle(int32 deltaTime, int32 keyFrameLength, int16 newAngle1, int16 lastAngle1) const;
+	int16 patchInterStep(int32 deltaTime, int32 keyFrameLength, int16 newPos, int16 lastPos) const;
 
 	/**
 	 * Verify animation at keyframe
@@ -52,9 +52,9 @@ private:
 	KeyFrame _animKeyframeBuf[32];
 
 	/** Rotation by anim and not by engine */
-	int16 _processRotationByAnim = 0; // processActorVar5
+	int16 _animMasterRot = 0; // AnimMasterRot
 	/** Last rotation angle */
-	int16 _processLastRotationAngle = ANGLE_0; // processActorVar6
+	int16 _animStepBeta = 0; // AnimStepBeta
 
 	/** Current step coordinates */
 	IVec3 _currentStep;
@@ -72,7 +72,7 @@ public:
 	 * @param bodyData Body model data
 	 * @param animTimerDataPtr Animation time data
 	 */
-	void setAnimAtKeyframe(int32 keyframeIdx, const AnimData &animData, BodyData &bodyData, AnimTimerDataStruct *animTimerDataPtr);
+	void setAnimObjet(int32 keyframeIdx, const AnimData &animData, BodyData &bodyData, AnimTimerDataStruct *animTimerDataPtr);
 
 	/**
 	 * Set new body animation
@@ -81,21 +81,21 @@ public:
 	 * @param bodyData Body model data
 	 * @param animTimerDataPtr Animation time data
 	 */
-	bool setModelAnimation(int32 keyframeIdx, const AnimData &animData, BodyData &bodyData, AnimTimerDataStruct *animTimerDataPtr);
+	bool doSetInterAnimObjet(int32 keyframeIdx, const AnimData &animData, BodyData &bodyData, AnimTimerDataStruct *animTimerDataPtr);
 
 	/**
 	 * Get entity anim index (This is taken from File3D entities)
 	 * @param animIdx Entity animation index
 	 * @param actorIdx Actor index
 	 */
-	int32 getBodyAnimIndex(AnimationTypes animIdx, int32 actorIdx = OWN_ACTOR_SCENE_INDEX);
+	int32 searchAnim(AnimationTypes animIdx, int32 actorIdx = OWN_ACTOR_SCENE_INDEX);
 
 	/**
 	 * Stock animation - copy the next keyFrame from a different buffer
 	 * @param bodyData Body model data
 	 * @param animTimerDataPtr Animation time data
 	 */
-	void stockAnimation(const BodyData &bodyData, AnimTimerDataStruct *animTimerDataPtr);
+	void stockInterAnim(const BodyData &bodyData, AnimTimerDataStruct *animTimerDataPtr);
 
 	/**
 	 * Initialize animation

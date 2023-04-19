@@ -45,6 +45,7 @@ namespace Sci {
 #define GAMEOPTION_TTS                      GUIO_GAMEOPTIONS17
 
 enum SciGameId {
+	GID_ALL,
 	GID_ASTROCHICKEN,
 	GID_CAMELOT,
 	GID_CASTLEBRAIN,
@@ -150,7 +151,9 @@ enum SciVersion {
 enum kMidiMode {
 	kMidiModeStandard,
 	kMidiModeFB01,
-	kMidiModeD110
+	kMidiModeD110,
+	kMidiModeMT540,
+	kMidiModeCT460
 };
 
 } // End of namespace Sci

@@ -29,7 +29,11 @@
 static const PlainGameDescriptor mTropolisGames[] = {
 	{"obsidian", "Obsidian"},
 	{"mti", "Muppet Treasure Island"},
+	{"albert1", "Uncle Albert's Magical Album"},
+	{"albert2", "Uncle Albert's Fabulous Voyage"},
+	{"albert3", "Uncle Albert's Mysterious Island"},
 	{"spqr", "SPQR: The Empire's Darkest Hour"},
+	{"sttgs", "Star Trek: The Game Show"},
 	{nullptr, nullptr}
 };
 
@@ -40,6 +44,8 @@ static const char *directoryGlobs[] = {
 	"RESOURCE",
 	"Saved Games",
 	"MTPLAY32",
+	"Albert",
+	"DATA",
 	"GAME",
 	nullptr
 };
@@ -50,6 +56,7 @@ public:
 		_guiOptions = GUIO3(GAMEOPTION_DYNAMIC_MIDI, GAMEOPTION_LAUNCH_DEBUG, GAMEOPTION_ENABLE_SHORT_TRANSITIONS);
 		_maxScanDepth = 3;
 		_directoryGlobs = directoryGlobs;
+		_flags = kADFlagCanPlayUnknownVariants;
 	}
 
 	const char *getName() const override {
@@ -63,8 +70,6 @@ public:
 	const char *getOriginalCopyright() const override {
 		return "mTropolis (C) mFactory/Quark";
 	}
-
-	bool canPlayUnknownVariants() const override { return true; }
 };
 
 REGISTER_PLUGIN_STATIC(MTROPOLIS_DETECTION, PLUGIN_TYPE_ENGINE_DETECTION, MTropolisMetaEngineDetection);

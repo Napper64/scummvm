@@ -124,6 +124,10 @@ ScummVM Team
        Arnaud Boutonne
        Paul Gilbert
 
+    Chamber:
+       Retro-Junk;
+       Eugene Sandulenko
+
     Chewy:
        Paul Gilbert
        Eugene Sandulenko
@@ -163,7 +167,7 @@ ScummVM Team
        Scott Percival
        Steven Hoefel
        Tobia Tesan
-       Misty De Méo
+       Misty De Meo
 
     DM:
        Arnaud Boutonne
@@ -190,6 +194,10 @@ ScummVM Team
        Vladimir Menshakov
        Willem Jan Palenstijn
 
+    Freescape:
+       Chris Allen                    - Sound engine programming
+       Gustavo Grieco
+
     Glk:
        Paul Gilbert
        Tor Andersson                  - GarGlk library
@@ -206,6 +214,7 @@ ScummVM Team
     Gob:
        Torbjorn Andersson
        Arnaud Boutonne
+       Simon Delamarre
        Sven Hesse
        Eugene Sandulenko
 
@@ -240,6 +249,9 @@ ScummVM Team
        Arnaud Boutonne
        Paul Gilbert
 
+    Hpl1:
+       Emanuele Grisenti
+
     Hugo:
        Arnaud Boutonne
        Oystein Eftevaag
@@ -256,6 +268,9 @@ ScummVM Team
     Illusions:
        Benjamin Haisch
        Eric Fry
+
+    Immortal:
+       Michael Hayman
 
     Kingdom:
        Arnaud Boutonne
@@ -297,6 +312,12 @@ ScummVM Team
        Arnaud Boutonne
        Paul Gilbert
        Filippos Karapetis
+
+    MM (Xeen):
+       Paul Gilbert
+       Benoit Pierre
+       David Goldsmith                - (Xeen analysis)
+       Matt Taylor                    - (Xeen analysis)
 
     Mohawk:
        Bastien Bouclet
@@ -389,7 +410,7 @@ ScummVM Team
 
     SCUMM:
        Torbjorn Andersson
-       Andrea Boscarino               - Digital iMUSE, various fixes
+       Andrea Boscarino               - Digital iMUSE, SMUSH audio, GUI
        James Brown                    - (retired)
        Jonathan Gray                  - (retired)
        Vincent Hamm                   - (retired)
@@ -455,6 +476,9 @@ ScummVM Team
     TeenAgent:
        Robert Megone                  - Help with callback rewriting
        Vladimir Menshakov
+
+    Tetraedge:
+       Matthew Duggan
 
     Tinsel:
        Torbjorn Andersson
@@ -533,6 +557,9 @@ ScummVM Team
        Ryan Nunn                      - (Pentagram)
        Willem Jan Palenstijn          - (Pentagram)
 
+    V-Cruise:
+       Eric Lasota
+
     Voyeur:
        Arnaud Boutonne
        Paul Gilbert
@@ -544,12 +571,6 @@ ScummVM Team
        Gunnar Birke                   - Wintermute 3D
        Einar Johan T. Somaaen
        Tobia Tesan
-
-    Xeen:
-       Paul Gilbert
-       Benoit Pierre
-       David Goldsmith                - (analysis)
-       Matt Taylor                    - (analysis)
 
     Z-Vision:
        Adrian Astley
@@ -573,9 +594,10 @@ ScummVM Team
        John Willis
 
     iPhone / iPad:
-       Oystein Eftevaag
+       Oystein Eftevaag               - (retired)
        Vincent Benony
        Thierry Crozat
+       Lars Sundstroem
 
     LinuxMoto:
        Lubomyr Lisen
@@ -677,6 +699,9 @@ ScummVM Team
                                         speedups on several ports;
                                         improvements to the sound mixer
        Trembyle                       - Archivist
+       Lothar Serra Mari              - Tackling Tremendously Tedious
+                                        Tasks(tm); ScummVM's Seal of Approval
+                                        (Awp?!)
 
   Website (code)
   --------------
@@ -748,8 +773,9 @@ Other contributions
 
     macOS:
        Max Horn                       - (retired)
-       Oystein Eftevaag
+       Oystein Eftevaag               - (retired)
        Thierry Crozat
+       dwa                            - Tiger/Leopard PPC
 
     Mandriva:
        Dominik Scherer                - (retired)

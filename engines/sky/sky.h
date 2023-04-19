@@ -23,9 +23,11 @@
 #define SKY_SKY_H
 
 
+#include "common/array.h"
 #include "common/error.h"
 #include "common/keyboard.h"
 #include "engines/engine.h"
+#include "graphics/big5.h"
 
 /**
  * This is the namespace of the Sky engine.
@@ -109,10 +111,14 @@ public:
 	static void *_itemList[300];
 	static SystemVars *_systemVars;
 	static const char *shortcutsKeymapId;
+	uint32 _chineseTraditionalOffsets[8];
+	char *_chineseTraditionalBlock;
+	Graphics::Big5Font *_big5Font;
 
 protected:
 	// Engine APIs
 	Common::Error init();
+	bool loadChineseTraditional();
 	Common::Error go();
 	Common::Error run() override {
 		Common::Error err;

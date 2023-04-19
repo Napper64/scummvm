@@ -155,7 +155,7 @@ static int find_free_audio_channel(ScriptAudioClip *clip, int priority, bool int
 
 	// NOTE: in backward compat mode we allow to place sound on a crossfade channel
 	int startAtChannel = _G(reserved_channel_count);
-	int endBeforeChannel = _GP(game).numCompatGameChannels;
+	int endBeforeChannel = _GP(game).numGameChannels;
 
 	if (_GP(game).audioClipTypes[clip->type].reservedChannels > 0) {
 		startAtChannel = 0;
@@ -163,6 +163,7 @@ static int find_free_audio_channel(ScriptAudioClip *clip, int priority, bool int
 			startAtChannel += MIN(MAX_SOUND_CHANNELS,
 				_GP(game).audioClipTypes[i].reservedChannels);
 		}
+		// NOTE: we allow to place sound on a crossfade channel for backward compatibility
 		endBeforeChannel = MIN(_GP(game).numCompatGameChannels,
 			startAtChannel + _GP(game).audioClipTypes[clip->type].reservedChannels);
 	}
@@ -462,6 +463,13 @@ void stop_and_destroy_channel(int chid) {
 	stop_and_destroy_channel_ex(chid, true);
 }
 
+void export_missing_audiochans() {
+	for (int i = 0; i < _GP(game).numCompatGameChannels; ++i) {
+		int h = ccGetObjectHandleFromAddress(&_G(scrAudioChannel)[i]);
+		if (h <= 0)
+			ccRegisterManagedObject(&_G(scrAudioChannel)[i], &_GP(ccDynamicAudio));
+	}
+}
 
 
 // ***** BACKWARDS COMPATIBILITY WITH OLD AUDIO SYSTEM ***** //
@@ -762,7 +770,7 @@ void update_volume_drop_if_voiceover() {
 // Update the music, and advance the crossfade on a step
 // (this should only be called once per game loop)
 void update_audio_system_on_game_loop() {
-	update_polled_stuff_if_runtime();
+	update_polled_stuff();
 
 	process_scheduled_music_update();
 

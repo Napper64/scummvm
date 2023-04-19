@@ -561,6 +561,8 @@ VectorRenderer *createRenderer(int mode) {
 			return new VectorRendererSpec<uint32>(format);
 		else if (g_system->getOverlayFormat().bytesPerPixel == 2)
 			return new VectorRendererSpec<uint16>(format);
+		else if (g_system->getOverlayFormat().bytesPerPixel == 1)
+			return new VectorRendererSpec<uint8>(format);
 		break;
 #ifndef DISABLE_FANCY_THEMES
 	case GUI::ThemeEngine::kGfxAntialias:
@@ -568,6 +570,9 @@ VectorRenderer *createRenderer(int mode) {
 			return new VectorRendererAA<uint32>(format);
 		else if (g_system->getOverlayFormat().bytesPerPixel == 2)
 			return new VectorRendererAA<uint16>(format);
+		// No AA with 8-bit
+		else if (g_system->getOverlayFormat().bytesPerPixel == 1)
+			return new VectorRendererSpec<uint8>(format);
 		break;
 #endif
 	default:
@@ -586,7 +591,6 @@ VectorRendererSpec(PixelFormat format) :
 	_blueMask((0xFF >> format.bLoss) << format.bShift),
 	_alphaMask((0xFF >> format.aLoss) << format.aShift) {
 
-	_bitmapAlphaColor = _format.RGBToColor(255, 0, 255);
 	_clippingArea = Common::Rect(0, 0, 32767, 32767);
 
 	_fgColor = _bgColor = _bevelColor = 0;
@@ -806,7 +810,7 @@ blitSurface(const Graphics::ManagedSurface *source, const Common::Rect &r) {
 
 template<typename PixelType>
 void VectorRendererSpec<PixelType>::
-blitKeyBitmap(const Graphics::ManagedSurface *source, const Common::Point &p, bool themeTrans) {
+blitManagedSurface(const Graphics::ManagedSurface *source, const Common::Point &p) {
 	Common::Rect drawRect(p.x, p.y, p.x + source->w, p.y + source->h);
 	drawRect.clip(_clippingArea);
 	drawRect.translate(-p.x, -p.y);
@@ -824,10 +828,7 @@ blitKeyBitmap(const Graphics::ManagedSurface *source, const Common::Point &p, bo
 		np = p;
 	}
 
-	if (themeTrans)
-		_activeSurface->transBlitFrom(*source, drawRect, np, _bitmapAlphaColor);
-	else
-		_activeSurface->blitFrom(*source, drawRect, np);
+	_activeSurface->blitFrom(*source, drawRect, np);
 }
 
 template<typename PixelType>
@@ -902,6 +903,9 @@ blendPixelPtr(PixelType *ptr, PixelType color, uint8 alpha) {
 			(_alphaMask & ((idst & _alphaMask) +
 			((int)(((int)(_alphaMask) -
 			(int)(idst & _alphaMask)) * alpha) >> 8))));
+	} else if (sizeof(PixelType) == 1) {
+		if (alpha & 0x80)
+			*ptr = color;
 	} else {
 		error("Unsupported BPP format: %u", (uint)sizeof(PixelType));
 	}
@@ -939,6 +943,8 @@ darkenFill(PixelType *ptr, PixelType *end) {
 	if (!g_system->hasFeature(OSystem::kFeatureOverlaySupportsAlpha)) {
 		// !kFeatureOverlaySupportsAlpha (but might have alpha bits)
 
+		mask |= _alphaMask;
+
 		while (ptr != end) {
 			*ptr = ((*ptr & ~mask) >> 2) | _alphaMask;
 			++ptr;
@@ -966,6 +972,8 @@ darkenFillClip(PixelType *ptr, PixelType *end, int x, int y) {
 
 	if (!g_system->hasFeature(OSystem::kFeatureOverlaySupportsAlpha)) {
 		// !kFeatureOverlaySupportsAlpha (but might have alpha bits)
+
+		mask |= _alphaMask;
 
 		while (ptr != end) {
 			if (IS_IN_CLIP(x, y)) *ptr = ((*ptr & ~mask) >> 2) | _alphaMask;
@@ -1140,7 +1148,7 @@ drawCircle(int x, int y, int r) {
 		x - r < 0 || y - r < 0 || x == 0 || y == 0 || r <= 0)
 		return;
 
-	bool useClippingVersions = !_clippingArea.contains(Common::Rect(x - r, y - r, x + r, y + r));
+	bool useClippingVersions = !_clippingArea.contains(Common::Rect(x - r, y - r, x + r + 1, y + r + 1));
 
 	if (Base::_fillMode != kFillDisabled && Base::_shadowOffset
 		&& x + r + Base::_shadowOffset < Base::_activeSurface->w
@@ -1271,16 +1279,16 @@ drawRoundedSquare(int x, int y, int r, int w, int h) {
 	if (r <= 0)
 		return;
 
-	bool useOriginal = _clippingArea.contains(Common::Rect(x, y, x + w, y + h));
+	bool useOriginal = _clippingArea.contains(Common::Rect(x, y, x + w + 1, y + h + 1));
 
 	if (Base::_fillMode != kFillDisabled && Base::_shadowOffset
 		&& x + w + Base::_shadowOffset + 1 < Base::_activeSurface->w
 		&& y + h + Base::_shadowOffset + 1 < Base::_activeSurface->h
 		&& h > (Base::_shadowOffset + 1) * 2) {
 		if (useOriginal) {
-			drawRoundedSquareShadow(x, y, r, w, h, Base::_shadowOffset);
+			drawRoundedSquareShadow(x, y, r, w, h, Base::_shadowOffset, Base::_shadowIntensity);
 		} else {
-			drawRoundedSquareShadowClip(x, y, r, w, h, Base::_shadowOffset);
+			drawRoundedSquareShadowClip(x, y, r, w, h, Base::_shadowOffset, Base::_shadowIntensity);
 		}
 	}
 
@@ -1323,12 +1331,12 @@ drawTab(int x, int y, int r, int w, int h, int s) {
 		// See the rounded rect alg for how to fix it. (The border should
 		// be drawn before the interior, both inside drawTabAlg.)
 		if (useClippingVersions) {
-			drawTabShadowClip(x, y, w - 2, h, r, s);
+			drawTabShadowClip(x, y, w - 2, h, r, s, Base::_shadowIntensity);
 			drawTabAlgClip(x, y, w - 2, h, r, _bgColor, Base::_fillMode);
 			if (Base::_strokeWidth)
 				drawTabAlgClip(x, y, w, h, r, _fgColor, kFillDisabled, (Base::_dynamicData >> 16), (Base::_dynamicData & 0xFFFF));
 		} else {
-			drawTabShadow(x, y, w - 2, h, r, s);
+			drawTabShadow(x, y, w - 2, h, r, s, Base::_shadowIntensity);
 			drawTabAlg(x, y, w - 2, h, r, _bgColor, Base::_fillMode);
 			if (Base::_strokeWidth)
 				drawTabAlg(x, y, w, h, r, _fgColor, kFillDisabled, (Base::_dynamicData >> 16), (Base::_dynamicData & 0xFFFF));
@@ -1633,8 +1641,7 @@ drawTabAlgClip(int x1, int y1, int w, int h, int r, PixelType color, VectorRende
 
 template<typename PixelType>
 void VectorRendererSpec<PixelType>::
-drawTabShadow(int x1, int y1, int w, int h, int r, int s) {
-	int offset = s;
+drawTabShadow(int x1, int y1, int w, int h, int r, int offset, uint32 shadowIntensity) {
 	int pitch = _activeSurface->pitch / _activeSurface->format.bytesPerPixel;
 
 	// "Harder" shadows when having lower BPP, since we will have artifacts (greenish tint on the modern theme)
@@ -1645,8 +1652,14 @@ drawTabShadow(int x1, int y1, int w, int h, int r, int s) {
 	int ystart = y1;
 	int width = w;
 	int height = h + offset + 1;
-
-	for (int i = offset; i >= 0; i--) {
+	
+	// HACK: shadowIntensity is tailed with 16-bits mantissa. We also represent the
+	// offset as a 16.16 fixed point number here as termination condition to simplify
+	// looping logic. An additional `shadowIntensity` is added to to keep consistent
+	// with previous implementation.
+	uint32 targetOffset = (uint32)(offset << 16) + shadowIntensity;
+	int curOffset = 0;
+	for (uint32 i = shadowIntensity; i <= targetOffset; i += shadowIntensity) {
 		int f, ddF_x, ddF_y;
 		int x, y, px, py;
 
@@ -1685,8 +1698,9 @@ drawTabShadow(int x1, int y1, int w, int h, int r, int s) {
 			ptr_fill += pitch;
 		}
 
-		// Move shadow one pixel upward each iteration
-		xstart += 1;
+		// Move shadow upward each iteration
+		xstart += (i >> 16) - curOffset;
+		curOffset = i >> 16;
 		// Multiply with expfactor
 		alpha = (alpha * (expFactor << 8)) >> 9;
 	}
@@ -1694,8 +1708,7 @@ drawTabShadow(int x1, int y1, int w, int h, int r, int s) {
 
 template<typename PixelType>
 void VectorRendererSpec<PixelType>::
-drawTabShadowClip(int x1, int y1, int w, int h, int r, int s) {
-	int offset = s;
+drawTabShadowClip(int x1, int y1, int w, int h, int r, int offset, uint32 shadowIntensity) {
 	int pitch = _activeSurface->pitch / _activeSurface->format.bytesPerPixel;
 
 	// "Harder" shadows when having lower BPP, since we will have artifacts (greenish tint on the modern theme)
@@ -1707,7 +1720,13 @@ drawTabShadowClip(int x1, int y1, int w, int h, int r, int s) {
 	int width = w;
 	int height = h + offset + 1;
 
-	for (int i = offset; i >= 0; i--) {
+	// HACK: shadowIntensity is tailed with 16-bits mantissa. We also represent the
+	// offset as a 16.16 fixed point number here as termination condition to simplify
+	// looping logic. An additional `shadowIntensity` is added to to keep consistent
+	// with previous implementation.
+	uint32 targetOffset = (uint32)(offset << 16) + shadowIntensity;
+	int curOffset = 0;
+	for (uint32 i = shadowIntensity; i <= targetOffset; i += shadowIntensity) {
 		int f, ddF_x, ddF_y;
 		int x, y, px, py;
 
@@ -1752,7 +1771,8 @@ drawTabShadowClip(int x1, int y1, int w, int h, int r, int s) {
 		}
 
 		// Move shadow one pixel upward each iteration
-		xstart += 1;
+		xstart += (i >> 16) - curOffset;
+		curOffset = i >> 16;
 		// Multiply with expfactor
 		alpha = (alpha * (expFactor << 8)) >> 9;
 	}
@@ -3658,7 +3678,7 @@ drawSquareShadowClip(int x, int y, int w, int h, int offset) {
 
 template<typename PixelType>
 void VectorRendererSpec<PixelType>::
-drawRoundedSquareShadow(int x1, int y1, int r, int w, int h, int offset) {
+drawRoundedSquareShadow(int x1, int y1, int r, int w, int h, int offset, uint32 shadowIntensity) {
 	int pitch = _activeSurface->pitch / _activeSurface->format.bytesPerPixel;
 
 	// "Harder" shadows when having lower BPP, since we will have artifacts (greenish tint on the modern theme)
@@ -3678,7 +3698,14 @@ drawRoundedSquareShadow(int x1, int y1, int r, int w, int h, int offset) {
 
 	// Soft shadows are constructed by drawing increasingly
 	// darker and smaller rectangles on top of each other.
-	for (int i = offset; i >= 0; i--) {
+
+	// HACK: shadowIntensity is tailed with 16-bits mantissa. We also represent the
+	// offset as a 16.16 fixed point number here as termination condition to simplify
+	// looping logic. An additional `shadowIntensity` is added to to keep consistent
+	// with previous implementation.
+	uint32 targetOffset = (uint32)(offset << 16) + shadowIntensity;
+	int curOffset = 0;
+	for (uint32 i = shadowIntensity; i <= targetOffset; i += shadowIntensity) {
 		int f, ddF_x, ddF_y;
 		int x, y, px, py;
 
@@ -3739,7 +3766,8 @@ drawRoundedSquareShadow(int x1, int y1, int r, int w, int h, int offset) {
 		}
 
 		// Make shadow smaller each iteration
-		shadowRect.grow(-1);
+		shadowRect.grow(curOffset - (i >> 16));
+		curOffset = i >> 16;
 
 		if (_shadowFillMode == kShadowExponential)
 			// Multiply with expfactor
@@ -3749,7 +3777,7 @@ drawRoundedSquareShadow(int x1, int y1, int r, int w, int h, int offset) {
 
 template<typename PixelType>
 void VectorRendererSpec<PixelType>::
-drawRoundedSquareShadowClip(int x1, int y1, int r, int w, int h, int offset) {
+drawRoundedSquareShadowClip(int x1, int y1, int r, int w, int h, int offset, uint32 shadowIntensity) {
 	int pitch = _activeSurface->pitch / _activeSurface->format.bytesPerPixel;
 
 	// "Harder" shadows when having lower BPP, since we will have artifacts (greenish tint on the modern theme)
@@ -3769,7 +3797,14 @@ drawRoundedSquareShadowClip(int x1, int y1, int r, int w, int h, int offset) {
 
 	// Soft shadows are constructed by drawing increasingly
 	// darker and smaller rectangles on top of each other.
-	for (int i = offset; i >= 0; i--) {
+
+	// HACK: shadowIntensity is tailed with 16-bits mantissa. We also represent the
+	// offset as a 16.16 fixed point number here as termination condition to simplify
+	// looping logic. An additional `shadowIntensity` is added to to keep consistent
+	// with previous implementation.
+	uint32 targetOffset = (uint32)(offset << 16) + shadowIntensity;
+	int curOffset = 0;
+	for (uint32 i = shadowIntensity; i <= targetOffset; i += shadowIntensity) {
 		int f, ddF_x, ddF_y;
 		int x, y, px, py;
 
@@ -3832,7 +3867,8 @@ drawRoundedSquareShadowClip(int x1, int y1, int r, int w, int h, int offset) {
 		}
 
 		// Make shadow smaller each iteration
-		shadowRect.grow(-1);
+		shadowRect.grow(curOffset - (i >> 16));
+		curOffset = i >> 16;
 
 		if (_shadowFillMode == kShadowExponential)
 			// Multiply with expfactor
@@ -4197,7 +4233,7 @@ drawInteriorRoundedSquareAlg(int x1, int y1, int r, int w, int h, PixelType colo
 
 	} else {
 
-		while (x > 1 + y++) {
+		while (x > y++) {
 			WU_ALGORITHM();
 
 			colorFill<PixelType>(ptr_tl - x - py + 1, ptr_tr + x - py, color);

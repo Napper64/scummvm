@@ -39,7 +39,7 @@
 #include "ultima/ultima8/gumps/widgets/edit_widget.h"
 #include "ultima/ultima8/gumps/u8_save_gump.h"
 #include "ultima/ultima8/world/get_object.h"
-#include "ultima/ultima8/meta_engine.h"
+#include "ultima/ultima8/metaengine.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -51,11 +51,10 @@ MenuGump::MenuGump(bool nameEntryMode)
 	_nameEntryMode = nameEntryMode;
 
 	Mouse *mouse = Mouse::get_instance();
-	mouse->pushMouseCursor();
 	if (!_nameEntryMode)
-		mouse->setMouseCursor(Mouse::MOUSE_HAND);
+		mouse->pushMouseCursor(Mouse::MOUSE_HAND);
 	else
-		mouse->setMouseCursor(Mouse::MOUSE_NONE);
+		mouse->pushMouseCursor(Mouse::MOUSE_NONE);
 
 	// Save old music state
 	MusicProcess *musicprocess = MusicProcess::get_instance();

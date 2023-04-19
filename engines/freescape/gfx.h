@@ -26,6 +26,7 @@
 #include "common/rect.h"
 
 #include "graphics/pixelformat.h"
+#include "graphics/managed_surface.h"
 #include "graphics/renderer.h"
 #include "math/frustum.h"
 #include "math/vector3d.h"
@@ -36,6 +37,7 @@ namespace Freescape {
 #define kCoordsArraySize 4
 
 typedef Common::Array<byte *> ColorMap;
+typedef Common::HashMap<int, int> ColorReMap;
 
 class Renderer;
 
@@ -65,7 +67,6 @@ public:
 	bool _isAccelerated;
 
 	virtual void init() = 0;
-	virtual void clear() = 0;
 	virtual void setViewport(const Common::Rect &rect) = 0;
 
 	/**
@@ -76,29 +77,52 @@ public:
 	virtual void polygonOffset(bool enabled) = 0;
 
 	virtual Texture *createTexture(const Graphics::Surface *surface) = 0;
-	void convertImageFormatIfNecessary(Graphics::Surface *surface);
+	Graphics::Surface *convertImageFormatIfNecessary(Graphics::ManagedSurface *surface);
 
 	virtual void freeTexture(Texture *texture) = 0;
 	virtual void drawTexturedRect2D(const Common::Rect &screenRect, const Common::Rect &textureRect, Texture *texture) = 0;
 
-	virtual void renderShoot(byte color, const Common::Point position, const Common::Rect viewPort) = 0;
+	virtual void renderSensorShoot(byte color, const Math::Vector3d sensor, const Math::Vector3d player, const Common::Rect viewPort) = 0;
+	virtual void renderPlayerShoot(byte color, const Common::Point position, const Common::Rect viewPort) = 0;
 	virtual void renderCube(const Math::Vector3d &position, const Math::Vector3d &size, Common::Array<uint8> *colours);
 	virtual void renderRectangle(const Math::Vector3d &position, const Math::Vector3d &size, Common::Array<uint8> *colours);
 	virtual void renderPolygon(const Math::Vector3d &origin, const Math::Vector3d &size, const Common::Array<uint16> *ordinates, Common::Array<uint8> *colours);
 	virtual void renderPyramid(const Math::Vector3d &origin, const Math::Vector3d &size, const Common::Array<uint16> *ordinates, Common::Array<uint8> *colours, int type);
 	virtual void renderFace(const Common::Array<Math::Vector3d> &vertices) = 0;
 
-	virtual void setSkyColor(uint8 color) = 0;
+	void setColorRemaps(ColorReMap *colorRemaps);
+	virtual void clear(uint8 color) = 0;
 	virtual void drawFloor(uint8 color) = 0;
 
 	Common::Rect viewport() const;
 
 	// palette
 	void readFromPalette(uint8 index, uint8 &r, uint8 &g, uint8 &b);
-	bool getRGBAt(uint8 index, uint8 &r, uint8 &g, uint8 &b);
+	uint8 indexFromColor(uint8 r, uint8 g, uint8 b);
+	bool getRGBAt(uint8 index, uint8 &r1, uint8 &g1, uint8 &b1, uint8 &r2, uint8 &g2, uint8 &b2, byte *&stipple);
+	bool getRGBAtC64(uint8 index, uint8 &r1, uint8 &g1, uint8 &b1, uint8 &r2, uint8 &g2, uint8 &b2);
+	bool getRGBAtCGA(uint8 index, uint8 &r1, uint8 &g1, uint8 &b1, uint8 &r2, uint8 &g2, uint8 &b2, byte *&stipple);
+	bool getRGBAtCPC(uint8 index, uint8 &r1, uint8 &g1, uint8 &b1, uint8 &r2, uint8 &g2, uint8 &b2, byte *&stipple);
+	bool getRGBAtEGA(uint8 index, uint8 &r1, uint8 &g1, uint8 &b1, uint8 &r2, uint8 &g2, uint8 &b2);
+	bool getRGBAtZX(uint8 index, uint8 &r1, uint8 &g1, uint8 &b1, uint8 &r2, uint8 &g2, uint8 &b2, byte *&stipple);
+	void extractCPCIndexes(uint8 cm1, uint8 cm2, uint8 &i1, uint8 &i2);
+	void extractC64Indexes(uint8 cm1, uint8 cm2, uint8 &i1, uint8 &i2);
+
+	void selectColorFromFourColorPalette(uint8 index, uint8 &r1, uint8 &g1, uint8 &b1);
+
+	virtual void setStippleData(byte *data) {};
+	virtual void useStipple(bool enabled) {};
 	byte *_palette;
+	void setColorMap(ColorMap *colorMap_);
 	ColorMap *_colorMap;
+	ColorReMap *_colorRemaps;
+	void fillColorPairArray();
+	byte _colorPair[16];
 	int _keyColor;
+	int _inkColor;
+	int _paperColor;
+	int _underFireBackgroundColor;
+	byte _stipples[16][128];
 
 	/**
 	 * Select the window where to render
@@ -110,7 +134,7 @@ public:
 	virtual void updateProjectionMatrix(float fov, float nearClipPlane, float farClipPlane) = 0;
 
 	Math::Matrix4 getMvpMatrix() const { return _mvpMatrix; }
-
+	virtual Graphics::Surface *getScreenshot() = 0;
 	void flipVertical(Graphics::Surface *s);
 
 	int _screenW;

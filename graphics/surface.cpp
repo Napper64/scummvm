@@ -24,10 +24,10 @@
 #include "common/util.h"
 #include "common/rect.h"
 #include "common/textconsole.h"
+#include "graphics/blit.h"
 #include "graphics/palette.h"
 #include "graphics/primitives.h"
 #include "graphics/surface.h"
-#include "graphics/conversion.h"
 #include "graphics/transform_tools.h"
 
 namespace Graphics {
@@ -63,6 +63,8 @@ void Surface::drawThickLine(int x0, int y0, int x1, int y1, int penX, int penY, 
 		error("Surface::drawThickLine: bytesPerPixel must be 1, 2, or 4");
 }
 
+// see graphics/blit-atari.cpp, Atari Falcon's SuperVidel addon allows accelerated blitting
+#ifndef USE_SV_BLITTER
 void Surface::create(int16 width, int16 height, const PixelFormat &f) {
 	assert(width >= 0 && height >= 0);
 	free();
@@ -84,6 +86,7 @@ void Surface::free() {
 	w = h = pitch = 0;
 	format = PixelFormat();
 }
+#endif
 
 void Surface::init(int16 width, int16 height, int16 newPitch, void *newPixels, const PixelFormat &f) {
 	w = width;
@@ -95,17 +98,12 @@ void Surface::init(int16 width, int16 height, int16 newPitch, void *newPixels, c
 
 void Surface::copyFrom(const Surface &surf) {
 	create(surf.w, surf.h, surf.format);
-	if (surf.pitch == pitch) {
-		memcpy(pixels, surf.pixels, h * pitch);
-	} else {
-		const byte *src = (const byte *)surf.pixels;
-		byte *dst = (byte *)pixels;
-		for (int y = h; y > 0; --y) {
-			memcpy(dst, src, w * format.bytesPerPixel);
-			src += surf.pitch;
-			dst += pitch;
-		}
-	}
+	copyBlit((byte *)pixels, (const byte *)surf.pixels, pitch, surf.pitch, w, h, format.bytesPerPixel);
+}
+
+void Surface::convertFrom(const Surface &surf, const PixelFormat &f) {
+	create(surf.w, surf.h, f);
+	crossBlit((byte *)pixels, (const byte *)surf.pixels, pitch, surf.pitch, w, h, format, surf.format);
 }
 
 Surface Surface::getSubArea(const Common::Rect &area) {
@@ -176,11 +174,7 @@ void Surface::copyRectToSurface(const void *buffer, int srcPitch, int destX, int
 	// Copy buffer data to internal buffer
 	const byte *src = (const byte *)buffer;
 	byte *dst = (byte *)getBasePtr(destX, destY);
-	for (int i = 0; i < height; i++) {
-		memcpy(dst, src, width * format.bytesPerPixel);
-		src += srcPitch;
-		dst += pitch;
-	}
+	copyBlit(dst, src, pitch, srcPitch, width, height, format.bytesPerPixel);
 }
 
 void Surface::copyRectToSurface(const Graphics::Surface &srcSurface, int destX, int destY, const Common::Rect subRect) {
@@ -419,6 +413,35 @@ void Surface::flipVertical(const Common::Rect &r) {
 	delete[] temp;
 }
 
+void Surface::flipHorizontal(const Common::Rect &r) {
+	uint32 tmp = 0;
+	const int width = r.width() * format.bytesPerPixel;
+	for (int y = r.top; y < r.bottom; ++y) {
+		byte *row = (byte *)getBasePtr(r.left, y);
+		for (int x = 0; x < width / 2; x += format.bytesPerPixel) {
+			memcpy(&tmp, row + x, format.bytesPerPixel);
+			memcpy(row + x, row + width - format.bytesPerPixel - x, format.bytesPerPixel);
+			memcpy(row + width - format.bytesPerPixel - x, &tmp, format.bytesPerPixel);
+		}
+	}
+}
+
+bool Surface::applyColorKey(uint8 rKey, uint8 gKey, uint8 bKey, bool overwriteAlpha) {
+	return Graphics::applyColorKey((byte *)pixels, (const byte *)pixels, pitch, pitch, w, h, format,
+	                               overwriteAlpha, rKey, gKey, bKey, rKey, gKey, bKey);
+}
+
+bool Surface::applyColorKey(uint8 rKey, uint8 gKey, uint8 bKey, bool overwriteAlpha,
+                            uint8 rNew, uint8 gNew, uint8 bNew) {
+	return Graphics::applyColorKey((byte *)pixels, (const byte *)pixels, pitch, pitch, w, h, format,
+	                               overwriteAlpha, rKey, gKey, bKey, rNew, gNew, bNew);
+}
+
+bool Surface::setAlpha(uint8 alpha, bool skipTransparent) {
+	return Graphics::setAlpha((byte *)pixels, (const byte *)pixels, pitch, pitch, w, h, format,
+	                          skipTransparent, alpha);
+}
+
 Graphics::Surface *Surface::scale(int16 newWidth, int16 newHeight, bool filtering) const {
 	Graphics::Surface *target = new Graphics::Surface();
 
@@ -527,8 +550,8 @@ Graphics::Surface *Surface::convertTo(const PixelFormat &dstFormat, const byte *
 		if (dstFormat.bytesPerPixel == 1) { // Checking if dithering could be skipped
 			if (!srcPalette // No palette is specified
 					|| !dstPalette // No dst palette
-					|| srcPaletteCount != dstPaletteCount // palettes have different size
-					|| !memcmp(srcPalette, dstPalette, srcPaletteCount * 3)) { // palettes are different
+					|| (srcPaletteCount == dstPaletteCount // palettes are the same
+						&& !memcmp(srcPalette, dstPalette, srcPaletteCount * 3))) {
 				surface->copyFrom(*this);
 				return surface;
 			}
@@ -545,7 +568,8 @@ Graphics::Surface *Surface::convertTo(const PixelFormat &dstFormat, const byte *
 
 	// We are here when we are converting from a higher bpp or palettes are different
 	if (dstFormat.bytesPerPixel == 1) {
-		ditherFloyd(srcPalette, srcPaletteCount, surface, dstPalette, dstPaletteCount, method);
+		ditherFloyd(srcPalette, srcPaletteCount, surface, dstPalette, dstPaletteCount, method,
+			    dstFormat);
 		return surface;
 	}
 
@@ -719,13 +743,8 @@ static void updatePixel(byte *surf, int x, int y, int w, int h, int qr, int qg, 
 	ptr[2] = CLIP(ptr[2] + qb * qq / qdiv, 0, 255);
 }
 
-void Surface::ditherFloyd(const byte *srcPalette, int srcPaletteCount, Surface *dstSurf, const byte *dstPalette, int dstPaletteCount, DitherMethod method) const {
-	assert(dstPalette);
-
-	PaletteLookup _paletteLookup;
-
-	_paletteLookup.setPalette(dstPalette, dstPaletteCount);
-
+void Surface::ditherFloyd(const byte *srcPalette, int srcPaletteCount, Surface *dstSurf, const byte *dstPalette, int dstPaletteCount,
+			  DitherMethod method, const PixelFormat &dstFormat) const {
 	byte *tmpSurf = (byte *)malloc(w * h * 3);
 
 	int bpp = format.bytesPerPixel;
@@ -890,29 +909,60 @@ void Surface::ditherFloyd(const byte *srcPalette, int srcPaletteCount, Surface *
 		{ nullptr, nullptr, 0 }
 	};
 
-	for (int y = 0; y < h; y++) {
-		const byte *src = &tmpSurf[y * w * 3];
-		byte *dst = (byte *)dstSurf->getBasePtr(0, y);
+	if (dstPalette) {
+		PaletteLookup _paletteLookup;
 
-		for (int x = 0; x < w; x++) {
-			byte r = src[0], g = src[1], b = src[2];
-			byte col = _paletteLookup.findBestColor(r, g, b);
+		_paletteLookup.setPalette(dstPalette, dstPaletteCount);
 
-			*dst = col;
+		for (int y = 0; y < h; y++) {
+			const byte *src = &tmpSurf[y * w * 3];
+			byte *dst = (byte *)dstSurf->getBasePtr(0, y);
 
-			int qr = r - dstPalette[col * 3 + 0];
-			int qg = g - dstPalette[col * 3 + 1];
-			int qb = b - dstPalette[col * 3 + 2];
+			for (int x = 0; x < w; x++) {
+				byte r = src[0], g = src[1], b = src[2];
+				byte col = _paletteLookup.findBestColor(r, g, b);
 
-			const DitherParams *params = algos[method].params;
+				*dst = col;
 
-			for (int i = 0; params[i].dx != 0 || params[i].dy != 0; i++)
-				updatePixel(tmpSurf, x + params[i].dx, y + params[i].dy, w, h, qr, qg, qb, params[i].qq, algos[method].qdiv);
+				int qr = r - dstPalette[col * 3 + 0];
+				int qg = g - dstPalette[col * 3 + 1];
+				int qb = b - dstPalette[col * 3 + 2];
 
-			src += 3;
-			dst++;
+				const DitherParams *params = algos[method].params;
+
+				for (int i = 0; params[i].dx != 0 || params[i].dy != 0; i++)
+					updatePixel(tmpSurf, x + params[i].dx, y + params[i].dy, w, h, qr, qg, qb, params[i].qq, algos[method].qdiv);
+
+				src += 3;
+				dst++;
+			}
 		}
-	}
+	} else if (dstFormat == PixelFormat(1, 3, 3, 2, 0, 5, 2, 0, 0)) {
+		for (int y = 0; y < h; y++) {
+			const byte *src = &tmpSurf[y * w * 3];
+			byte *dst = (byte *)dstSurf->getBasePtr(0, y);
+
+			for (int x = 0; x < w; x++) {
+				byte r = src[0], g = src[1], b = src[2];
+				byte col = (r & 0xe0) | ((g >> 3) & 0x1c) | ((b >> 6) & 3);
+
+				*dst = col;
+
+				int qr = r & 0x1f;
+				int qg = g & 0x1f;
+				int qb = b & 0x3f;
+
+				const DitherParams *params = algos[method].params;
+
+				for (int i = 0; params[i].dx != 0 || params[i].dy != 0; i++)
+					updatePixel(tmpSurf, x + params[i].dx, y + params[i].dy, w, h, qr, qg, qb, params[i].qq, algos[method].qdiv);
+
+				src += 3;
+				dst++;
+			}
+		}
+	} else
+		error("Unsupported dithering target format or missing palette");
 
 	::free(tmpSurf);
 }

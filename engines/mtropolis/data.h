@@ -76,7 +76,7 @@ enum TextAlignmentCode {
 
 namespace DataObjectTypes {
 
-enum DataObjectType {
+enum DataObjectType : uint {
 	kUnknown								= 0,
 
 	kProjectLabelMap						= 0x22,
@@ -104,6 +104,7 @@ enum DataObjectType {
 	kChangeSceneModifier					= 0x136,
 	kReturnModifier							= 0x140,
 	kSoundEffectModifier					= 0x1a4,
+	kSimpleMotionModifier					= 0x1fe,
 	kDragMotionModifier						= 0x208,
 	kPathMotionModifierV1					= 0x21c,
 	kPathMotionModifierV2					= 0x21b,
@@ -425,7 +426,7 @@ struct ProjectLabelMap : public DataObject {
 		LabelTree();
 		~LabelTree();
 
-		enum {
+		enum : uint {
 			kExpandedInEditor = 0x80000000,
 		};
 
@@ -501,7 +502,7 @@ struct AssetCatalog : public DataObject {
 		uint32 flags1;
 		uint16 nameLength;
 		uint16 alwaysZero;
-		uint32 unknown1;	 // Possibly scene ID
+		uint32 streamID;
 		uint32 filePosition; // Contains a static value in Obsidian
 
 		AssetInfoRev4Fields rev4Fields;
@@ -719,7 +720,7 @@ protected:
 };
 
 struct SoundElement : public StructuralDef {
-	enum SoundFlags {
+	enum SoundFlags : uint {
 		kPaused = 0x40000000,
 		kLoop = 0x80000000,
 	};
@@ -1010,7 +1011,7 @@ protected:
 	DataReadErrorCode load(DataReader &reader) override;
 };
 
-enum MessageFlags {
+enum MessageFlags : uint {
 	kMessageFlagNoRelay = 0x20000000,
 	kMessageFlagNoCascade = 0x40000000,
 	kMessageFlagNoImmediate = 0x80000000,
@@ -1085,7 +1086,7 @@ protected:
 };
 
 struct ChangeSceneModifier : public DataObject {
-	enum ChangeSceneFlags {
+	enum ChangeSceneFlags : uint {
 		kChangeSceneFlagNextScene			= 0x80000000,
 		kChangeSceneFlagPrevScene			= 0x40000000,
 		kChangeSceneFlagSpecificScene		= 0x20000000,
@@ -1185,6 +1186,23 @@ struct PathMotionModifier : public DataObject {
 	bool havePointDefMessageSpecs;
 
 	Common::Array<PointDef> points;
+
+protected:
+	DataReadErrorCode load(DataReader &reader) override;
+};
+
+struct SimpleMotionModifier : public DataObject {
+	SimpleMotionModifier();
+
+	TypicalModifierHeader modHeader;
+
+	Event executeWhen;
+	Event terminateWhen;
+	uint16 motionType;
+	uint16 directionFlags;
+	uint16 steps;
+	uint32 delayMSecTimes4800;
+	uint8 unknown1[4];
 
 protected:
 	DataReadErrorCode load(DataReader &reader) override;

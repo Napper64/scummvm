@@ -290,6 +290,17 @@ CGE2
    * - Paul Gilbert
      -
 
+Chamber
+^^^^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Retro-Junk;
+     -
+   * - Eugene Sandulenko
+     -
+
 Chewy
 ^^^^^
 
@@ -458,6 +469,17 @@ DreamWeb
    * - Willem Jan Palenstijn
      -
 
+Freescape
+^^^^^^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Chris Allen
+     - Sound engine programming
+   * - Gustavo Grieco
+     -
+
 Glk
 ^^^
 
@@ -499,6 +521,8 @@ Gob
    * - Torbjörn Andersson
      -
    * - Arnaud Boutonné
+     -
+   * - Simon Delamarre
      -
    * - Sven Hesse
      -
@@ -585,6 +609,15 @@ Hopkins
    * - Paul Gilbert
      -
 
+Hpl1
+^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Emanuele Grisenti
+     -
+
 Hugo
 ^^^^
 
@@ -629,6 +662,15 @@ Illusions
    * - Benjamin Haisch
      -
    * - Eric Fry
+     -
+
+Immortal
+^^^^^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Michael Hayman
      -
 
 Kingdom
@@ -739,6 +781,21 @@ MADS
      -
    * - Filippos Karapetis
      -
+
+MM (Xeen)
+^^^^^^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Paul Gilbert
+     -
+   * - Benoit Pierre
+     -
+   * - David Goldsmith
+     - (Xeen analysis)
+   * - Matt Taylor
+     - (Xeen analysis)
 
 Mohawk
 ^^^^^^
@@ -982,7 +1039,7 @@ SCUMM
    * - Torbjörn Andersson
      -
    * - Andrea Boscarino
-     - Digital iMUSE, various fixes
+     - Digital iMUSE, SMUSH audio, GUI
    * - James Brown
      - (retired)
    * - Jonathan Gray
@@ -1143,6 +1200,15 @@ TeenAgent
    * - Robert Megone
      - Help with callback rewriting
    * - Vladimir Menshakov
+     -
+
+Tetraedge
+^^^^^^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Matthew Duggan
      -
 
 Tinsel
@@ -1332,6 +1398,15 @@ Ultima
    * - Willem Jan Palenstijn
      - (Pentagram)
 
+V-Cruise
+^^^^^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Eric Lasota
+     -
+
 Voyeur
 ^^^^^^
 
@@ -1364,21 +1439,6 @@ Wintermute
      -
    * - Tobia Tesan
      -
-
-Xeen
-^^^^
-
-.. list-table::
-   :widths: 35 65
-
-   * - Paul Gilbert
-     -
-   * - Benoit Pierre
-     -
-   * - David Goldsmith
-     - (analysis)
-   * - Matt Taylor
-     - (analysis)
 
 Z-Vision
 ^^^^^^^^
@@ -1443,10 +1503,12 @@ iPhone / iPad
    :widths: 35 65
 
    * - Oystein Eftevaag
-     -
+     - (retired)
    * - Vincent Bénony
      -
    * - Thierry Crozat
+     -
+   * - Lars Sundström
      -
 
 LinuxMoto
@@ -1692,6 +1754,8 @@ Miscellaneous
      - ARM assembly routines for nice speedups on several ports; improvements to the sound mixer
    * - Trembyle
      - Archivist
+   * - Lothar Serra Mari
+     - Tackling Tremendously Tedious Tasks(tm); ScummVM's Seal of Approval (Awp?!)
 
 Website (code)
 **************
@@ -1847,9 +1911,11 @@ macOS
    * - Max Horn
      - (retired)
    * - Oystein Eftevaag
-     -
+     - (retired)
    * - Thierry Crozat
      -
+   * - dwa
+     - Tiger/Leopard PPC
 
 Mandriva
 ^^^^^^^^

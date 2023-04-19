@@ -32,7 +32,7 @@
 #include "backends/networking/curl/networkreadstream.h"
 #include "common/config-manager.h"
 #include "common/debug.h"
-#include "common/json.h"
+#include "common/formats/json.h"
 
 namespace Cloud {
 namespace Box {
@@ -46,6 +46,10 @@ BoxStorage::BoxStorage(Common::String token, Common::String refreshToken, bool e
 
 BoxStorage::BoxStorage(Common::String code, Networking::ErrorCallback cb) {
 	getAccessToken(code, cb);
+}
+
+BoxStorage::BoxStorage(Networking::JsonResponse codeFlowJson, Networking::ErrorCallback cb) {
+	codeFlowComplete(cb, codeFlowJson);
 }
 
 BoxStorage::~BoxStorage() {}

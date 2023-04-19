@@ -23,6 +23,7 @@
 #define ULTIMA8_GAMES_GAMEDATA_H
 
 #include "ultima/shared/std/containers.h"
+#include "ultima/shared/std/string.h"
 #include "ultima/ultima8/graphics/frame_id.h"
 
 namespace Ultima {
@@ -76,7 +77,7 @@ public:
 	GumpShapeArchive *getGumps() const {
 		return _gumps;
 	}
-	const Shape *getMouse() const {
+	Shape *getMouse() const {
 		return _mouse;
 	}
 	MusicFlex *getMusic() const {

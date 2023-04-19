@@ -22,9 +22,6 @@
 #ifndef NANCY_ACTION_RECORDTYPES_H
 #define NANCY_ACTION_RECORDTYPES_H
 
-#include "engines/nancy/commontypes.h"
-#include "engines/nancy/renderobject.h"
-
 #include "engines/nancy/action/actionrecord.h"
 
 namespace Nancy {
@@ -77,9 +74,17 @@ protected:
 	Common::String getRecordTypeName() const override { return "Hot1FrExitSceneChange"; }
 };
 
-class HotMultiframeMultisceneChange : public Unimplemented {
+class HotMultiframeMultisceneChange : public ActionRecord {
 public:
 	void readData(Common::SeekableReadStream &stream) override;
+	void execute() override;
+
+	SceneChangeDescription _onTrue;
+	SceneChangeDescription _onFalse;
+	byte _condType;
+	uint16 _conditionID;
+	byte _conditionPayload;
+	Common::Array<HotspotDescription> _hotspots;
 
 protected:
 	Common::String getRecordTypeName() const override { return "HotMultiframeMultisceneChange"; }
@@ -110,87 +115,25 @@ protected:
 	Common::String getRecordTypeName() const override { return "PaletteNextScene"; }
 };
 
-class StartFrameNextScene : public Unimplemented {
+class LightningOn : public ActionRecord {
 public:
 	void readData(Common::SeekableReadStream &stream) override;
+	void execute() override;
 
-protected:
-	Common::String getRecordTypeName() const override { return "StartFrameNextScene"; }
-};
-
-class StartStopPlayerScrolling : public Unimplemented {
-public:
-	void readData(Common::SeekableReadStream &stream) override;
-	// TODO add a Start and Stop subclass
-
-	byte _type = 0;
-
-protected:
-	Common::String getRecordTypeName() const override { return "StartStopPlayerScrolling"; }
-};
-
-class LightningOn : public Unimplemented {
-public:
-	void readData(Common::SeekableReadStream &stream) override;
+	int16 _distance;
+	uint16 _pulseTime;
+	int16 _rgbPercent;
 
 protected:
 	Common::String getRecordTypeName() const override { return "LightningOn"; }
 };
 
-class LightningOff : public Unimplemented {
+class SpecialEffect : public Unimplemented {
 public:
 	void readData(Common::SeekableReadStream &stream) override;
 
 protected:
-	Common::String getRecordTypeName() const override { return "LightningOff"; }
-};
-
-class AmbientLightUp : public Unimplemented {
-public:
-	void readData(Common::SeekableReadStream &stream) override;
-
-protected:
-	Common::String getRecordTypeName() const override { return "AmbientLightUp"; }
-};
-
-class AmbientLightDown : public Unimplemented {
-public:
-	void readData(Common::SeekableReadStream &stream) override;
-
-protected:
-	Common::String getRecordTypeName() const override { return "AmbientLightDown"; }
-};
-
-class AmbientLightToTod : public Unimplemented {
-public:
-	void readData(Common::SeekableReadStream &stream) override;
-
-protected:
-	Common::String getRecordTypeName() const override { return "AmbientLightToTod"; }
-};
-
-class AmbientLightToTodOff : public Unimplemented {
-public:
-	void readData(Common::SeekableReadStream &stream) override;
-
-protected:
-	Common::String getRecordTypeName() const override { return "AmbientLightToTodOff"; }
-};
-
-class FlickerOn : public Unimplemented {
-public:
-	void readData(Common::SeekableReadStream &stream) override;
-
-protected:
-	Common::String getRecordTypeName() const override { return "FlickerOn"; }
-};
-
-class FlickerOff : public Unimplemented {
-public:
-	void readData(Common::SeekableReadStream &stream) override;
-
-protected:
-	Common::String getRecordTypeName() const override { return "FlickerOff"; }
+	Common::String getRecordTypeName() const override { return "SpecialEffect"; }
 };
 
 class MapCall : public ActionRecord {
@@ -226,57 +169,14 @@ protected:
 	Common::String getRecordTypeName() const override { return "MapCallHotMultiframe"; }
 };
 
-class MapLocationAccess : public Unimplemented {
+class TextBoxWrite : public ActionRecord {
 public:
+	virtual ~TextBoxWrite();
+
 	void readData(Common::SeekableReadStream &stream) override;
+	void execute() override;
 
-protected:
-	Common::String getRecordTypeName() const override { return "MapLocationAccess"; }
-};
-
-class MapLightning : public Unimplemented {
-public:
-	void readData(Common::SeekableReadStream &stream) override;
-
-protected:
-	Common::String getRecordTypeName() const override { return "MapLightning"; }
-};
-
-class MapLightningOff : public Unimplemented {
-public:
-	void readData(Common::SeekableReadStream &stream) override;
-
-protected:
-	Common::String getRecordTypeName() const override { return "MapLightningOff"; }
-};
-
-class MapSound : public Unimplemented {
-public:
-	void readData(Common::SeekableReadStream &stream) override;
-
-protected:
-	Common::String getRecordTypeName() const override { return "MapSound"; }
-};
-
-class MapAviOverride : public Unimplemented {
-public:
-	void readData(Common::SeekableReadStream &stream) override;
-
-protected:
-	Common::String getRecordTypeName() const override { return "MapAviOverride"; }
-};
-
-class MapAviOverrideOff : public Unimplemented {
-public:
-	void readData(Common::SeekableReadStream &stream) override;
-
-protected:
-	Common::String getRecordTypeName() const override { return "MapAviOverrideOff"; }
-};
-
-class TextBoxWrite : public Unimplemented {
-public:
-	void readData(Common::SeekableReadStream &stream) override;
+	Common::String _text;
 
 protected:
 	Common::String getRecordTypeName() const override { return "TextBoxWrite"; }
@@ -290,9 +190,14 @@ protected:
 	Common::String getRecordTypeName() const override { return "TextBoxClear"; }
 };
 
-class BumpPlayerClock : public Unimplemented {
+class BumpPlayerClock : public ActionRecord {
 public:
 	void readData(Common::SeekableReadStream &stream) override;
+	void execute() override;
+
+	byte _relative;
+	uint16 _hours;
+	uint16 _minutes;
 
 protected:
 	Common::String getRecordTypeName() const override { return "BumpPlayerClock"; }
@@ -372,17 +277,19 @@ protected:
 	Common::String getRecordTypeName() const override { return "LoseGame"; }
 };
 
-class PushScene : public Unimplemented {
+class PushScene : public ActionRecord {
 public:
 	void readData(Common::SeekableReadStream &stream) override;
+	void execute() override;
 
 protected:
 	Common::String getRecordTypeName() const override { return "PushScene"; }
 };
 
-class PopScene : public Unimplemented {
+class PopScene : public ActionRecord {
 public:
 	void readData(Common::SeekableReadStream &stream) override;
+	void execute() override;
 
 protected:
 	Common::String getRecordTypeName() const override { return "PopScene"; }
@@ -408,9 +315,12 @@ protected:
 	Common::String getRecordTypeName() const override { return "AddInventoryNoHS"; }
 };
 
-class RemoveInventoryNoHS : public Unimplemented {
+class RemoveInventoryNoHS : public ActionRecord {
 public:
 	void readData(Common::SeekableReadStream &stream) override;
+	void execute() override;
+
+	uint _itemID;
 
 protected:
 	Common::String getRecordTypeName() const override { return "RemoveInventoryNoHS"; }
@@ -422,22 +332,21 @@ public:
 	void execute() override;
 
 	uint16 _difficulty = 0;
-	EventFlagDescription _flag;
+	FlagDescription _flag;
 
 protected:
 	Common::String getRecordTypeName() const override { return "DifficultyLevel"; }
 };
 
-class ShowInventoryItem : public ActionRecord, public RenderObject {
+class ShowInventoryItem : public RenderActionRecord {
 public:
 	void readData(Common::SeekableReadStream &stream) override;
 	void execute() override;
 
-	ShowInventoryItem(RenderObject &redrawFrom) : RenderObject(redrawFrom, 9) {}
+	ShowInventoryItem() : RenderActionRecord(9) {}
 	virtual ~ShowInventoryItem() { _fullSurface.free(); }
 
 	void init() override;
-	void onPause(bool pause) override;
 
 	uint16 _objectID = 0;
 	Common::String _imageName;
@@ -455,11 +364,10 @@ class PlayDigiSoundAndDie : public ActionRecord {
 public:
 	void readData(Common::SeekableReadStream &stream) override;
 	void execute() override;
-	// TODO subclass into Play and Stop (?)
 
 	SoundDescription _sound;
 	SceneChangeDescription _sceneChange;
-	EventFlagDescription _flagOnTrigger;
+	FlagDescription _flagOnTrigger;
 
 protected:
 	Common::String getRecordTypeName() const override { return "PlayDigiSoundAndDie"; }
@@ -483,7 +391,7 @@ public:
 
 	SoundDescription _sound; // 0x0
 	SceneChangeDescription _sceneChange; // 0x22
-	EventFlagDescription _flag; // 0x2A
+	FlagDescription _flag; // 0x2A
 	Common::Array<HotspotDescription> _hotspots; // 0x31
 
 protected:
@@ -498,13 +406,10 @@ public:
 	byte _characterID; // 0x00
 	SoundDescription _genericSound; // 0x01
 
-	Common::String _text;
-	SceneChangeDescription _sceneChange;
-	uint16 _hintID;
-	int16 _hintWeight;
+	const Hint *selectedHint;
+	int16 _hintID;
 
 	void selectHint();
-	void getHint(uint hint, uint difficulty);
 
 protected:
 	Common::String getRecordTypeName() const override { return "HintSystem"; }

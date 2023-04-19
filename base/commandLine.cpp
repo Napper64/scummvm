@@ -61,6 +61,10 @@ static const char USAGE_STRING[] =
 	"Try '%s --help' for more options.\n"
 ;
 
+#ifdef SDL_BACKEND
+#include "backends/platform/sdl/sdl-sys.h"
+#endif
+
 // DONT FIXME: DO NOT ORDER ALPHABETICALLY, THIS IS ORDERED BY IMPORTANCE/CATEGORY! :)
 static const char HELP_STRING1[] =
 	"ScummVM - Graphical Adventure Game Interpreter\n"
@@ -90,11 +94,14 @@ static const char HELP_STRING1[] =
 	"  --auto-detect            Display a list of games from current or specified directory\n"
 	"                           and start the first one. Use --path=PATH to specify a directory.\n"
 	"  --recursive              In combination with --add or --detect recurse down all subdirectories\n"
+	"  --no-exit                In combination with commands that exit after running, like --add or --list-engines,\n"
+	"                           open the launcher instead of exiting\n"
 #if defined(WIN32)
 	"  --console                Enable the console window (default:enabled)\n"
 #endif
 	"\n"
-	"  -c, --config=CONFIG      Use alternate configuration file\n"
+	"  -c, --config=CONFIG      Use alternate configuration file path\n"
+	"  -i, --initial-cfg=CONFIG Load an initial configuration file if no configuration file has been saved yet\n"
 #if defined(SDL_BACKEND)
 	"  -l, --logfile=PATH       Use alternate path for log file\n"
 	"  --screenshotpath=PATH    Specify path where screenshot files are created\n"
@@ -175,6 +182,7 @@ static const char HELP_STRING4[] =
 																			  ")\n"
 	"  --show-fps               Set the turn on display FPS info in 3D games\n"
 	"  --no-show-fps            Set the turn off display FPS info in 3D games\n"
+	"  --random-seed=SEED       Set the random seed used to initialize entropy\n"
 	"  --renderer=RENDERER      Select 3D renderer (software, opengl, opengl_shaders)\n"
 	"  --aspect-ratio           Enable aspect ratio correction\n"
 	"  --[no-]dirtyrects        Enable dirty rectangles optimisation in software renderer\n"
@@ -204,13 +212,21 @@ static const char HELP_STRING4[] =
 #if defined(ENABLE_SCUMM) || defined(ENABLE_GROOVIE)
 	"  --demo-mode              Start demo mode of Maniac Mansion or The 7th Guest\n"
 #endif
-#if defined(ENABLE_DIRECTOR)
+#if defined(ENABLE_DIRECTOR) || defined(ENABLE_TESTBED)
 	"  --start-movie=NAME@NUM   Start movie at frame for Director\n"
 	"							Either can be specified without the other.\n"
 #endif
 #ifdef ENABLE_SCUMM
 	"  --tempo=NUM              Set music tempo (in percent, 50-200) for SCUMM games\n"
 	"                           (default: 100)\n"
+#endif
+#if defined(ENABLE_HE) && defined(USE_ENET)
+	"  --host-game              Host an online game for Moonbase Commander.\n"
+	"                           This method only works on the full version of the game,\n"
+	"                           Demo users can still host a game via the main menu.\n"
+	"  --join-game=IP[:PORT]    Join an online game for Moonbase Commander.\n"
+	"                           This method only works on the full version of the game,\n"
+	"                           Demo users can still join a game via the main menu.\n"
 #endif
 	"  --engine-speed=NUM       Set frame per second limit (0 - 100), 0 = no limit\n"
 	"                           (default: 60)\n"
@@ -334,6 +350,10 @@ void registerDefaults() {
 #ifdef ENABLE_SCUMM
 	ConfMan.registerDefault("tempo", 0);
 #endif
+#if defined(ENABLE_HE) && defined(USE_ENET)
+	ConfMan.registerDefault("host_game", false);
+	ConfMan.registerDefault("join_game", "null");
+#endif
 #if defined(ENABLE_SKY) || defined(ENABLE_QUEEN)
 	ConfMan.registerDefault("alt_intro", false);
 #endif
@@ -436,7 +456,7 @@ static QualifiedGameDescriptor findGameMatchingName(const Common::String &name) 
 }
 
 static Common::String createTemporaryTarget(const Common::String &engineId, const Common::String &gameId) {
-	Common::String domainName = gameId;
+	Common::String domainName = EngineMan.generateUniqueDomain(gameId);
 
 	ConfMan.addGameDomain(domainName);
 	ConfMan.set("engineid", engineId, domainName);
@@ -457,7 +477,7 @@ static Common::String createTemporaryTarget(const Common::String &engineId, cons
 
 // Use this for options which have an *optional* value
 #define DO_OPTION_OPT(shortCmd, longCmd, defaultVal) \
-	if (isLongCmd ? (!strcmp(s + 2, longCmd) || !memcmp(s + 2, longCmd"=", sizeof(longCmd"=") - 1)) : (tolower(s[1]) == shortCmd)) { \
+	if (isLongCmd ? (!strcmp(s + 2, longCmd) || !strncmp(s + 2, longCmd"=", sizeof(longCmd"=") - 1)) : (tolower(s[1]) == shortCmd)) { \
 		s += 2; \
 		if (isLongCmd) { \
 			s += sizeof(longCmd) - 1; \
@@ -632,6 +652,9 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			DO_OPTION('c', "config")
 			END_OPTION
 
+			DO_OPTION('i', "initial-cfg")
+			END_OPTION
+
 #if defined(SDL_BACKEND)
 			DO_OPTION('l', "logfile")
 			END_OPTION
@@ -691,7 +714,7 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 
 				settings["last_window_width"] = w;
 				settings["last_window_height"] = h;
-				settings.erase("window_size");
+				settings.erase("window-size");
 			END_OPTION
 #endif
 
@@ -865,6 +888,9 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			DO_LONG_OPTION_INT("talkspeed")
 			END_OPTION
 
+			DO_LONG_OPTION_INT("random-seed")
+			END_OPTION
+
 			DO_LONG_OPTION_BOOL("copy-protection")
 			END_OPTION
 
@@ -878,6 +904,9 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			END_OPTION
 
 			DO_LONG_OPTION_BOOL("recursive")
+			END_OPTION
+
+			DO_LONG_OPTION_BOOL("exit")
 			END_OPTION
 
 			DO_LONG_OPTION("themepath")
@@ -897,6 +926,13 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 
 #ifdef ENABLE_SCUMM
 			DO_LONG_OPTION_INT("tempo")
+			END_OPTION
+#endif
+
+#if defined(ENABLE_HE) && defined(USE_ENET)
+			DO_LONG_OPTION_BOOL("host-game")
+			END_OPTION
+			DO_LONG_OPTION("join-game")
 			END_OPTION
 #endif
 
@@ -928,7 +964,7 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			END_OPTION
 #endif
 
-#if defined(ENABLE_DIRECTOR)
+#if defined(ENABLE_DIRECTOR) || defined(ENABLE_TESTBED)
 			DO_LONG_OPTION("start-movie")
 			END_OPTION
 #endif
@@ -1444,7 +1480,8 @@ static void calcMD5Mac(Common::Path &filePath, int32 length) {
 	if (!macResMan.open(fileName, dir)) {
 		printf("Mac resource file '%s' not found or could not be open\n", filePath.toString(nativeSeparator).c_str());
 	} else {
-		if (!macResMan.hasResFork() && !macResMan.hasDataFork()) {
+		Common::ScopedPtr<Common::SeekableReadStream> dataFork(Common::MacResManager::openFileOrDataFork(fileName, dir));
+		if (!macResMan.hasResFork() && !dataFork) {
 			printf("'%s' has neither data not resource fork\n", macResMan.getBaseFileName().toString().c_str());
 		} else {
 			bool tail = false;
@@ -1460,14 +1497,13 @@ static void calcMD5Mac(Common::Path &filePath, int32 length) {
 					md5 += Common::String::format(" (%s %d bytes)", tail ? "last" : "first", length);
 				printf("%s (resource): %s, %llu bytes\n", macResMan.getBaseFileName().toString().c_str(), md5.c_str(), (unsigned long long)macResMan.getResForkDataSize());
 			}
-			if (macResMan.hasDataFork()) {
-				Common::SeekableReadStream *stream = macResMan.getDataFork();
-				if (tail && stream->size() > length)
-					stream->seek(-length, SEEK_END);
-				Common::String md5 = Common::computeStreamMD5AsString(*stream, length);
-				if (length != 0 && length < stream->size())
+			if (dataFork) {
+				if (tail && dataFork->size() > length)
+					dataFork->seek(-length, SEEK_END);
+				Common::String md5 = Common::computeStreamMD5AsString(*dataFork, length);
+				if (length != 0 && length < dataFork->size())
 					md5 += Common::String::format(" (%s %d bytes)", tail ? "last" : "first", length);
-				printf("%s (data): %s, %llu bytes\n", macResMan.getBaseFileName().toString().c_str(), md5.c_str(), (unsigned long long)stream->size());
+				printf("%s (data): %s, %llu bytes\n", macResMan.getBaseFileName().toString().c_str(), md5.c_str(), (unsigned long long)dataFork->size());
 			}
 		}
 		macResMan.close();
@@ -1699,48 +1735,60 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 		}
 	}
 
+	// For commands that normally exit, check if --no-exit was specified
+	bool cmdDoExit = settings.getValOrDefault("exit", "true") == "true";
+
 	// Handle commands passed via the command line (like --list-targets and
 	// --list-games). This must be done after the config file and the plugins
 	// have been loaded.
 	if (command == "list-targets") {
 		listTargets();
-		return true;
+		return cmdDoExit;
 	} else if (command == "list-all-debugflags") {
 		listAllEngineDebugFlags();
-		return true;
+		return cmdDoExit;
 	} else if (command == "list-debugflags") {
 		listDebugFlags(settings["list-debugflags"]);
-		return true;
+		return cmdDoExit;
 	} else if (command == "list-games") {
 		listGames(settings["engine"]);
-		return true;
+		return cmdDoExit;
 	} else if (command == "list-all-games") {
 		listAllGames(settings["engine"]);
-		return true;
+		return cmdDoExit;
 	} else if (command == "list-engines") {
 		listEngines();
-		return true;
+		return cmdDoExit;
 	} else if (command == "list-all-engines") {
 		listAllEngines();
-		return true;
+		return cmdDoExit;
 #ifdef ENABLE_EVENTRECORDER
 	} else if (command == "list-records") {
 		err = listRecords(settings["game"]);
-		return true;
+		return cmdDoExit;
 #endif
 	} else if (command == "list-saves") {
 		err = listSaves(settings["game"]);
-		return true;
+		return cmdDoExit;
 	} else if (command == "list-themes") {
 		listThemes();
-		return true;
+		return cmdDoExit;
 	} else if (command == "list-audio-devices") {
 		listAudioDevices();
-		return true;
+		return cmdDoExit;
 	} else if (command == "version") {
 		printf("%s\n", gScummVMFullVersion);
+#ifdef SDL_BACKEND
+#ifdef USE_SDL2
+		SDL_version sdlLinkedVersion;
+		SDL_GetVersion(&sdlLinkedVersion);
+		printf("Using SDL backend with SDL %d.%d.%d\n", sdlLinkedVersion.major, sdlLinkedVersion.minor, sdlLinkedVersion.patch);
+#else
+		printf("Using SDL backend with SDL %d.%d.%d\n", SDL_Linked_Version()->major, SDL_Linked_Version()->minor, SDL_Linked_Version()->patch);
+#endif
+#endif
 		printf("Features compiled in: %s\n", gScummVMFeatures);
-		return true;
+		return cmdDoExit;
 	} else if (command == "help") {
 #ifndef DISABLE_HELP_STRINGS
 		printf(HELP_STRING1, s_appName);
@@ -1780,7 +1828,7 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 
 		printf(HELP_STRING4);
 #endif
-		return true;
+		return cmdDoExit;
 	} else if (command == "auto-detect") {
 		bool resursive = settings["recursive"] == "true";
 		// If auto-detects fails (returns an empty ID) return true to close ScummVM.
@@ -1789,7 +1837,7 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 		if (resursive) {
 			printf("ERROR: Autodetection not supported with --recursive; are you sure you didn't want --detect?\n");
 			err = Common::kUnknownError;
-			return true;
+			return cmdDoExit;
 			// There is not a particularly good technical reason for this.
 			// From an UX point of view, however, it might get confusing.
 			// Consider removing this if consensus says otherwise.
@@ -1797,15 +1845,15 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 			command = detectGames(settings["path"], gameOption.engineId, gameOption.gameId, resursive);
 			if (command.empty()) {
 				err = Common::kNoGameDataFoundError;
-				return true;
+				return cmdDoExit;
 			}
 		}
 	} else if (command == "detect") {
 		detectGames(settings["path"], gameOption.engineId, gameOption.gameId, settings["recursive"] == "true");
-		return true;
+		return cmdDoExit;
 	} else if (command == "add") {
 		addGames(settings["path"], gameOption.engineId, gameOption.gameId, settings["recursive"] == "true");
-		return true;
+		return cmdDoExit;
 	} else if (command == "md5" || command == "md5mac") {
 		Common::String filename = settings.getValOrDefault("md5-path", "scummvm");
 		// Assume '/' separator except on Windows if the path contain at least one `\`
@@ -1822,22 +1870,17 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 
 		if (command == "md5" && settings.contains("md5-engine")) {
 			Common::String engineID = settings["md5-engine"];
-			if (engineID == "scumm") {
-				// Hardcoding value as scumm doesn't use AdvancedMetaEngineDetection
-				md5Length = 1024 * 1024;
-			} else {
-				const Plugin *plugin = EngineMan.findPlugin(engineID);
-				if (!plugin) {
-					warning("'%s' is an invalid engine ID. Use the --list-engines command to list supported engine IDs", engineID.c_str());
-					return true;
-				}
 
-				const AdvancedMetaEngineDetection* advEnginePtr = dynamic_cast<AdvancedMetaEngineDetection*>(&(plugin->get<MetaEngineDetection>()));
-				if (advEnginePtr == nullptr) {
-					warning("The requested engine (%s) doesn't support MD5-based detection", engineID.c_str());
-					return true;
-				}
-				md5Length = (int32)advEnginePtr->getMD5Bytes();
+			const Plugin *plugin = EngineMan.findPlugin(engineID);
+			if (!plugin) {
+				warning("'%s' is an invalid engine ID. Use the --list-engines command to list supported engine IDs", engineID.c_str());
+				return true;
+			}
+
+			md5Length = plugin->get<MetaEngineDetection>().getMD5Bytes();
+			if (!md5Length) {
+				warning("The requested engine (%s) doesn't support MD5-based detection", engineID.c_str());
+				return true;
 			}
 		}
 
@@ -1847,16 +1890,16 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 		} else
 			calcMD5Mac(Filename, md5Length);
 
-		return true;
+		return cmdDoExit;
 #ifdef DETECTOR_TESTING_HACK
 	} else if (command == "test-detector") {
 		runDetectorTest();
-		return true;
+		return cmdDoExit;
 #endif
 #ifdef UPGRADE_ALL_TARGETS_HACK
 	} else if (command == "upgrade-targets") {
 		upgradeTargets();
-		return true;
+		return cmdDoExit;
 #endif
 	}
 
@@ -1885,6 +1928,8 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 	// Finally, store the command line settings into the config manager.
 	static const char * const sessionSettings[] = {
 		"config",
+		"logfile",
+		"initial-cfg",
 		"fullscreen",
 		"gfx-mode",
 		"stretch-mode",
@@ -1909,12 +1954,30 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 		"opl-driver",
 		"talkspeed",
 		"render-mode",
+		"random-seed",
+		nullptr
+	};
+
+	// Skip some settings that should only be used for the command-line commands
+	static const char * const skipSettings[] = {
+		"recursive",
+		"exit",
+		"md5-engine",
+		"md5-length",
+		"md5-path",
+		"list-debugflags",
 		nullptr
 	};
 
 	for (Common::StringMap::const_iterator x = settings.begin(); x != settings.end(); ++x) {
 		Common::String key(x->_key);
 		Common::String value(x->_value);
+
+		bool skip = false;
+		for (auto skipKey = skipSettings; *skipKey && !skip; ++skipKey)
+			skip = (x->_key == *skipKey);
+		if (skip)
+			continue;
 
 		// Replace any "-" in the key by "_" (e.g. change "save-slot" to "save_slot").
 		for (Common::String::iterator c = key.begin(); c != key.end(); ++c)
@@ -1927,6 +1990,20 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 			useSessionDomain = (x->_key == *sessionKey);
 		ConfMan.set(key, value, useSessionDomain ? Common::ConfigManager::kSessionDomain : Common::ConfigManager::kTransientDomain);
 	}
+
+	// In non-release builds, if themepath and extrapath are not defined yet, add them to the session path so that it works out
+	// of the box when building and running in tree.
+#if !defined(RELEASE_BUILD) && !defined(WIN32)
+	#define ADD_DEFAULT_PATH(key, path) \
+		if (!ConfMan.hasKey(key)) { \
+			Common::FSNode node(path); \
+			if (node.exists() && node.isDirectory() && node.isReadable()) \
+				ConfMan.set(key, path, Common::ConfigManager::kSessionDomain); \
+		}
+
+	ADD_DEFAULT_PATH("themepath", "gui/themes/")
+	ADD_DEFAULT_PATH("extrapath", "dists/engine-data/")
+#endif
 
 	return false;
 }

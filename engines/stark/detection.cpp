@@ -73,7 +73,7 @@ static const ADGameDescription gameDescriptions[] = {
 	// The Longest Journey
 	// GOG edition
 	{
-		"tlj", "GOG",
+		"tlj", "GOG.com",
 		AD_ENTRY2s("x.xarc",		"a0559457126caadab0cadac02d35f26f", 3032,
 				   "chapters.ini",	"5b5a1f1dd2297d9ce0d3d12216d5d2c5", 485),
 		Common::EN_ANY,
@@ -366,6 +366,19 @@ static const ADGameDescription gameDescriptions[] = {
 	{
 		"tlj", "Fanmade",
 		AD_ENTRY2s("x.xarc",		"a0559457126caadab0cadac02d35f26f", 3032,
+				   "chapters.ini",	"790b51a88b5493bff5168a77738e0e84", 451),
+		Common::HU_HUN,
+		Common::kPlatformWindows,
+		ADGF_NO_FLAGS,
+		GUIO_NONE
+	},
+
+	// The Longest Journey
+	// Hungarian fan-made applied to German DVD version
+	// Trac report #14384
+	{
+		"tlj", "Fanmade",
+		AD_ENTRY2s("x.xarc",		"de8327850d7bba90b690b141eaa23f61", 3032,
 				   "chapters.ini",	"790b51a88b5493bff5168a77738e0e84", 451),
 		Common::HU_HUN,
 		Common::kPlatformWindows,

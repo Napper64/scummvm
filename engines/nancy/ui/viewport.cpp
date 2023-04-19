@@ -36,24 +36,18 @@ namespace UI {
 
 // does NOT put the object in a valid state until loadVideo is called
 void Viewport::init() {
-	Common::SeekableReadStream *viewChunk = g_nancy->getBootChunkStream("VIEW");
-	viewChunk->seek(0);
+	moveTo(g_nancy->_viewportData->screenPosition);
 
-	Common::Rect dest;
-	readRect(*viewChunk, dest);
-	viewChunk->skip(16); // skip viewport source rect
-	readRect(*viewChunk, _format1Bounds);
-	readRect(*viewChunk, _format2Bounds);
-
-	_screenPosition = dest;
-
-	setEdgesSize(g_nancy->_verticalEdgesSize, g_nancy->_verticalEdgesSize, g_nancy->_horizontalEdgesSize, g_nancy->_horizontalEdgesSize);
+	setEdgesSize(	g_nancy->_bootSummary->verticalEdgesSize,
+					g_nancy->_bootSummary->verticalEdgesSize,
+					g_nancy->_bootSummary->horizontalEdgesSize,
+					g_nancy->_bootSummary->horizontalEdgesSize);
 
 	RenderObject::init();
 }
 
 void Viewport::handleInput(NancyInput &input) {
-	Time playTime = g_nancy->getTotalPlayTime();
+	Time systemTime = g_system->getMillis();
 	byte direction = 0;
 
 	// Make cursor sticky when scrolling the viewport
@@ -156,7 +150,7 @@ void Viewport::handleInput(NancyInput &input) {
 		const Nancy::State::Scene::SceneSummary &summary = NancySceneState.getSceneSummary();
 		Time movementDelta = NancySceneState.getMovementTimeDelta(direction & kMoveFast);
 
-		if (playTime > _nextMovementTime) {
+		if (systemTime > _nextMovementTime) {
 			if (direction & kLeft) {
 				setNextFrame();
 			}
@@ -173,14 +167,14 @@ void Viewport::handleInput(NancyInput &input) {
 				scrollDown(summary.verticalScrollDelta);
 			}
 
-			_nextMovementTime = playTime + movementDelta;
+			_nextMovementTime = systemTime + movementDelta;
 		}
 	}
 
 	_movementLastFrame = direction;
 }
 
-void Viewport::loadVideo(const Common::String &filename, uint frameNr, uint verticalScroll, NancyFlag dontWrap, uint16 format, const Common::String &palette) {
+void Viewport::loadVideo(const Common::String &filename, uint frameNr, uint verticalScroll, byte panningType, uint16 format, const Common::String &palette) {
 	if (_decoder.isVideoLoaded()) {
 		_decoder.close();
 	}
@@ -192,30 +186,19 @@ void Viewport::loadVideo(const Common::String &filename, uint frameNr, uint vert
 	_videoFormat = format;
 
 	enableEdges(kUp | kDown | kLeft | kRight);
+	
+	_panningType = panningType;
 
 	setFrame(frameNr);
 	setVerticalScroll(verticalScroll);
 
 	if (palette.size()) {
-		GraphicsManager::loadSurfacePalette(_drawSurface, palette);
-		_fullFrame.setPalette(_drawSurface.getPalette(), 0, 256);
+		GraphicsManager::loadSurfacePalette(_fullFrame, palette);
+		setPalette(palette);
 	}
 
 	_movementLastFrame = 0;
 	_nextMovementTime = 0;
-	_dontWrap = dontWrap;
-}
-
-void Viewport::setPalette(const Common::String &paletteName) {
-	GraphicsManager::loadSurfacePalette(_drawSurface, paletteName);
-	_fullFrame.setPalette(_drawSurface.getPalette(), 0, 256);
-	_needsRedraw = true;
-}
-
-void Viewport::setPalette(const Common::String &paletteName, uint paletteStart, uint paletteSize) {
-	GraphicsManager::loadSurfacePalette(_drawSurface, paletteName, paletteStart, paletteSize);
-	_fullFrame.setPalette(_drawSurface.getPalette(), 0, 256);
-	_needsRedraw = true;
 }
 
 void Viewport::setFrame(uint frameNr) {
@@ -225,12 +208,12 @@ void Viewport::setFrame(uint frameNr) {
 
 	// Format 1 uses quarter-size images, while format 2 uses full-size ones
 	// Videos in TVD are always upside-down
-	GraphicsManager::copyToManaged(*newFrame, _fullFrame, g_nancy->getGameType() == kGameTypeVampire, _videoFormat == 1);
+	GraphicsManager::copyToManaged(*newFrame, _fullFrame, g_nancy->getGameType() == kGameTypeVampire, _videoFormat == kSmallVideoFormat);
 
 	_needsRedraw = true;
 	_currentFrame = frameNr;
 
-	if (_dontWrap == kTrue && !((_edgesMask & kLeft) && (_edgesMask & kRight))) {
+	if (_panningType == kPanLeftRight && !((_edgesMask & kLeft) && (_edgesMask & kRight))) {
 		if (_currentFrame == 0) {
 			disableEdges(kRight);
 		} else if (_currentFrame == getFrameCount() - 1) {
@@ -263,14 +246,18 @@ void Viewport::setVerticalScroll(uint scroll) {
 	_drawSurface.create(_fullFrame, sourceBounds);
 	_needsRedraw = true;
 
-	if (scroll == getMaxScroll()) {
-		disableEdges(kDown);
-		enableEdges(kUp);
-	} else if (scroll == 0) {
-		disableEdges(kUp);
-		enableEdges(kDown);
+	if (getMaxScroll() > 0) {
+		if (scroll == getMaxScroll()) {
+			disableEdges(kDown);
+			enableEdges(kUp);
+		} else if (scroll == 0) {
+			disableEdges(kUp);
+			enableEdges(kDown);
+		} else {
+			enableEdges(kUp | kDown);
+		}
 	} else {
-		enableEdges(kUp | kDown);
+		disableEdges(kUp | kDown);
 	}
 }
 
@@ -288,16 +275,6 @@ void Viewport::scrollDown(uint delta) {
 
 uint16 Viewport::getMaxScroll() const {
 	return _fullFrame.h - _drawSurface.h - (g_nancy->getGameType() == kGameTypeVampire ? 1 : 0);
-}
-
-Common::Rect Viewport::getBoundsByFormat(uint format) const {
-	if (format == 1) {
-		return _format1Bounds;
-	} else if (format == 2) {
-		return _format2Bounds;
-	} else {
-		return Common::Rect();
-	}
 }
 
 // Convert a viewport-space rectangle to screen coordinates
