@@ -37,6 +37,9 @@
 #include "twine/detection.h"
 #include "twine/input.h"
 #include "twine/scene/actor.h"
+#include "twine/script/script_life.h"
+#include "twine/script/script_move.h"
+#include "twine/shared.h"
 
 namespace TwinE {
 
@@ -50,7 +53,6 @@ namespace TwinE {
 /** Default frames per second */
 #define DEFAULT_FRAMES_PER_SECOND 20
 #define DEFAULT_HZ (1000 / DEFAULT_FRAMES_PER_SECOND)
-#define TO_SECONDS(x) (DEFAULT_HZ * (x))
 
 #define ORIGINAL_WIDTH 640
 #define ORIGINAL_HEIGHT 480
@@ -58,13 +60,14 @@ namespace TwinE {
 static const struct TwinELanguage {
 	const char *name;
 	const char *id;
+	const int voice;
 } LanguageTypes[] = {
-	{"English", "EN_"},
-	{"French", "FR_"},
-	{"German", "DE_"},
-	{"Spanish", "SP_"},
-	{"Italian", "IT_"},
-	{"Portuguese", ""}};
+	{"English", "EN_", 1},
+	{"French", "FR_", 2},
+	{"German", "DE_", 3},
+	{"Spanish", "SP_", 1},
+	{"Italian", "IT_", 1},
+	{"Portuguese", "", 1}};
 
 enum MidiFileType {
 	MIDIFILE_NONE,
@@ -86,8 +89,7 @@ enum MovieType {
 	All the settings with (*) means they are new and only exist in this engine. */
 struct ConfigFile {
 	/** Index into the LanguageTypes array. */
-	int32 LanguageId = 0;
-	bool Voice = true;
+	int32 _languageId = 0;
 	/** Enable/Disable game dialogues */
 	bool FlagDisplayText = false;
 	/** Flag to display game debug */
@@ -137,8 +139,8 @@ class Renderer;
 class Resources;
 class Scene;
 class Screens;
-class ScriptLife;
-class ScriptMove;
+class ScriptLifeV1;
+class ScriptMoveV1;
 class Holomap;
 class Sound;
 class Text;
@@ -242,6 +244,7 @@ public:
 	Common::Error loadGameStream(Common::SeekableReadStream *stream) override;
 	Common::Error saveGameStream(Common::WriteStream *stream, bool isAutosave = false) override;
 
+	int32 toSeconds(int x) const;
 	void wipeSaveSlot(int slot);
 	SaveStateList getSaveSlots() const;
 	void autoSave();
@@ -249,6 +252,7 @@ public:
 	void pushMouseCursorVisible();
 	void popMouseCursorVisible();
 
+	bool isCDROM() const { return true; /* TODO */}
 	bool isLBA1() const { return _gameType == TwineGameType::GType_LBA; }
 	bool isLBA2() const { return _gameType == TwineGameType::GType_LBA2; }
 	bool isLBASlideShow() const { return _gameType == TwineGameType::GType_LBASHOW; }
@@ -259,6 +263,11 @@ public:
 	bool isAndroid() const { return _platform == Common::Platform::kPlatformAndroid; };
 	const char *getGameId() const;
 	Common::Language getGameLang() const;
+
+	inline int numLocations() const {
+		const int maxLocations = isLBA1() ? 150 : NUM_LOCATIONS;
+		return maxLocations;
+	}
 
 	bool unlockAchievement(const Common::String &id);
 
@@ -293,10 +302,10 @@ public:
 
 	int32 _frameCounter = 0;
 	SceneLoopState _sceneLoopState = SceneLoopState::ReturnToMenu;
-	int32 _lbaTime = 0;
+	int32 timerRef = 0;
 
 	int32 _loopInventoryItem = 0;
-	int32 _loopActorStep = 0;
+	int32 _stepFalling = 0;
 	uint32 _gameFlags;
 	Common::Platform _platform;
 
@@ -324,6 +333,9 @@ public:
 	void exitSceneryView();
 
 	void queueMovie(const char *filename);
+
+	void clearScreenMinMax(Common::Rect &rect);
+	void adjustScreenMax(Common::Rect &rect, int16 x, int16 y);
 
 	/**
 	 * @return A random value between [0-max)

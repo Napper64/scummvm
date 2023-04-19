@@ -33,7 +33,7 @@
 #include "backends/networking/curl/networkreadstream.h"
 #include "common/config-manager.h"
 #include "common/debug.h"
-#include "common/json.h"
+#include "common/formats/json.h"
 
 namespace Cloud {
 namespace OneDrive {
@@ -46,6 +46,10 @@ OneDriveStorage::OneDriveStorage(Common::String token, Common::String refreshTok
 
 OneDriveStorage::OneDriveStorage(Common::String code, Networking::ErrorCallback cb) {
 	getAccessToken(code, cb);
+}
+
+OneDriveStorage::OneDriveStorage(Networking::JsonResponse codeFlowJson, Networking::ErrorCallback cb) {
+	codeFlowComplete(cb, codeFlowJson);
 }
 
 OneDriveStorage::~OneDriveStorage() {}

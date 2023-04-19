@@ -24,15 +24,16 @@
 #include "common/debug-channels.h"
 #include "common/error.h"
 #include "common/events.h"
-#include "common/ini-file.h"
+#include "common/formats/ini-file.h"
 #include "common/stream.h"
 #include "common/system.h"
 #include "common/file.h"
 #include "common/keyboard.h"
 #include "common/macresman.h"
 #include "common/util.h"
-#include "common/gzio.h"
+#include "common/compression/gzio.h"
 #include "common/config-manager.h"
+#include "common/translation.h"
 
 #include "engines/advancedDetector.h"
 #include "engines/util.h"
@@ -48,7 +49,7 @@
 
 #include "graphics/palette.h"
 #include "common/memstream.h"
-#include "common/winexe_pe.h"
+#include "common/formats/winexe_pe.h"
 #include "common/substream.h"
 #include "common/md5.h"
 #include "graphics/wincursor.h"
@@ -160,7 +161,7 @@ Common::MemoryReadStream *readWiseFile(Common::File &setupFile, const struct Wis
 	setupFile.seek(wiseFile.start);
 	setupFile.read(compressedBuffer, wiseFile.end - wiseFile.start - 4);
 	if (Common::GzioReadStream::deflateDecompress(uncompressedBuffer, wiseFile.uncompressedLength,
-					   compressedBuffer, wiseFile.end - wiseFile.start - 4) != wiseFile.uncompressedLength) {
+					   compressedBuffer, wiseFile.end - wiseFile.start - 4) != (int)wiseFile.uncompressedLength) {
 		debug("wise inflate failed");
 		delete[] compressedBuffer;
 		delete[] uncompressedBuffer;
@@ -518,7 +519,7 @@ Common::Error HadeschEngine::run() {
 		}
 	}
 
-	if (_cdScenesPath == "") {
+	if (_cdScenesPath.empty()) {
 		debug("Cannot find OL.POD");
 		return Common::kUnsupportedGameidError;
 	}
@@ -604,13 +605,13 @@ Common::Error HadeschEngine::run() {
 				// TODO: make equivalents for mobile devices. Keyboard is
 				// used for 4 things:
 				//
-				// * Skipping cutscenes (press space)
+				// * Skipping cutscenes (press space or escape. In original: only space).
 				// * Entering name.
 				//      Original requires a non-empty name. We allow an
 				//      empty name.
 				// * Optional save name
 				// * Cheats
-				if (event.kbd.keycode == Common::KEYCODE_SPACE)
+				if (event.kbd.keycode == Common::KEYCODE_SPACE || event.kbd.keycode == Common::KEYCODE_ESCAPE)
 					stopVideo = true;
 				if ((event.kbd.ascii >= 'a' && event.kbd.ascii <= 'z')
 				    || (event.kbd.ascii >= '0' && event.kbd.ascii <= '9')) {

@@ -811,12 +811,13 @@ uint16 Hotspots::check(uint8 handleMouse, int16 delay, uint16 &id, uint16 &index
 							  ((delay <= 0) || (_vm->_game->_mouseButtons == kMouseButtonsNone)))
 							_vm->_draw->blitCursor();
 
-
-						if ((key != _currentKey) && (_vm->getGameType() != kGameTypeFascination) &&
-						                            (_vm->getGameType() != kGameTypeGeisha))
-						// If the hotspot changed, leave the old one
-						// Code not present in Fascination executables
-								leave(_currentIndex);
+						if ((_currentKey != 0) &&
+							(key != _currentKey) &&
+							(_vm->getGameType() != kGameTypeFascination) &&
+							(_vm->getGameType() != kGameTypeGeisha))
+							// If the hotspot changed, leave the old one
+							// Code not present in Fascination executables
+							leave(_currentIndex);
 
 						_currentKey = 0;
 						break;
@@ -1269,6 +1270,17 @@ void Hotspots::evaluateNew(uint16 i, uint16 *ids, InputDesc *inputs,
 		height  = _vm->_game->_script->readUint16();
 	}
 	type &= 0x7F;
+
+	if (_vm->getGameType() == kGameTypeAdibou1 &&
+		left == 0xFFFF - 5 &&
+		(_vm->isCurrentTot("L61EXO-7.tot") || _vm->isCurrentTot("L61EXO-9.tot"))) {
+		// WORKAROUND: In those "find matching cards" games, hotspots of cards already found
+		// are normally removed by setting their x coordinate to 0xFFFF. However, sometimes
+		// the hotspot pos() function subtracts an additional 5 from x, which results in the
+		// hotspot not being properly removed (and clicking on it leads to a crash).
+		// TODO: the original executable somehow avoids this problem.
+		left = 0xFFFF;
+	}
 
 	// Draw a border around the hotspot
 	if (_vm->_draw->_renderFlags & RENDERFLAG_BORDERHOTSPOTS) {
@@ -2022,7 +2034,7 @@ void Hotspots::setCurrentHotspot(const uint16 *ids, uint16 id) const {
 	}
 
 	if (Hotspot::getState(id) == kStateFilled)
-		WRITE_VAR(16, ids[id & 0xFFF]);
+		WRITE_VAR(16, (int16)ids[id & 0xFFF]);
 	else
 		WRITE_VAR(16, id & 0xFFF);
 }

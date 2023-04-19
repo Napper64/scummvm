@@ -14,6 +14,7 @@ import android.view.SurfaceHolder;
 
 import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Scanner;
 
 import javax.microedition.khronos.egl.EGL10;
 import javax.microedition.khronos.egl.EGLConfig;
@@ -77,14 +78,15 @@ public abstract class ScummVM implements SurfaceHolder.Callback, Runnable {
 	abstract protected Bitmap getBitmapResource(int resource);
 	abstract protected void setTouchMode(int touchMode);
 	abstract protected int getTouchMode();
-	abstract protected void showSAFRevokePermsControl(boolean enable);
+	abstract protected String getScummVMBasePath();
+	abstract protected String getScummVMConfigPath();
+	abstract protected String getScummVMLogPath();
 	abstract protected String[] getSysArchives();
 	abstract protected String[] getAllStorageLocations();
 	abstract protected String[] getAllStorageLocationsNoPermissionRequest();
-	abstract protected boolean createDirectoryWithSAF(String dirPath);
-	abstract protected String createFileWithSAF(String filePath);
-	abstract protected void closeFileWithSAF(String hackyFilename);
-	abstract protected boolean isDirectoryWritableWithSAF(String dirPath);
+	abstract protected SAFFSTree getNewSAFTree(boolean folder, boolean write, String initialURI, String prompt);
+	abstract protected SAFFSTree[] getSAFTrees();
+	abstract protected SAFFSTree findSAFTree(String name);
 
 	public ScummVM(AssetManager asset_manager, SurfaceHolder holder, final MyScummVMDestroyedCallback scummVMDestroyedCallback) {
 		_asset_manager = asset_manager;
@@ -252,6 +254,20 @@ public abstract class ScummVM implements SurfaceHolder.Callback, Runnable {
 		}
 
 		_egl_surface = EGL10.EGL_NO_SURFACE;
+	}
+
+	// Callback from C++ peer instance
+	final protected int eglVersion() {
+		String version = _egl.eglQueryString(_egl_display, EGL10.EGL_VERSION);
+		if (version == null) {
+			// 1.0
+			return 0x00010000;
+		}
+
+		Scanner versionScan = new Scanner(version).useLocale(Locale.ROOT).useDelimiter("[ .]");
+		int versionInt = versionScan.nextInt() << 16;
+		versionInt |= versionScan.nextInt() & 0xffff;
+		return versionInt;
 	}
 
 	private void deinitEGL() {

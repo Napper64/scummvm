@@ -113,7 +113,11 @@ private:
 	void processManualMovementExecution(int actorIdx);
 	void processManualRotationExecution(int actorIdx);
 
-	bool _heroAction = false;
+	/**
+	 * This is true if the player hits the action button. E.g. in the second prison scene when you hide in the waste.
+	 */
+	bool _actionNormal = false;
+	void manualRealAngle(ActorStruct *actor);
 
 public:
 	Movements(TwinEEngine *engine);
@@ -123,7 +127,7 @@ public:
 	/**
 	 * Hero executes the current action of the trigger zone
 	 */
-	bool shouldTriggerZoneAction() const;
+	bool shouldExecuteAction() const;
 
 	bool _lastJoyFlag = false;
 
@@ -133,7 +137,7 @@ public:
 	 * Get shadow position
 	 * @param pos Shadow coordinates
 	 */
-	IVec3 getShadowPosition(const IVec3 &pos);
+	IVec3 getShadow(const IVec3 &pos);
 
 	/**
 	 * Set actor safe angle
@@ -142,7 +146,7 @@ public:
 	 * @param stepAngle number of steps
 	 * @param movePtr time pointer to update
 	 */
-	void setActorAngleSafe(int16 startAngle, int16 endAngle, int16 stepAngle, ActorMoveStruct *movePtr);
+	void initRealAngle(int16 startAngle, int16 endAngle, int16 stepAngle, ActorMoveStruct *movePtr);
 
 	/**
 	 * Clear actors safe angle
@@ -166,19 +170,11 @@ public:
 	 * @param x2 Actor 2 X
 	 * @param z2 Actor 2 Z
 	 */
-	int32 getAngleAndSetTargetActorDistance(int32 x1, int32 z1, int32 x2, int32 z2);
+	int32 getAngle(int32 x1, int32 z1, int32 x2, int32 z2);
 
-	inline int32 getAngleAndSetTargetActorDistance(const IVec3& v1, const IVec3 &v2) {
-		return getAngleAndSetTargetActorDistance(v1.x, v1.z, v2.x, v2.z);
+	inline int32 getAngle(const IVec3& v1, const IVec3 &v2) {
+		return getAngle(v1.x, v1.z, v2.x, v2.z);
 	}
-
-	/**
-	 * Rotate actor with a given angle
-	 * @param x Actor current X coordinate
-	 * @param z Actor current Z coordinate
-	 * @param angle Actor angle to rotate
-	 */
-	IVec3 rotateActor(int32 x, int32 z, int32 angle);
 
 	/**
 	 * Move actor around the scene
@@ -189,11 +185,11 @@ public:
 	 */
 	void initRealAngleConst(int32 start, int32 end, int32 duration, ActorMoveStruct *movePtr) const;
 
-	void processActorMovements(int32 actorIdx);
+	void doDir(int32 actorIdx);
 };
 
-inline bool Movements::shouldTriggerZoneAction() const {
-	return _heroAction;
+inline bool Movements::shouldExecuteAction() const {
+	return _actionNormal;
 }
 
 } // namespace TwinE

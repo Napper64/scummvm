@@ -65,7 +65,6 @@ GameSetupStructBase::GameSetupStructBase()
 	memset(paluses, 0, sizeof(paluses));
 	memset(defpal, 0, sizeof(defpal));
 	memset(reserved, 0, sizeof(reserved));
-	memset(messages, 0, sizeof(messages));
 }
 
 GameSetupStructBase::~GameSetupStructBase() {
@@ -74,8 +73,7 @@ GameSetupStructBase::~GameSetupStructBase() {
 
 void GameSetupStructBase::Free() {
 	for (int i = 0; i < MAXGLOBALMES; ++i) {
-		delete[] messages[i];
-		messages[i] = nullptr;
+		messages[i].Free();
 	}
 	delete[] load_messages;
 	load_messages = nullptr;
@@ -224,7 +222,7 @@ void GameSetupStructBase::WriteToFile(Stream *out) {
 	out->WriteInt32(invhotdotsprite);
 	out->WriteArrayOfInt32(reserved, 17);
 	for (int i = 0; i < MAXGLOBALMES; ++i) {
-		out->WriteInt32(messages[i] ? 1 : 0);
+		out->WriteInt32(!messages[i].IsEmpty() ? 1 : 0);
 	}
 	out->WriteInt32(dict ? 1 : 0);
 	out->WriteInt32(0); // globalscript
@@ -240,9 +238,6 @@ Size ResolutionTypeToSize(GameResolutionType resolution, bool letterbox) {
 	case kGameResolution_320x240:
 		return Size(320, 240);
 	case kGameResolution_640x400:
-		// The engine was modified for Whispers of a Machine to return 640x360
-		if (strcmp(_GP(game).guid, "{5833654f-6f0d-40d9-99e2-65c101c8544a}") == 0)
-			return Size(640, 360);
 		return letterbox ? Size(640, 480) : Size(640, 400);
 	case kGameResolution_640x480:
 		return Size(640, 480);

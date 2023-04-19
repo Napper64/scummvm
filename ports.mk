@@ -59,7 +59,11 @@ endif
 dist-generic: $(EXECUTABLE) $(PLUGINS)
 	mkdir -p ./dist-generic/scummvm/data
 	mkdir -p ./dist-generic/scummvm/doc
+	rm -f ./dist-generic/scummvm/$(EXECUTABLE)
 	cp $(EXECUTABLE) ./dist-generic/scummvm
+ifeq ($(BACKEND), atari)
+	m68k-atari-mint-flags -S ./dist-generic/scummvm/$(EXECUTABLE)
+endif
 	cp $(DIST_FILES_DOCS) ./dist-generic/scummvm/doc
 	cp $(DIST_FILES_THEMES) ./dist-generic/scummvm/data
 ifdef DIST_FILES_ENGINEDATA
@@ -239,22 +243,6 @@ ios7bundle: iphone
 			print "\t\t</dict>";\
 			print "\t</dict>";\
 			s=2}\
-		/<key>CFBundleIcons~ipad<\/key>/ {\
-			print $$0;\
-			print "\t<dict>";\
-			print "\t\t<key>CFBundlePrimaryIcon</key>";\
-			print "\t\t<dict>";\
-			print "\t\t\t<key>CFBundleIconFiles</key>";\
-			print "\t\t\t<array>";\
-			print "\t\t\t\t<string>AppIcon29x29</string>";\
-			print "\t\t\t\t<string>AppIcon40x40</string>";\
-			print "\t\t\t\t<string>AppIcon60x60</string>";\
-			print "\t\t\t\t<string>AppIcon76x76</string>";\
-			print "\t\t\t\t<string>AppIcon83.5x83.5</string>";\
-			print "\t\t\t</array>";\
-			print "\t\t</dict>";\
-			print "\t</dict>";\
-			s=2}\
 		/<key>UILaunchImages<\/key>/ {\
 			print $$0;\
 			print "\t<array>";\
@@ -359,6 +347,74 @@ endif
 	cp $(srcdir)/dists/ios7/Images.xcassets/LaunchImage.launchimage/ScummVM-splash-750x1334.png $(bundle_name)/LaunchImage-800-667h@2x.png
 	codesign -s - --deep --force $(bundle_name)
 
+tvosbundle: iphone
+	mkdir -p $(bundle_name)
+	awk 'BEGIN {s=0}\
+		/<key>CFBundleIcons<\/key>/ {\
+			print $$0;\
+			print "\t<dict>";\
+			print "\t\t<key>CFBundlePrimaryIcon</key>";\
+			print "\t\t<string>App Icon</string>";\
+			print "\t</dict>";\
+			s=2}\
+		/<key>TVTopShelfImage<\/key>/ {\
+			print $$0;\
+			print "\t<dict>";\
+			print "\t\t<key>TVTopShelfPrimaryImageWide</key>";\
+			print "\t\t<string>Top Shelf Image</string>";\
+			print "\t\t<key>TVTopShelfPrimaryImage</key>";\
+			print "\t\t<string>Top Shelf Image Wide</string>";\
+			print "\t</dict>";\
+			s=2}\
+		/<key>UILaunchImages<\/key>/ {\
+			print $$0;\
+			print "\t<array>";\
+			print "\t\t<dict>";\
+			print "\t\t\t<key>UILaunchImageMinimumOSVersion</key>";\
+			print "\t\t\t<string>9.0</string>";\
+			print "\t\t\t<key>UILaunchImageName</key>";\
+			print "\t\t\t<string>LaunchImage</string>";\
+			print "\t\t\t<key>UILaunchImageOrientation</key>";\
+			print "\t\t\t<string>Landscape</string>";\
+			print "\t\t\t<key>UILaunchImageSize</key>";\
+			print "\t\t\t<string>{1920, 1080}</string>";\
+			print "\t\t</dict>";\
+			print "\t\t<dict>";\
+			print "\t\t\t<key>UILaunchImageMinimumOSVersion</key>";\
+			print "\t\t\t<string>11.0</string>";\
+			print "\t\t\t<key>UILaunchImageName</key>";\
+			print "\t\t\t<string>LaunchImage</string>";\
+			print "\t\t\t<key>UILaunchImageOrientation</key>";\
+			print "\t\t\t<string>Landscape</string>";\
+			print "\t\t\t<key>UILaunchImageSize</key>";\
+			print "\t\t\t<string>{1920, 1080}</string>";\
+			print "\t\t</dict>";\
+			print "\t</array>";\
+			s=2}\
+		s==0 {print $$0}\
+		s > 0 { s-- }' $(srcdir)/dists/tvos/Info.plist >$(bundle_name)/Info.plist
+	sed -i'' -e 's/$$(PRODUCT_BUNDLE_IDENTIFIER)/org.scummvm.scummvm/' $(bundle_name)/Info.plist
+	sed -i'' -e 's/$$(EXECUTABLE_NAME)/ScummVM/' $(bundle_name)/Info.plist
+	sed -i'' -e '/UILaunchStoryboardName/{N;d;}' $(bundle_name)/Info.plist
+	cp $(DIST_FILES_DOCS) $(bundle_name)/
+	cp $(DIST_FILES_THEMES) $(bundle_name)/
+ifdef DIST_FILES_NETWORKING
+	cp $(DIST_FILES_NETWORKING) $(bundle_name)/
+endif
+ifdef DIST_FILES_ENGINEDATA
+	cp $(DIST_FILES_ENGINEDATA) $(bundle_name)/
+endif
+ifdef DIST_FILES_VKEYBD
+	cp $(DIST_FILES_VKEYBD) $(bundle_name)/
+endif
+ifneq ($(DIST_FILES_SHADERS),)
+	cp $(DIST_FILES_SHADERS) $(bundle_name)/
+endif
+	$(STRIP) scummvm
+	chmod 755 scummvm
+	cp scummvm $(bundle_name)/ScummVM
+	cp -r $(srcdir)/dists/tvos/Assets.car $(bundle_name)/Assets.car
+	codesign -s - --deep --force $(bundle_name)
 
 ifndef WITHOUT_SDL
 OSX_STATIC_LIBS := `$(SDLCONFIG) --prefix=$(STATICLIBPATH) --static-libs`
@@ -457,12 +513,20 @@ ifdef USE_FAAD
 OSX_STATIC_LIBS += $(STATICLIBPATH)/lib/libfaad.a
 endif
 
+ifdef USE_MIKMOD
+OSX_STATIC_LIBS += $(STATICLIBPATH)/lib/libmikmod.a
+endif
+
 ifdef USE_MPEG2
 OSX_STATIC_LIBS += $(STATICLIBPATH)/lib/libmpeg2.a
 endif
 
 ifdef USE_A52
 OSX_STATIC_LIBS += $(STATICLIBPATH)/lib/liba52.a
+endif
+
+ifdef USE_VPX
+OSX_STATIC_LIBS += $(STATICLIBPATH)/lib/libvpx.a
 endif
 
 ifdef USE_JPEG
@@ -475,6 +539,10 @@ endif
 
 ifdef USE_DISCORD
 OSX_STATIC_LIBS += $(STATICLIBPATH)/lib/libdiscord-rpc.a
+endif
+
+ifdef USE_RETROWAVE
+OSX_STATIC_LIBS += $(STATICLIBPATH)/lib/libRetroWave.a
 endif
 
 ifdef USE_SPARKLE
@@ -500,7 +568,7 @@ iphone: $(DETECT_OBJS) $(OBJS)
 	+$(LD) $(LDFLAGS) -o scummvm $(DETECT_OBJS) $(OBJS) \
 		$(OSX_STATIC_LIBS) \
 		-framework UIKit -framework CoreGraphics -framework OpenGLES -framework GameController \
-		-framework CoreFoundation -framework QuartzCore -framework Foundation \
+		-framework CoreFoundation -framework QuartzCore -framework Foundation -framework Accelerate \
 		-framework AudioToolbox -framework CoreAudio -framework SystemConfiguration -lobjc -lz
 
 # Special target to create a snapshot disk image for macOS
@@ -516,6 +584,7 @@ osxsnap: bundle
 	mv ./ScummVM-snapshot/COPYING.ISC ./ScummVM-snapshot/License\ \(ISC\)
 	mv ./ScummVM-snapshot/COPYING.LUA ./ScummVM-snapshot/License\ \(Lua\)
 	mv ./ScummVM-snapshot/COPYING.MIT ./ScummVM-snapshot/License\ \(MIT\)
+	mv ./ScummVM-snapshot/COPYING.MKV ./ScummVM-snapshot/License\ \(MKV\)
 	mv ./ScummVM-snapshot/COPYING.TINYGL ./ScummVM-snapshot/License\ \(TinyGL\)
 	mv ./ScummVM-snapshot/COPYING.GLAD ./ScummVM-snapshot/License\ \(Glad\)
 	$(XCODETOOLSPATH)/SetFile -t ttro -c ttxt ./ScummVM-snapshot/*
@@ -539,7 +608,9 @@ osxsnap: bundle
 	cp $(DIST_FILES_DOCS_se) ./ScummVM-snapshot/doc/se/
 	$(XCODETOOLSPATH)/SetFile -t ttro -c ttxt ./ScummVM-snapshot/doc/QuickStart
 	$(XCODETOOLSPATH)/SetFile -t ttro -c ttxt ./ScummVM-snapshot/doc/*/*
+ifndef MACOSX_LEOPARD_OR_BELOW
 	xattr -w "com.apple.TextEncoding" "utf-8;134217984" ./ScummVM-snapshot/doc/*/*
+endif
 	cp -RP $(bundle_name) ./ScummVM-snapshot/
 	cp $(srcdir)/dists/macosx/DS_Store ./ScummVM-snapshot/.DS_Store
 	cp $(srcdir)/dists/macosx/background.jpg ./ScummVM-snapshot/background.jpg
@@ -581,6 +652,10 @@ endif
 	@echo All is done.
 	@echo Now run
 	@echo -e "\tgit commit -m 'DISTS: Generated Code::Blocks and MSVC project files'"
+
+
+release-checks:
+	devtools/release-checks.sh
 
 # Mark special targets as phony
 .PHONY: deb bundle osxsnap install uninstall

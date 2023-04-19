@@ -20,12 +20,16 @@
  */
 
 #include "common/config-manager.h"
+#include "common/compression/clickteam.h"
 #include "common/debug-channels.h"
 #include "common/macresman.h"
 #include "common/md5.h"
 #include "common/events.h"
 #include "common/system.h"
 #include "common/translation.h"
+
+#include "backends/keymapper/keymap.h"
+#include "backends/keymapper/keymapper.h"
 
 #include "engines/util.h"
 
@@ -37,6 +41,7 @@
 #include "scumm/charset.h"
 #include "scumm/costume.h"
 #include "scumm/debugger.h"
+#include "scumm/detection_tables.h"
 #include "scumm/dialogs.h"
 #include "scumm/file.h"
 #include "scumm/file_nes.h"
@@ -84,6 +89,17 @@
 #include "scumm/imuse/drivers/midi.h"
 #include "scumm/detection_steam.h"
 
+#ifdef ENABLE_HE
+#ifdef USE_ENET
+#include "scumm/he/net/net_main.h"
+#include "scumm/dialog-sessionselector.h"
+#include "scumm/dialog-createsession.h"
+#ifdef USE_LIBCURL
+#include "scumm/he/net/net_lobby.h"
+#endif
+#endif
+#endif
+
 #include "backends/audiocd/audiocd.h"
 
 #include "audio/mixer.h"
@@ -100,6 +116,9 @@ struct dbgChannelDesc {
 	const char *channel, *desc;
 	uint32 flag;
 };
+
+
+const char *const insaneKeymapId = "scumm-insane";
 
 
 ScummEngine::ScummEngine(OSystem *syst, const DetectorResult &dr)
@@ -231,10 +250,12 @@ ScummEngine::ScummEngine(OSystem *syst, const DetectorResult &dr)
 		ConfMan.setBool("subtitles", true);
 
 	// TODO Detect subtitle only versions of scumm6 games
-	if (ConfMan.getBool("speech_mute"))
-		_voiceMode = 2;
-	else
-		_voiceMode = ConfMan.getBool("subtitles");
+	if (!isUsingOriginalGUI()) {
+		if (ConfMan.getBool("speech_mute"))
+			_voiceMode = 2;
+		else
+			_voiceMode = ConfMan.getBool("subtitles");
+	}
 
 	if (ConfMan.hasKey("render_mode")) {
 		_renderMode = Common::parseRenderMode(ConfMan.get("render_mode"));
@@ -360,7 +381,7 @@ ScummEngine::ScummEngine(OSystem *syst, const DetectorResult &dr)
 
 	setV1ColorTable(_renderMode);
 
-	_isRTL = (_language == Common::HE_ISR && (_game.heversion == 0 || _game.heversion >= 72)) 
+	_isRTL = (_language == Common::HE_ISR && (_game.heversion == 0 || _game.heversion >= 72))
 			&& (_game.id == GID_MANIAC || (_game.version >= 4 && _game.version < 7)) && !(_game.features & GF_HE_NO_BIDI);
 #ifndef DISABLE_HELP
 	// Create custom GMM dialog providing a help subdialog
@@ -483,12 +504,6 @@ ScummEngine_v3::ScummEngine_v3(OSystem *syst, const DetectorResult &dr)
 	// All v3 and older games only used 16 colors with exception of the GF_OLD256 games.
 	if (!(_game.features & GF_OLD256))
 		_game.features |= GF_16COLOR;
-
-	_savePreparedSavegame = nullptr;
-}
-
-ScummEngine_v3::~ScummEngine_v3() {
-	delete _savePreparedSavegame;
 }
 
 ScummEngine_v3old::ScummEngine_v3old(OSystem *syst, const DetectorResult &dr)
@@ -711,6 +726,20 @@ ScummEngine_v90he::ScummEngine_v90he(OSystem *syst, const DetectorResult &dr)
 	_videoParams.number = 0;
 	_videoParams.wizResNum = 0;
 
+#ifdef USE_ENET
+	/* Online stuff for compatable HE games */
+	_net = 0;
+	if (_game.id == GID_FOOTBALL || _game.id == GID_BASEBALL2001 || _game.id == GID_FOOTBALL2002 ||
+		_game.id == GID_MOONBASE) {
+		_net = new Net(this);
+	}
+#ifdef USE_LIBCURL
+	_lobby = 0;
+	if (_game.id == GID_FOOTBALL || _game.id == GID_BASEBALL2001)
+		_lobby = new Lobby(this);
+#endif
+#endif
+
 	VAR_NUM_SPRITE_GROUPS = 0xFF;
 	VAR_NUM_SPRITES = 0xFF;
 	VAR_NUM_PALETTES = 0xFF;
@@ -723,6 +752,14 @@ ScummEngine_v90he::ScummEngine_v90he(OSystem *syst, const DetectorResult &dr)
 ScummEngine_v90he::~ScummEngine_v90he() {
 	delete _moviePlay;
 	delete _sprite;
+
+#ifdef USE_ENET
+	delete _net;
+#ifdef USE_LIBCURL
+	delete _lobby;
+#endif
+#endif
+
 	if (_game.heversion >= 98) {
 		delete _logicHE;
 	}
@@ -853,6 +890,21 @@ ScummEngine_v8::~ScummEngine_v8() {
 Common::Error ScummEngine::init() {
 
 	const Common::FSNode gameDataDir(ConfMan.get("path"));
+
+	for (uint i = 0; ruScummPatcherTable[i].patcherName; i++) {
+		if (ruScummPatcherTable[i].gameid == _game.id && (_game.variant == nullptr || strcmp(_game.variant, ruScummPatcherTable[i].variant) == 0)) {
+			Common::File *f = new Common::File();
+			if (f->open(ruScummPatcherTable[i].patcherName)) {
+				Common::Archive *patcher = Common::ClickteamInstaller::openPatch(f, true, true, &SearchMan, DisposeAfterUse::YES);
+				if (patcher) {
+					SearchMan.add("ruscumm", patcher, 3);
+					break;
+				}
+			}
+			delete f;
+		}
+	}
+
 
 	ConfMan.registerDefault("original_gui", true);
 	if (ConfMan.hasKey("original_gui", _targetName)) {
@@ -1234,10 +1286,15 @@ Common::Error ScummEngine::init() {
 	// Create the debugger now that _numVariables has been set
 	setDebugger(new ScummDebugger(this));
 
+	Common::Keymapper *keymapper = _system->getEventManager()->getKeymapper();
+	_insaneKeymap = keymapper->getKeymap(insaneKeymapId);
+	if (_insaneKeymap)
+		_insaneKeymap->setEnabled(false);
+
 	resetScumm();
 	resetScummVars();
 
-	if (_game.version >= 5 && _game.version <= 7) {
+	if (_game.version >= 5 && _game.version <= 7 && _game.id != GID_DIG) {
 		_sound->setupSound();
 		// In case of talkie edition without sfx file, enable subtitles
 		if (!_sound->hasSfxFile() && !ConfMan.getBool("subtitles"))
@@ -1270,6 +1327,26 @@ void ScummEngine::setupScumm(const Common::String &macResourceFile) {
 		}
 	}
 
+	// Sync the voice mode options from the outside world (the ScummVM audio options tab)
+	if (_game.version >= 5 && _game.version <= 8) {
+		if (ConfMan.hasKey("subtitles", _targetName) && ConfMan.hasKey("speech_mute", _targetName)) {
+			bool speechMute = ConfMan.getBool("speech_mute", _targetName);
+			bool subtitles = ConfMan.getBool("subtitles", _targetName);
+
+			int resultingVoiceMode = 2; // Subtitles only
+
+			if (!speechMute && !subtitles) { // Voice only
+				resultingVoiceMode = 0;
+			} else if (!speechMute && subtitles) { // Text and voice
+				resultingVoiceMode = 1;
+			}
+
+			ConfMan.setInt("original_gui_text_status", resultingVoiceMode);
+			ConfMan.flushToDisk();
+			syncSoundSettings();
+		}
+	}
+
 	// On some systems it's not safe to run CD audio games from the CD.
 	if (_game.features & GF_AUDIOTRACKS && !Common::File::exists("CDDA.SOU")) {
 		uint track;
@@ -1286,8 +1363,11 @@ void ScummEngine::setupScumm(const Common::String &macResourceFile) {
 		} else
 			track = 1;
 
+		// The Ultimate Talkie version of Monkey Island 1 provides an automatic
+		// fallback with MIDI music when CD tracks are not found.
 		if (!existExtractedCDAudioFiles(track)
-		    && !isDataAndCDAudioReadFromSameCD()) {
+		    && !isDataAndCDAudioReadFromSameCD()
+			&& !(_game.id == GID_MONKEY && _game.features & GF_ULTIMATE_TALKIE)) {
 			warnMissingExtractedCDAudio();
 		}
 		_system->getAudioCDManager()->open();
@@ -1362,9 +1442,6 @@ void ScummEngine::setupScumm(const Common::String &macResourceFile) {
 	else
 		OF_OWNER_ROOM = 0x0F;
 
-	// if (_game.id==GID_MONKEY2 && _bootParam == 0)
-	//	_bootParam = 10001;
-
 	if (!_copyProtection && _game.id == GID_INDY4 && _bootParam == 0) {
 		_bootParam = -7873;
 	}
@@ -1382,6 +1459,14 @@ void ScummEngine::setupScumm(const Common::String &macResourceFile) {
 		_bootParam = -1;
 	}
 
+	if (_game.version == 8 && (_language != Common::EN_ANY && _language != Common::EN_GRB && _language != Common::EN_USA)) {
+		ConfMan.registerDefault("enable_song", true);
+		if (ConfMan.hasKey("enable_song", _targetName)) {
+			_enableCOMISong = ConfMan.getBool("enable_song");
+		}
+	}
+
+#ifndef ATARI
 	int maxHeapThreshold = -1;
 
 	if (_game.features & GF_16BIT_COLOR) {
@@ -1396,6 +1481,10 @@ void ScummEngine::setupScumm(const Common::String &macResourceFile) {
 	}
 
 	_res->setHeapThreshold(400000, maxHeapThreshold);
+#else
+	// RAM is cheap, disk I/O isn't... helps with retaining the resources in COMI and similar
+	_res->setHeapThreshold(16 * 1024 * 1024, 32 * 1024 * 1024);
+#endif
 
 	free(_compositeBuf);
 	_compositeBuf = (byte *)malloc(_screenWidth * _textSurfaceMultiplier * _screenHeight * _textSurfaceMultiplier * _outputPixelFormat.bytesPerPixel);
@@ -1414,10 +1503,9 @@ void ScummEngine_v7::setupScumm(const Common::String &macResourceFile) {
 		}
 	}
 
-	if (_game.id == GID_DIG && (_game.features & GF_DEMO))
-		_smushFrameRate = 15;
-	else
-		_smushFrameRate = (_game.id == GID_FT) ? 10 : 12;
+	// This is just an initialization, most SMUSH videos do have
+	// their own framerate value embedded in their ANIM header...
+	_smushFrameRate = (_game.id == GID_FT) ? 10 : 12;
 
 	ScummEngine::setupScumm(macResourceFile);
 
@@ -1436,7 +1524,26 @@ void ScummEngine_v7::setupScumm(const Common::String &macResourceFile) {
 		filesAreCompressed |= _sound->isSfxFileCompressed();
 	}
 
-	_musicEngine = _imuseDigital = new IMuseDigital(this, _mixer, &_resourceAccessMutex);
+	int sampleRate = DIMUSE_BASE_SAMPLERATE;
+
+	ConfMan.registerDefault("dimuse_sample_rate", DIMUSE_BASE_SAMPLERATE);
+	if (ConfMan.hasKey("dimuse_sample_rate", _targetName)) {
+		// Only accept sample rates which are a multiple or submultiple of 22050, with
+		// lower and upper bounds set to what the internal mixer is currently able to achieve...
+		if ((ConfMan.getInt("dimuse_sample_rate") % (DIMUSE_BASE_SAMPLERATE / 2)) == 0 &&
+			(ConfMan.getInt("dimuse_sample_rate") >= DIMUSE_BASE_SAMPLERATE / 2) &&
+			(ConfMan.getInt("dimuse_sample_rate") <= DIMUSE_BASE_SAMPLERATE * 4)) {
+			sampleRate = ConfMan.getInt("dimuse_sample_rate");
+		}
+	}
+
+	bool lowLatencyMode = false;
+	ConfMan.registerDefault("dimuse_low_latency_mode", false);
+	if (ConfMan.hasKey("dimuse_low_latency_mode", _targetName)) {
+		lowLatencyMode = ConfMan.getBool("dimuse_low_latency_mode");
+	}
+
+	_musicEngine = _imuseDigital = new IMuseDigital(this, sampleRate, _mixer, &_resourceAccessMutex, lowLatencyMode);
 
 	if (filesAreCompressed) {
 		GUI::MessageDialog dialog(_(
@@ -1719,6 +1826,8 @@ void ScummEngine::resetScumm() {
 	// all keys are released
 	for (i = 0; i < 512; i++)
 		_keyDownMap[i] = false;
+	for (i = 0; i < kScummActionCount; i++)
+		_actionMap[i] = false;
 
 	_lastSaveTime = _system->getMillis();
 }
@@ -1748,7 +1857,6 @@ void ScummEngine_v2::resetScumm() {
 void ScummEngine_v3::resetScumm() {
 	ScummEngine_v4::resetScumm();
 
-
 	if (_game.id == GID_LOOM && _game.platform == Common::kPlatformPCEngine) {
 		// Load tile set and palette for the distaff
 		byte *roomptr = getResourceAddress(rtRoom, 90);
@@ -1760,9 +1868,6 @@ void ScummEngine_v3::resetScumm() {
 		_gdi->loadTiles(roomptr);
 		_gdi->_distaff = false;
 	}
-
-	delete _savePreparedSavegame;
-	_savePreparedSavegame = nullptr;
 }
 
 void ScummEngine_v4::resetScumm() {
@@ -2016,7 +2121,7 @@ void ScummEngine::setupMusic(int midi, const Common::String &macInstrumentFile) 
 	} else if ((_sound->_musicType == MDT_PCSPK || _sound->_musicType == MDT_PCJR) && (_game.version > 2 && _game.version <= 4)) {
 		_musicEngine = new Player_V2(this, _mixer, MidiDriver::getMusicType(dev) != MT_PCSPK);
 	} else if (_sound->_musicType == MDT_CMS) {
-		_musicEngine = new Player_V2CMS(this, _mixer);
+		_musicEngine = new Player_V2CMS(this);
 	} else if (_game.platform == Common::kPlatform3DO && _game.heversion <= 62) {
 		// 3DO versions use digital music and sound samples.
 	} else if (_game.platform == Common::kPlatformFMTowns && (_game.version == 3 || _game.id == GID_MONKEY)) {
@@ -2049,7 +2154,7 @@ void ScummEngine::setupMusic(int midi, const Common::String &macInstrumentFile) 
 			// of the Mac music via a selected MIDI device.
 			nativeMidiDriver = new IMuseDriver_MacM68k(_mixer);
 			// The Mac driver is never MT-32.
-			_native_mt32 = false;
+			_native_mt32 = enable_gs = false;
 			// Ignore non-native drivers. This also ignores the multi MIDI setting.
 			useOnlyNative = true;
 		} else if (_sound->_musicType == MDT_AMIGA) {
@@ -2116,20 +2221,16 @@ void ScummEngine::setupMusic(int midi, const Common::String &macInstrumentFile) 
 
 void ScummEngine::syncSoundSettings() {
 	if (isUsingOriginalGUI() && _game.version > 6) {
-		if (ConfMan.hasKey("original_gui_text_status", _targetName)) {
-			_voiceMode = ConfMan.getInt("original_gui_text_status");
-		} else if (ConfMan.hasKey("subtitles", _targetName) && ConfMan.hasKey("speech_mute", _targetName)){
-			int guiTextStatus = 0;
-			if (ConfMan.getBool("speech_mute")) {
-				guiTextStatus = 2;
-			} else if (ConfMan.getBool("subtitles")) {
-				guiTextStatus = 1;
-			}
-
-			// Let's set it now so we don't have to do the conversion the next time...
-			ConfMan.setInt("original_gui_text_status", guiTextStatus);
-			_voiceMode = guiTextStatus;
+		int guiTextStatus = 0;
+		if (ConfMan.getBool("speech_mute")) {
+			guiTextStatus = 2;
+		} else if (ConfMan.getBool("subtitles")) {
+			guiTextStatus = 1;
 		}
+
+		// Mainly used by COMI
+		ConfMan.setInt("original_gui_text_status", guiTextStatus);
+		_voiceMode = guiTextStatus;
 
 		if (VAR_VOICE_MODE != 0xFF)
 			VAR(VAR_VOICE_MODE) = _voiceMode;
@@ -2230,10 +2331,6 @@ Common::Error ScummEngine::go() {
 	}
 
 	while (!shouldQuit()) {
-		// Randomize the PRNG by calling it at regular intervals. This ensures
-		// that it will be in a different state each time you run the program.
-		_rnd.getRandomNumber(2);
-
 		// Determine how long to wait before the next loop iteration should start
 		int delta = (VAR_TIMER_NEXT != 0xFF) ? VAR(VAR_TIMER_NEXT) : 4;
 #ifndef DISABLE_TOWNS_DUAL_LAYER_MODE
@@ -2271,7 +2368,29 @@ Common::Error ScummEngine::go() {
 			delta = ceil(delta / 3.0) * 3;
 		}
 
-		// In COMI we put no speed limit while on the main menu.
+		// The following delta value substitutions are aimed at removing
+		// any frame rate limit to main menu rooms in which you can type
+		// custom names for save states. We do this in order to avoid
+		// lag and/or lose keyboard inputs.
+
+		if (_enableEnhancements) {
+			// INDY3:
+			if (_game.id == GID_INDY3 && _currentRoom == 14) {
+				delta = 3;
+			}
+
+			// LOOM (EGA & FM-TOWNS):
+			if (_game.id == GID_LOOM && _game.version == 3 && _currentRoom == 70) {
+				delta = 3; // Enough not to flash the cursor too quickly and to remove lag...
+			}
+
+			// ZAK (FM-Towns):
+			if (_game.id == GID_ZAK && _game.version == 3 && _currentRoom == 50) {
+				delta = 3; // Enough not to flash the cursor too quickly and to remove lag...
+			}
+		}
+
+		// COMI (not marked as enhancement because without this the menu shows issues):
 		if (_game.version == 8 && _currentRoom == 92) {
 			delta = 0;
 		}
@@ -2596,7 +2715,8 @@ load_game:
 
 	_res->increaseExpireCounter();
 
-	animateCursor();
+	if (!isUsingOriginalGUI() || ((_game.version >= 3) || !isPaused()))
+		animateCursor();
 
 	/* show or hide mouse */
 	CursorMan.showMouse(_cursor.state > 0);
@@ -2619,7 +2739,7 @@ void ScummEngine_v90he::scummLoop(int delta) {
 #endif
 
 void ScummEngine::scummLoop_updateScummVars() {
-	if (_game.version >= 7) {
+	if (_game.version == 7) {
 		VAR(VAR_CAMERA_POS_X) = camera._cur.x;
 		VAR(VAR_CAMERA_POS_Y) = camera._cur.y;
 	} else if (_game.platform == Common::kPlatformNES) {
@@ -2700,6 +2820,12 @@ void ScummEngine::scummLoop_handleSaveLoad() {
 
 			if (success && (_saveTemporaryState || _game.version == 8) && VAR_GAME_LOADED != 0xFF)
 				VAR(VAR_GAME_LOADED) = (_game.version == 8) ? 1 : GAME_PROPER_LOAD;
+
+			// If we are here, it means that we are loading a game from the ScummVM menu;
+			// let's call the exit save/load script (only used in v6) to restore the cursor
+			// properly.
+			if (VAR_SAVELOAD_SCRIPT2 != 0xFF && _currentRoom != 0)
+				runScript(VAR(VAR_SAVELOAD_SCRIPT2), 0, 0, nullptr);
 		}
 
 		if (!success) {
@@ -2723,6 +2849,9 @@ void ScummEngine::scummLoop_handleSaveLoad() {
 }
 
 void ScummEngine_v3::scummLoop_handleSaveLoad() {
+	if (isUsingOriginalGUI() && _saveLoadFlag == 0 && !_loadFromLauncher)
+		return;
+
 	bool processIQPoints = (_game.id == GID_INDY3 && (_saveLoadFlag == 2 || _loadFromLauncher));
 	_loadFromLauncher = false;
 
@@ -2908,6 +3037,15 @@ void ScummEngine_v5::scummLoop_handleSaveLoad() {
 }
 
 void ScummEngine_v6::scummLoop_handleSaveLoad() {
+	// When launching a savegame from the launcher it may happen (if the game was
+	// saved within the original GUI) that the cursor can remain invisible until
+	// an event changes it. The original save dialog calls the exit save/load script
+	// to reinstate the cursor correctly, so we do that manually for this edge case.
+	if (_loadFromLauncher && VAR_SAVELOAD_SCRIPT2 != 0xFF && _currentRoom != 0) {
+		_loadFromLauncher = false;
+		runScript(VAR(VAR_SAVELOAD_SCRIPT2), 0, 0, nullptr);
+	}
+
 	ScummEngine::scummLoop_handleSaveLoad();
 
 	if (_videoModeChanged) {
@@ -3028,6 +3166,34 @@ void ScummEngine::scummLoop_handleEffects() {
 }
 
 void ScummEngine::scummLoop_handleSound() {
+	// The original interpreters for the earlier games (v0-v4) allowed the user
+	// to disable internal speaker sounds with a keyboard combination.
+	// Let's see if sound has to be played: if we're not using the original GUI,
+	// let's allow it unconditionally; if the sound device is not between the ones listed,
+	// we allow the sound, otherwise we let our keyboard combination flag decide.
+	if (_game.version < 5 && isUsingOriginalGUI()) {
+		bool soundIsEnabled = !((_sound->_musicType == MDT_PCSPK ||
+								_sound->_musicType == MDT_PCJR ||
+								_sound->_musicType == MDT_CMS ||
+								_sound->_musicType == MDT_APPLEIIGS ||
+								_sound->_musicType == MDT_C64) &&
+								(_internalSpeakerSoundsAreOn == 0));
+
+		// Furthermore, the original ones apparently did the trick at a lower level. In our case
+		// this a bit overkill for a feature which is not that known: we could just mute the
+		// mixer to obtain the same effect. Let's avoid muting/unmuting the mixer at every
+		// scummLoop_handleSound() call, though :-)
+		if (!soundIsEnabled && !_mixerMutedByGUI) {
+			_mixer->muteSoundType(Audio::Mixer::SoundType::kMusicSoundType, true);
+			_mixer->muteSoundType(Audio::Mixer::SoundType::kPlainSoundType, true);
+			_mixerMutedByGUI = true;
+		} else if (soundIsEnabled && _mixerMutedByGUI) {
+			_mixer->muteSoundType(Audio::Mixer::SoundType::kMusicSoundType, false);
+			_mixer->muteSoundType(Audio::Mixer::SoundType::kPlainSoundType, false);
+			_mixerMutedByGUI = false;
+		}
+	}
+
 	_sound->processSound();
 }
 
@@ -3143,13 +3309,13 @@ bool ScummEngine::isUsingOriginalGUI() {
 	if (_game.id == GID_MONKEY2 && (_game.features & GF_DEMO))
 		return false;
 
+	if (_game.platform == Common::kPlatformPCEngine)
+		return false;
+
 	if (_game.heversion != 0)
 		return false;
 
-	if (_game.version > 3)
-		return _useOriginalGUI;
-
-	return false;
+	return _useOriginalGUI;
 }
 
 void ScummEngine::runBootscript() {
@@ -3173,6 +3339,7 @@ void ScummEngine::runBootscript() {
 	}
 
 	args[0] = _bootParam;
+
 	if (_game.id == GID_MANIAC && (_game.features & GF_DEMO) && (_game.platform != Common::kPlatformC64))
 		runScript(9, 0, 0, args);
 	else
@@ -3275,10 +3442,12 @@ void ScummEngine::pauseEngineIntern(bool pause) {
 
 #ifdef ENABLE_SCUMM_7_8
 void ScummEngine_v7::pauseEngineIntern(bool pause) {
-	if (pause) {
-		_splayer->pause();
-	} else {
-		_splayer->unpause();
+	if (_splayer) { // We may call it from setupScumm() before _splayer is inited
+		if (pause) {
+			_splayer->pause();
+		} else {
+			_splayer->unpause();
+		}
 	}
 
 	ScummEngine::pauseEngineIntern(pause);
@@ -3332,6 +3501,36 @@ char ScummEngine::displayMessage(const char *altButton, const char *message, ...
 	return runDialog(dialog);
 }
 
+bool ScummEngine::displayMessageYesNo(const char *message, ...) {
+	char buf[STRINGBUFLEN];
+	va_list va;
+
+	va_start(va, message);
+	vsnprintf(buf, STRINGBUFLEN, message, va);
+	va_end(va);
+
+	GUI::MessageDialog dialog(buf, _("Yes"), _("No"));
+	return runDialog(dialog) == GUI::kMessageOK;
+}
+
+#if defined(ENABLE_HE) && defined(USE_ENET)
+int ScummEngine_v90he::networkSessionDialog() {
+	GUI::MessageDialog dialog(_("Would you like to host or join a network play session?"), _("Host"), _("Join"));
+	int res = runDialog(dialog);
+	if (res == GUI::kMessageOK) {
+		// Hosting a session.
+		CreateSessionDialog createDialog;
+		if (runDialog(createDialog)) {
+			return -1;
+		} else {
+			return -2;
+		}
+	}
+	// Joining a session
+	SessionSelectorDialog sessionDialog(this);
+	return runDialog(sessionDialog);
+}
+#endif
 
 #pragma mark -
 #pragma mark --- Miscellaneous ---

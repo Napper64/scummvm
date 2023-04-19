@@ -112,6 +112,8 @@ public:
 	void renderFrame(uint16 frameId, RenderMode mode = kRenderModeNormal);
 	void renderSprites(uint16 frameId, RenderMode mode = kRenderModeNormal);
 	bool renderPrePaletteCycle(uint16 frameId, RenderMode mode = kRenderModeNormal);
+	void setLastPalette(uint16 frameId);
+	bool isPaletteColorCycling();
 	void renderPaletteCycle(uint16 frameId, RenderMode mode = kRenderModeNormal);
 	void renderCursor(Common::Point pos, bool forceUpdate = false);
 	void updateWidgets(bool hasVideoPlayback);
@@ -129,6 +131,7 @@ private:
 	void screenShot();
 
 	bool processImmediateFrameScript(Common::String s, int id);
+	bool processFrozenScripts();
 
 public:
 	Common::Array<Channel *> _channels;
@@ -159,8 +162,6 @@ public:
 
 	int _numChannelsDisplayed;
 
-	uint16 _framesRan; // used by kDebugFewFramesOnly
-
 private:
 	DirectorEngine *_vm;
 	Lingo *_lingo;
@@ -171,6 +172,9 @@ private:
 	uint16 _nextFrame;
 	int _currentLabel;
 	DirectorSound *_soundManager;
+	int _currentPalette;
+
+	int _previousBuildBotBuild = -1;
 };
 
 } // End of namespace Director

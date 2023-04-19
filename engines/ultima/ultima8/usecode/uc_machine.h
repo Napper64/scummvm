@@ -23,6 +23,7 @@
 #define ULTIMA8_USECODE_UCMACHINE_H
 
 #include "ultima/ultima8/misc/common_types.h"
+#include "ultima/shared/std/string.h"
 #include "ultima/shared/std/containers.h"
 #include "ultima/ultima8/usecode/intrinsics.h"
 
@@ -111,11 +112,9 @@ private:
 
 	static UCMachine *_ucMachine;
 
-#ifdef DEBUG
 	// tracing
 	bool _tracingEnabled;
 	bool _traceAll;
-	bool _traceEvents;
 	Std::set<ObjId> _traceObjIDs;
 	Std::set<ProcId> _tracePIDs;
 	Std::set<uint16> _traceClasses;
@@ -129,11 +128,6 @@ private:
 		return false;
 	}
 
-public:
-	bool trace_event() const {
-		return (_tracingEnabled && (_traceAll || _traceEvents));
-	}
-#endif
 };
 
 } // End of namespace Ultima8

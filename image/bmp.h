@@ -56,6 +56,7 @@ namespace Image {
  *  - Hugo
  *  - Mohawk
  *  - Petka
+ *  - TwinE
  *  - Wintermute
  *  - Ultima8
  * @{
@@ -85,7 +86,7 @@ private:
 /**
  * Outputs an uncompressed BMP stream of the given input surface.
  */
-bool writeBMP(Common::WriteStream &out, const Graphics::Surface &input);
+bool writeBMP(Common::WriteStream &out, const Graphics::Surface &input, const byte *palette = nullptr);
 /** @} */
 } // End of namespace Image
 

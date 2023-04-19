@@ -184,6 +184,8 @@ void Actor::initActor(int mode) {
 	_charset = 0;
 	memset(_sound, 0, sizeof(_sound));
 	_targetFacing = _facing;
+	_lastValidX = 0;
+	_lastValidY = 0;
 
 	_shadowMode = 0;
 	_layer = 0;
@@ -795,6 +797,7 @@ void Actor::startWalkActor(int destX, int destY, int dir) {
 	if (_vm->_game.version <= 4) {
 		abr.x = destX;
 		abr.y = destY;
+		abr.box = kInvalidBox;
 	} else {
 		abr = adjustXYToBeInBox(destX, destY);
 	}
@@ -1526,6 +1529,10 @@ void Actor::setDirection(int direction) {
 	if (_costume == 0)
 		return;
 
+	// Verified for v3-v6 and HE
+	if (!isInCurrentRoom() && _vm->_game.version >= 3 && _vm->_game.version <= 6)
+		return;
+
 	// Update the costume for the new direction (and mark the actor for redraw)
 	aMask = 0x8000;
 	for (i = 0; i < 16; i++, aMask >>= 1) {
@@ -1901,12 +1908,37 @@ AdjustBoxResult Actor::adjustXYToBeInBox(int dstX, int dstY) {
 	int box;
 	const int firstValidBox = (_vm->_game.features & GF_SMALL_HEADER) ? 0 : 1;
 
-	abr.x = dstX;
-	abr.y = dstY;
+	// The original v3-4 interpreters register and use the last valid (X,Y) values
+	// for the current actor. During the execution of the current function, if
+	// the routine can't find a bestDist which is smaller than the init value
+	// (0xFFFF), the rest of the code flow just happens to reuse the last valid
+	// coordinates obtained from a previous call of the function.
+	// This sounds like pseudo-undefined behavior caused by an oversight, but we
+	// can get along with it as it appears we actually need this to happen...
+	//
+	// By simulating what v3 and v4 disasms did, we correctly fix bug #2377.
+	// The originals relied on global variables containing the latest valid
+	// coordinates modified in here and in startWalkActor, but registering
+	// the modifications only in here seems to be enough to cover this edge case.
+	//
+	// HE and v5-6 games appear to actually have undefined behavior, since they
+	// create something akin to our AdjustBoxResult structure right inside the
+	// current function, so this means that the coordinates inside it potentially
+	// might never be initialized if bestDist is never modified.
+	// The same thing applies to v7-8, but it's really unlikely that any distance
+	// would end up being higher than 0x7FFFFFFF...
+
+	bool isOldSystem = _vm->_game.version <= 4;
+
+	abr.x = isOldSystem ? _lastValidX : dstX;
+	abr.y = isOldSystem ? _lastValidY : dstY;
 	abr.box = kInvalidBox;
 
-	if (_ignoreBoxes)
+	if (_ignoreBoxes) {
+		abr.x = dstX;
+		abr.y = dstY;
 		return abr;
+	}
 
 	for (int tIdx = 0; tIdx < ARRAYSIZE(thresholdTable); tIdx++) {
 		threshold = thresholdTable[tIdx];
@@ -1936,6 +1968,8 @@ AdjustBoxResult Actor::adjustXYToBeInBox(int dstX, int dstY) {
 			// Check if the point is contained in the box. If it is,
 			// we don't have to search anymore.
 			if (_vm->checkXYInBoxBounds(box, dstX, dstY)) {
+				_lastValidX = dstX;
+				_lastValidY = dstY;
 				abr.x = dstX;
 				abr.y = dstY;
 				abr.box = box;
@@ -1947,6 +1981,8 @@ AdjustBoxResult Actor::adjustXYToBeInBox(int dstX, int dstY) {
 
 			// Check if the box is closer than the previous boxes.
 			if (tmpDist < bestDist) {
+				_lastValidX = tmpX;
+				_lastValidY = tmpY;
 				abr.x = tmpX;
 				abr.y = tmpY;
 
@@ -2611,37 +2647,49 @@ void Actor_v0::startAnimActor(int f) {
 }
 
 void Actor::animateActor(int anim) {
-	int cmd, dir;
+	int chore, dir;
 
 	if (_vm->_game.version >= 7 && !((_vm->_game.id == GID_FT) && (_vm->_game.features & GF_DEMO) && (_vm->_game.platform == Common::kPlatformDOS))) {
 
 		if (anim == 0xFF)
 			anim = 2000;
 
-		cmd = anim / 1000;
+		chore = anim / 1000;
 		dir = anim % 1000;
 
 	} else {
+		// Format of the input parameter:
+		// - The 2 least significant bits are the direction
+		// - The rest is the chore command to execute
+		chore = anim >> 2;
+		dir = oldDirToNewDir(anim & 3);
 
-		cmd = anim / 4;
-		dir = oldDirToNewDir(anim % 4);
-
-		// Convert into old cmd code
-		cmd = 0x3F - cmd + 2;
+		// Convert into old chore code
+		chore = 0x3F - chore + 2;
 
 	}
 
-	switch (cmd) {
+	switch (chore) {
 	case 2:				// stop walking
-		startAnimActor(_standFrame);
-		stopActorMoving();
+		if (isInCurrentRoom() ||
+			!(_vm->_game.version >= 3 && _vm->_game.version <= 6)) {
+			startAnimActor(_standFrame);
+			stopActorMoving();
+		}
 		break;
 	case 3:				// change direction immediatly
-		_moving &= ~MF_TURN;
+		if (isInCurrentRoom() ||
+			!(_vm->_game.version >= 3 && _vm->_game.version <= 6)) {
+			_moving &= ~MF_TURN;
+		}
+
 		setDirection(dir);
 		break;
 	case 4:				// turn to new direction
-		turnToDirection(dir);
+		if (isInCurrentRoom() ||
+			!(_vm->_game.version >= 3 && _vm->_game.version <= 6)) {
+			turnToDirection(dir);
+		}
 		break;
 	case 64:
 		if (_vm->_game.version == 0) {
@@ -2652,7 +2700,7 @@ void Actor::animateActor(int anim) {
 		// fall through
 	default:
 		if (_vm->_game.version <= 2)
-			startAnimActor(anim / 4);
+			startAnimActor(anim >> 2);
 		else
 			startAnimActor(anim);
 	}

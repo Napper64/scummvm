@@ -382,7 +382,7 @@ bool ObjManager::save_obj(NuvieIO *save_buf, Obj *obj, uint16 parent_objblk_n) {
 	obj_save_count += 1;
 
 	if (obj->container) {
-		for (link = obj->container->end(); link != NULL; link = link->prev)
+		for (link = obj->container->start(); link != NULL; link = link->next)
 			save_obj(save_buf, (Obj *)link->data, objblk_n);
 	}
 
@@ -673,7 +673,6 @@ bool ObjManager::is_stackable(Obj *obj) {
 		case OBJ_U6_BREAD: // 0x80, // loaf of bread
 		case OBJ_U6_MEAT_PORTION: // 0x81, // portion of meat
 		case OBJ_U6_FLASK_OF_OIL: // 0x53, // flask of oil
-		case OBJ_U6_EGG: // 0x14F, // egg
 		case OBJ_U6_GOLD_NUGGET: // 0x59, // gold nugget
 		case OBJ_U6_ZU_YLEM: // 0x5B, // Zu Ylem
 		case OBJ_U6_SNAKE_VENOM: // 0x5C, // silver snake venom
@@ -1623,7 +1622,7 @@ bool ObjManager::addObjToContainer(U6LList *llist, Obj *obj) {
 		c_obj = (Obj *)link->data;
 
 	if (c_obj) { // we've found our container.
-		c_obj->add(obj);
+		c_obj->add(obj, false, true); //add at tail position
 
 		//DEBUG(0,LEVEL_DEBUGGING,"Cont: %s\n", tile_manager->lookAtTile(get_obj_tile_num(c_obj->obj_n)+c_obj->frame_n,0,false));
 		//DEBUG(0,LEVEL_DEBUGGING,"Add to container %s", tile_manager->lookAtTile(get_obj_tile_num(obj->obj_n)+obj->frame_n,0,false));

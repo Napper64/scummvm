@@ -51,6 +51,10 @@ struct Hacks {
 	bool ignoreMismatchedProjectNameInObjectLookups;
 	bool removeQuickTimeEdits;
 	bool ignoreMToonMaintainRateFlag;
+	bool allowAssetsFromOtherScenes;
+	bool mtiVariableReferencesHack;
+	bool mtiSceneReturnHack;
+
 	uint midiVolumeScale;	// 256 = 1.0
 
 	uint32 minTransitionDuration;

@@ -847,6 +847,21 @@ bool DynamicList::setAtIndex(size_t index, const DynamicValue &value) {
 	}
 }
 
+void DynamicList::deleteAtIndex(size_t index) {
+	if (_container != nullptr) {
+		size_t size = _container->getSize();
+		if (size < _container->getSize()) {
+			for (size_t i = index + 1; i < size; i++) {
+				DynamicValue valueToMove;
+				_container->getAtIndex(i, valueToMove);
+				_container->setAtIndex(i - 1, valueToMove);
+			}
+
+			_container->truncateToSize(size - 1);
+		}
+	}
+}
+
 void DynamicList::truncateToSize(size_t sz) {
 	if (sz == 0)
 		clear();
@@ -2650,7 +2665,7 @@ void MessageProperties::setValue(const DynamicValue &value) {
 		_value = value;
 }
 
-WorldManagerInterface::WorldManagerInterface() : _gameMode(false), _combineRedraws(true), _opInt(0) {
+WorldManagerInterface::WorldManagerInterface() : _gameMode(false), _combineRedraws(true), _postponeRedraws(false), _opInt(0) {
 }
 
 bool WorldManagerInterface::readAttribute(MiniscriptThread *thread, DynamicValue &result, const Common::String &attrib) {
@@ -2673,6 +2688,12 @@ bool WorldManagerInterface::readAttribute(MiniscriptThread *thread, DynamicValue
 		return true;
 	} else if (attrib == "combineredraws") {
 		result.setBool(_combineRedraws);
+		return true;
+	} else if (attrib == "postponeredraws") {
+		result.setBool(_postponeRedraws);
+		return true;
+	} else if (attrib == "clickcount") {
+		result.setInt(thread->getRuntime()->getMultiClickCount());
 		return true;
 	}
 
@@ -2698,6 +2719,9 @@ MiniscriptInstructionOutcome WorldManagerInterface::writeRefAttribute(Miniscript
 	} else if (attrib == "combineredraws") {
 		DynamicValueWriteBoolHelper::create(&_combineRedraws, result);
 		return kMiniscriptInstructionOutcomeContinue;
+	} else if (attrib == "postponeredraws") {
+		DynamicValueWriteBoolHelper::create(&_postponeRedraws, result);
+		return kMiniscriptInstructionOutcomeContinue;
 	} else if (attrib == "qtpalettehack") {
 		DynamicValueWriteDiscardHelper::create(result);
 		return kMiniscriptInstructionOutcomeContinue;
@@ -2707,8 +2731,14 @@ MiniscriptInstructionOutcome WorldManagerInterface::writeRefAttribute(Miniscript
 		DynamicValueWriteIntegerHelper<int32>::create(&_opInt, result);
 		return kMiniscriptInstructionOutcomeContinue;
 	} else if (attrib == "scenefades") {
-		// TODO
+#ifdef MTROPOLIS_DEBUG_ENABLE
+		if (Debugger *debugger = thread->getRuntime()->debugGetDebugger())
+			debugger->notify(kDebugSeverityWarning, "'scenefades' attribute was set on WorldManager, which is implemented yet");
+#endif
 		DynamicValueWriteDiscardHelper::create(result);
+		return kMiniscriptInstructionOutcomeContinue;
+	} else if (attrib == "cursor") {
+		DynamicValueWriteFuncHelper<WorldManagerInterface, &WorldManagerInterface::setCursor, true>::create(this, result);
 		return kMiniscriptInstructionOutcomeContinue;
 	}
 	return RuntimeObject::writeRefAttribute(thread, result, attrib);
@@ -2736,7 +2766,8 @@ MiniscriptInstructionOutcome WorldManagerInterface::setCurrentScene(MiniscriptTh
 		return kMiniscriptInstructionOutcomeFailed;
 	}
 
-	thread->getRuntime()->addSceneStateTransition(HighLevelSceneTransition(scene->getSelfReference().lock().staticCast<Structural>(), HighLevelSceneTransition::kTypeChangeToScene, false, false));
+	bool addToReturnList = (_opInt & 0x01) != 0;
+	thread->getRuntime()->addSceneStateTransition(HighLevelSceneTransition(scene->getSelfReference().lock().staticCast<Structural>(), HighLevelSceneTransition::kTypeChangeToScene, false, addToReturnList));
 
 	return kMiniscriptInstructionOutcomeContinue;
 }
@@ -2763,6 +2794,28 @@ MiniscriptInstructionOutcome WorldManagerInterface::setAutoResetCursor(Miniscrip
 MiniscriptInstructionOutcome WorldManagerInterface::setWinSndBufferSize(MiniscriptThread *thread, const DynamicValue &value) {
 	// Ignore
 	return kMiniscriptInstructionOutcomeContinue;
+}
+
+MiniscriptInstructionOutcome WorldManagerInterface::setCursor(MiniscriptThread *thread, const DynamicValue &value) {
+	switch (value.getType())
+	{
+	case DynamicValueTypes::kNull:
+		thread->getRuntime()->setCursorElement(Common::WeakPtr<VisualElement>());
+		return kMiniscriptInstructionOutcomeContinue;
+	case DynamicValueTypes::kObject: {
+			Common::SharedPtr<RuntimeObject> obj = value.getObject().object.lock();
+			if (obj && obj->isElement() && static_cast<Element *>(obj.get())->isVisual()) {
+				thread->getRuntime()->setCursorElement(obj.staticCast<VisualElement>());
+				return kMiniscriptInstructionOutcomeContinue;
+			} else {
+				thread->error("Object assigned as cursor wasn't a visual element");
+				return kMiniscriptInstructionOutcomeFailed;
+			}
+		} break;
+	default:
+		thread->error("Value assigned as cursor wasn't an object");
+		return kMiniscriptInstructionOutcomeFailed;
+	}
 }
 
 SystemInterface::SystemInterface() : _masterVolume(kFullVolume) {
@@ -2926,7 +2979,10 @@ void StructuralHooks::onSetPosition(Runtime *runtime, Structural *structural, Co
 ProjectPresentationSettings::ProjectPresentationSettings() : width(640), height(480), bitsPerPixel(8) {
 }
 
-Structural::Structural() : _parent(nullptr), _paused(false), _loop(false), _flushPriority(0) {
+Structural::Structural() : Structural(nullptr) {
+}
+
+Structural::Structural(Runtime *runtime) : _parent(nullptr), _paused(false), _loop(false), _flushPriority(0), _runtime(runtime) {
 }
 
 Structural::~Structural() {
@@ -3054,6 +3110,9 @@ bool Structural::readAttribute(MiniscriptThread *thread, DynamicValue &result, c
 			result.clear();
 		else
 			result.setObject(_children[0]->getSelfReference());
+		return true;
+	} else if (attrib == "element") {
+		result.setObject(getSelfReference());
 		return true;
 	}
 
@@ -3230,6 +3289,10 @@ Structural *Structural::findPrevSibling() const {
 	return nullptr;
 }
 
+Runtime *Structural::getRuntime() const {
+	return _runtime;
+}
+
 void Structural::setParent(Structural *parent) {
 	_parent = parent;
 }
@@ -3272,6 +3335,8 @@ void Structural::materializeSelfAndDescendents(Runtime *runtime, ObjectLinkingSc
 	setRuntimeGUID(runtime->allocateRuntimeGUID());
 
 	materializeDescendents(runtime, outerScope);
+
+	_runtime = runtime;
 }
 
 void Structural::materializeDescendents(Runtime *runtime, ObjectLinkingScope *outerScope) {
@@ -3443,6 +3508,8 @@ void Structural::debugInspect(IDebugInspectionReport *report) const {
 		report->declareStaticContents(debugGetTypeName());
 	if (report->declareStatic("guid"))
 		report->declareStaticContents(Common::String::format("%x", getStaticGUID()));
+	if (report->declareStatic("runtimeID"))
+		report->declareStaticContents(Common::String::format("%x", getRuntimeGUID()));
 }
 
 void Structural::debugSkipMovies() {
@@ -4066,11 +4133,18 @@ Runtime::Teardown::Teardown() : onlyRemoveChildren(false) {
 Runtime::SceneReturnListEntry::SceneReturnListEntry() : isAddToDestinationSceneTransition(false) {
 }
 
+Runtime::DispatchActionTaskData::DispatchActionTaskData() : action(Actions::kNone) {
+}
+
 Runtime::ConsumeMessageTaskData::ConsumeMessageTaskData() : consumer(nullptr) {
 }
 
 Runtime::ConsumeCommandTaskData::ConsumeCommandTaskData() : structural(nullptr) {
 }
+
+Runtime::ApplyDefaultVisibilityTaskData::ApplyDefaultVisibilityTaskData() : element(nullptr), targetVisibility(false) {
+}
+
 
 Runtime::UpdateMouseStateTaskData::UpdateMouseStateTaskData() : mouseDown(false) {
 }
@@ -4159,11 +4233,12 @@ Runtime::Runtime(OSystem *system, Audio::Mixer *mixer, ISaveUIProvider *saveProv
 	: _system(system), _mixer(mixer), _saveProvider(saveProvider), _loadProvider(loadProvider),
 	  _nextRuntimeGUID(1), _realDisplayMode(kColorDepthModeInvalid), _fakeDisplayMode(kColorDepthModeInvalid),
 	  _displayWidth(1024), _displayHeight(768), _realTime(0), _realTimeBase(0), _playTime(0), _playTimeBase(0), _sceneTransitionState(kSceneTransitionStateNotTransitioning),
-	  _lastFrameCursor(nullptr), _defaultCursor(new DefaultCursorGraphic()), _platform(kProjectPlatformUnknown),
+	  _lastFrameCursor(nullptr), _lastFrameMouseVisible(false), _defaultCursor(new DefaultCursorGraphic()), _platform(kProjectPlatformUnknown),
 	  _cachedMousePosition(Common::Point(0, 0)), _realMousePosition(Common::Point(0, 0)), _trackedMouseOutside(false),
-	  _forceCursorRefreshOnce(true), _autoResetCursor(false), _haveModifierOverrideCursor(false), _sceneGraphChanged(false), _isQuitting(false),
-	  _collisionCheckTime(0), _defaultVolumeState(true), _activeSceneTransitionEffect(nullptr), _sceneTransitionStartTime(0), _sceneTransitionEndTime(0),
-	  _sharedSceneWasSetExplicitly(false), _modifierOverrideCursorID(0), _subtitleRenderer(subRenderer) {
+	  _forceCursorRefreshOnce(true), _autoResetCursor(false), _haveModifierOverrideCursor(false), _haveCursorElement(false), _sceneGraphChanged(false), _isQuitting(false),
+	  _collisionCheckTime(0), /*_elementCursorUpdateTime(0), */_defaultVolumeState(true), _activeSceneTransitionEffect(nullptr), _sceneTransitionStartTime(0), _sceneTransitionEndTime(0),
+	  _sharedSceneWasSetExplicitly(false), _modifierOverrideCursorID(0), _subtitleRenderer(subRenderer), _multiClickStartTime(0), _multiClickInterval(500), _multiClickCount(0)
+{
 	_random.reset(new Common::RandomSource("mtropolis"));
 
 	_vthread.reset(new VThread());
@@ -4267,6 +4342,14 @@ bool Runtime::runFrame() {
 			case kOSEventTypeMouseMove: {
 					MouseInputEvent *mouseEvt = static_cast<MouseInputEvent *>(evt.get());
 
+					if (evtType == kOSEventTypeMouseDown) {
+						if (_multiClickStartTime + _multiClickInterval <= _playTime) {
+							_multiClickStartTime = _playTime;
+							_multiClickCount = 1;
+						} else
+							_multiClickCount++;
+					}
+
 					// Maybe shouldn't post the update mouse button task if non-left buttons are pressed?
 					if ((evtType == kOSEventTypeMouseDown || evtType == kOSEventTypeMouseUp) && mouseEvt->getButton() == Actions::kMouseButtonLeft) {
 						UpdateMouseStateTaskData *taskData = _vthread->pushTask("Runtime::updateMouseStateTask", this, &Runtime::updateMouseStateTask);
@@ -4369,7 +4452,7 @@ bool Runtime::runFrame() {
 		}
 
 		// This has to be in this specific spot: Queued messages that occur from scene transitions are normally discharged
-		// after the "Scene Started" event, but before scene transition.
+		// after Scene Started, Scene Changed, and element Show events, but before scene transition.
 		//
 		// Obsidian depends on this behavior in several scripts, most notably setting up conditional ambience correctly.
 		// For example, in Inspiration chapter, on exiting the plane into the statue:
@@ -4479,8 +4562,13 @@ bool Runtime::runFrame() {
 			_collisionCheckTime = _playTime;
 
 			checkBoundaries();
-			checkCollisions();
+			checkCollisions(nullptr);
+			continue;
 		}
+
+		// Reset cursor if the cursor element is gone
+		if (_haveCursorElement && _elementTrackedToCursor.expired())
+			updateMainWindowCursor();
 
 		if (_isQuitting)
 			return false;
@@ -4492,6 +4580,8 @@ bool Runtime::runFrame() {
 #ifdef MTROPOLIS_DEBUG_ENABLE
 	if (_debugger)
 		_debugger->runFrame(realMSec);
+#else
+	(void)realMSec;
 #endif
 
 	// Frame completed
@@ -4612,23 +4702,30 @@ void Runtime::drawFrame() {
 	_system->updateScreen();
 
 	Common::SharedPtr<CursorGraphic> cursor;
+	bool mouseVisible = true;
 
 	Common::SharedPtr<Window> focusWindow = _mouseFocusWindow.lock();
 
 	if (!focusWindow)
 		focusWindow = findTopWindow(_realMousePosition.x, _realMousePosition.y);
 
-	if (focusWindow)
+	if (focusWindow) {
 		cursor = focusWindow->getCursorGraphic();
+		mouseVisible = focusWindow->getMouseVisible();
+	}
 
 	if (!cursor)
 		cursor = _defaultCursor;
 
-	if (cursor != _lastFrameCursor) {
+	if ((cursor != _lastFrameCursor || !_lastFrameMouseVisible) && mouseVisible) {
 		CursorMan.showMouse(true);
 		CursorMan.replaceCursor(cursor->getCursor());
 
 		_lastFrameCursor = cursor;
+		_lastFrameMouseVisible = true;
+	} else if (_lastFrameMouseVisible && !mouseVisible) {
+		CursorMan.showMouse(false);
+		_lastFrameMouseVisible = false;
 	}
 
 	if (_project)
@@ -4693,9 +4790,31 @@ void Runtime::executeLowLevelSceneStateTransition(const LowLevelSceneStateTransi
 			forceCursorRefreshOnce();
 		}
 		break;
+	case LowLevelSceneStateTransitionAction::kShowDefaultVisibleElements:
+		executeSceneChangeRecursiveVisibilityChange(action.getScene().get(), true);
+		break;
+	case LowLevelSceneStateTransitionAction::kHideAllElements:
+		executeSceneChangeRecursiveVisibilityChange(action.getScene().get(), false);
+		break;
 	default:
 		assert(false);
 		break;
+	}
+}
+
+void Runtime::executeSceneChangeRecursiveVisibilityChange(Structural *structural, bool showing) {
+	const Common::Array<Common::SharedPtr<Structural> > &children = structural->getChildren();
+
+	// Queue in reverse order since VThread sends are LIFO
+	for (size_t i = 0; i < children.size(); i++)
+		executeSceneChangeRecursiveVisibilityChange(children[children.size() - 1 - i].get(), showing);
+
+	if (structural->isElement() && static_cast<Element *>(structural)->isVisual()) {
+		VisualElement *visual = static_cast<VisualElement *>(structural);
+
+		ApplyDefaultVisibilityTaskData *taskData = getVThread().pushTask("Runtime::applyDefaultVisibility", this, &Runtime::applyDefaultVisibility);
+		taskData->element = visual;
+		taskData->targetVisibility = showing;
 	}
 }
 
@@ -4726,6 +4845,7 @@ void Runtime::executeCompleteTransitionToScene(const Common::SharedPtr<Structura
 		Common::SharedPtr<Structural> stackedScene = _sceneStack[i].scene;
 
 		queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kSceneEnded, 0), _activeMainScene.get(), true, true);
+		_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(_activeMainScene, LowLevelSceneStateTransitionAction::kHideAllElements));
 		queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kParentDisabled, 0), _activeMainScene.get(), true, true);
 		_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(_activeMainScene, LowLevelSceneStateTransitionAction::kUnload));
 
@@ -4738,6 +4858,7 @@ void Runtime::executeCompleteTransitionToScene(const Common::SharedPtr<Structura
 	if (targetSharedScene != _activeSharedScene) {
 		if (_activeSharedScene) {
 			queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kSceneEnded, 0), _activeSharedScene.get(), true, true);
+			_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(_activeMainScene, LowLevelSceneStateTransitionAction::kHideAllElements));
 			queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kParentDisabled, 0), _activeSharedScene.get(), true, true);
 			_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(_activeSharedScene, LowLevelSceneStateTransitionAction::kUnload));
 		}
@@ -4745,6 +4866,8 @@ void Runtime::executeCompleteTransitionToScene(const Common::SharedPtr<Structura
 		_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(targetSharedScene, LowLevelSceneStateTransitionAction::kLoad));
 		queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kParentEnabled, 0), targetSharedScene.get(), true, true);
 		queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kSceneStarted, 0), targetSharedScene.get(), true, true);
+
+		_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(targetSharedScene, LowLevelSceneStateTransitionAction::kShowDefaultVisibleElements));
 
 		SceneStackEntry sharedSceneEntry;
 		sharedSceneEntry.scene = targetSharedScene;
@@ -4855,6 +4978,7 @@ void Runtime::executeHighLevelSceneTransition(const HighLevelSceneTransition &tr
 						_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(targetSharedScene, LowLevelSceneStateTransitionAction::kLoad));
 						queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kParentEnabled, 0), targetSharedScene.get(), true, true);
 						queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kSceneStarted, 0), targetSharedScene.get(), true, true);
+						_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(targetSharedScene, LowLevelSceneStateTransitionAction::kShowDefaultVisibleElements));
 
 						SceneStackEntry sharedSceneEntry;
 						sharedSceneEntry.scene = targetScene;
@@ -4906,6 +5030,7 @@ void Runtime::executeHighLevelSceneTransition(const HighLevelSceneTransition &tr
 				_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(targetSharedScene, LowLevelSceneStateTransitionAction::kLoad));
 				queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kParentEnabled, 0), targetSharedScene.get(), true, true);
 				queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kSceneStarted, 0), targetSharedScene.get(), true, true);
+				_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(targetSharedScene, LowLevelSceneStateTransitionAction::kShowDefaultVisibleElements));
 
 				SceneStackEntry sharedSceneEntry;
 				sharedSceneEntry.scene = targetSharedScene;
@@ -4935,6 +5060,8 @@ void Runtime::executeSharedScenePostSceneChangeActions() {
 		if (_activeMainScene == subsectionScenes[1])
 			queueEventAsLowLevelSceneStateTransitionAction(Event(EventIDs::kSharedSceneNoPrevScene, 0), _activeSharedScene.get(), true, true);
 	}
+
+	_pendingLowLevelTransitions.push_back(LowLevelSceneStateTransitionAction(_activeMainScene, LowLevelSceneStateTransitionAction::kShowDefaultVisibleElements));
 }
 
 void Runtime::recursiveDeactivateStructural(Structural *structural) {
@@ -5111,6 +5238,12 @@ void Runtime::loadScene(const Common::SharedPtr<Structural>& scene) {
 }
 
 void Runtime::sendMessageOnVThread(const Common::SharedPtr<MessageDispatch> &dispatch) {
+	EventIDs::EventID eventID = dispatch->getMsg()->getEvent().eventType;
+
+	// 0 is normally not produced and is invalid, 1 is "None" and is an invalid message
+	if (eventID == 1 || eventID == 0)
+		return;
+
 #ifndef DISABLE_TEXT_CONSOLE
 	const int msgDebugLevel = 3;
 
@@ -5189,7 +5322,7 @@ void Runtime::sendMessageOnVThread(const Common::SharedPtr<MessageDispatch> &dis
 				break;
 
 			case EventIDs::kMotionStarted:
-				extType = "Motion Ended";
+				extType = "Motion Started";
 				break;
 			case EventIDs::kMotionEnded:
 				extType = "Motion Started";
@@ -5626,8 +5759,37 @@ VThreadState Runtime::updateMousePositionTask(const UpdateMousePositionTaskData 
 		sendMessageOnVThread(dispatch);
 	}
 
+	// Cursor element positions are only updated on mouse movement, not when initially set
+	bool needUpdateElementPosition = (_cachedMousePosition.x != data.x || _cachedMousePosition.y != data.y);
+
 	_cachedMousePosition.x = data.x;
 	_cachedMousePosition.y = data.y;
+
+	if (needUpdateElementPosition)
+		updateCursorElementPosition();
+
+	return kVThreadReturn;
+}
+
+VThreadState Runtime::applyDefaultVisibility(const ApplyDefaultVisibilityTaskData &data) {
+	Event evt;
+	if (data.targetVisibility) {
+		if (data.element->isVisibleByDefault() == false || data.element->isVisible())
+			return kVThreadReturn;
+
+		evt = Event(EventIDs::kElementShow, 0);
+	} else {
+		if (!data.element->isVisible())
+			return kVThreadReturn;
+
+		evt = Event(EventIDs::kElementHide, 0);
+	}
+
+	// Visibility change events are sourced from the element
+ 	Common::SharedPtr<MessageProperties> props(new MessageProperties(evt, DynamicValue(), data.element->getSelfReference()));
+	Common::SharedPtr<MessageDispatch> dispatch(new MessageDispatch(props, data.element, false, false, true));
+
+	sendMessageOnVThread(dispatch);
 
 	return kVThreadReturn;
 }
@@ -5637,6 +5799,17 @@ void Runtime::updateMainWindowCursor() {
 	const uint32 kArrowID = 10011;
 
 	if (!_mainWindow.expired()) {
+		if (_haveCursorElement) {
+			Common::SharedPtr<Window> mainWindow = _mainWindow.lock();
+			if (_elementTrackedToCursor.expired()) {
+				mainWindow->setMouseVisible(true);
+				_elementTrackedToCursor.reset();
+			} else {
+				mainWindow->setMouseVisible(false);
+				return;
+			}
+		}
+
 		uint32 selectedCursor = kArrowID;
 		if (!_mouseOverObject.expired())
 			selectedCursor = kHandPointUpID;
@@ -5651,6 +5824,7 @@ void Runtime::updateMainWindowCursor() {
 				if (graphic) {
 					Common::SharedPtr<Window> mainWindow = _mainWindow.lock();
 					mainWindow->setCursorGraphic(graphic);
+					mainWindow->setMouseVisible(true);
 				}
 			}
 		}
@@ -5682,18 +5856,22 @@ void Runtime::instantiateIfAlias(Common::SharedPtr<Modifier> &modifier, const Co
 			error("Failed to resolve alias");
 		}
 
-		if (!modifier->isVariable()) {
-			Common::SharedPtr<Modifier> clonedModifier = templateModifier->shallowClone();
-			clonedModifier->setSelfReference(clonedModifier);
-			clonedModifier->setRuntimeGUID(allocateRuntimeGUID());
+		Common::SharedPtr<Modifier> clonedModifier = templateModifier->shallowClone();
+		clonedModifier->setSelfReference(clonedModifier);
+		clonedModifier->setRuntimeGUID(allocateRuntimeGUID());
 
-			clonedModifier->setName(modifier->getName());
+		clonedModifier->setName(modifier->getName());
 
-			modifier = clonedModifier;
-			clonedModifier->setParent(relinkParent);
+		modifier = clonedModifier;
+		clonedModifier->setParent(relinkParent);
 
-			ModifierChildCloner cloner(this, clonedModifier);
-			clonedModifier->visitInternalReferences(&cloner);
+		ModifierChildCloner cloner(this, clonedModifier);
+		clonedModifier->visitInternalReferences(&cloner);
+
+		// Aliased variables use the same variable storage, but are treated as distinct objects.
+		if (clonedModifier->isVariable()) {
+ 			assert(templateModifier->isVariable());
+			static_cast<VariableModifier *>(clonedModifier.get())->setStorage(static_cast<const VariableModifier *>(templateModifier.get())->getStorage());
 		}
 	}
 }
@@ -5824,6 +6002,10 @@ void Runtime::setAutoResetCursor(bool enabled) {
 	_autoResetCursor = enabled;
 }
 
+uint Runtime::getMultiClickCount() const {
+	return _multiClickCount;
+}
+
 bool Runtime::isAwaitingSceneTransition() const {
 	return _sceneTransitionState != kSceneTransitionStateNotTransitioning;
 }
@@ -5893,7 +6075,7 @@ void Runtime::removeCollider(ICollider *collider) {
 	}
 }
 
-void Runtime::checkCollisions() {
+void Runtime::checkCollisions(ICollider *optRestrictToCollider) {
 	if (!_colliders.size())
 		return;
 
@@ -5905,6 +6087,9 @@ void Runtime::checkCollisions() {
 
 	for (const Common::SharedPtr<CollisionCheckState> &collisionCheckPtr : _colliders) {
 		CollisionCheckState &colCheck = *collisionCheckPtr.get();
+
+		if (optRestrictToCollider && colCheck.collider != optRestrictToCollider)
+			continue;
 
 		Modifier *modifier = nullptr;
 		bool collideInFront;
@@ -6021,6 +6206,26 @@ void Runtime::checkCollisions() {
 
 			oldCollidingElements.push_back(colElement);
 		}
+	}
+}
+
+void Runtime::setCursorElement(const Common::WeakPtr<VisualElement> &element) {
+	_elementTrackedToCursor = element;
+	_haveCursorElement = !element.expired();
+
+	updateMainWindowCursor();
+}
+
+void Runtime::updateCursorElementPosition() {
+	Common::SharedPtr<VisualElement> element = _elementTrackedToCursor.lock();
+	if (!element)
+		return;
+
+	Common::Point elementPos = element->getGlobalPosition();
+	if (elementPos != _cachedMousePosition) {
+		VisualElement::OffsetTranslateTaskData *taskData = _vthread->pushTask("VisualElement::offsetTranslateTask", element.get(), &VisualElement::offsetTranslateTask);
+		taskData->dx = _cachedMousePosition.x - elementPos.x;
+		taskData->dy = _cachedMousePosition.y - elementPos.y;
 	}
 }
 
@@ -6674,7 +6879,7 @@ Project::AssetDesc::AssetDesc() : typeCode(0), id(0) {
 }
 
 Project::Project(Runtime *runtime)
-	: _runtime(runtime), _projectFormat(Data::kProjectFormatUnknown), _isBigEndian(false),
+	: Structural(runtime), _projectFormat(Data::kProjectFormatUnknown), _isBigEndian(false),
 	  _haveGlobalObjectInfo(false), _haveProjectStructuralDef(false), _playMediaSignaller(new PlayMediaSignaller()),
 	  _keyboardEventSignaller(new KeyboardEventSignaller()) {
 }
@@ -6893,6 +7098,15 @@ Common::SharedPtr<Modifier> Project::resolveAlias(uint32 aliasID) const {
 	return _globalModifiers.getModifiers()[aliasID - 1];
 }
 
+Common::SharedPtr<Modifier> Project::findGlobalVarWithName(const Common::String &name) const {
+	for (const Common::SharedPtr<Modifier> &modifier : _globalModifiers.getModifiers()) {
+		if (modifier && modifier->isVariable() && MTropolis::caseInsensitiveEqual(name, modifier->getName()))
+			return modifier;
+	}
+
+	return nullptr;
+}
+
 void Project::materializeGlobalVariables(Runtime *runtime, ObjectLinkingScope *outerScope) {
 	for (Common::Array<Common::SharedPtr<Modifier> >::const_iterator it = _globalModifiers.getModifiers().begin(), itEnd = _globalModifiers.getModifiers().end(); it != itEnd; ++it) {
 		Modifier *modifier = it->get();
@@ -6928,6 +7142,60 @@ Common::WeakPtr<Asset> Project::getAssetByID(uint32 assetID) const {
 		return Common::WeakPtr<Asset>();
 
 	return desc->asset;
+}
+
+void Project::forceLoadAsset(uint32 assetID, Common::Array<Common::SharedPtr<Asset> > &outHoldAssets) {
+	AssetDesc *assetDesc = _assetsByID[assetID];
+	uint32 streamID = assetDesc->streamID;
+
+	size_t streamIndex = streamID - 1;
+
+	const StreamDesc &streamDesc = _streams[streamIndex];
+	uint segmentIndex = streamDesc.segmentIndex;
+
+	openSegmentStream(segmentIndex);
+
+	Common::SeekableSubReadStreamEndian stream(_segments[segmentIndex].weakStream, streamDesc.pos, streamDesc.pos + streamDesc.size, _isBigEndian);
+	Data::DataReader reader(streamDesc.pos, stream, _projectFormat);
+
+	const Data::PlugInModifierRegistry &plugInDataLoaderRegistry = _plugInRegistry.getDataLoaderRegistry();
+
+	reader.seek(assetDesc->filePosition - streamDesc.pos);
+
+	Common::SharedPtr<Data::DataObject> dataObject;
+	Data::loadDataObject(plugInDataLoaderRegistry, reader, dataObject);
+
+	if (!dataObject) {
+		error("Failed to force-load asset data object");
+	}
+
+	Data::DataObjectTypes::DataObjectType dataObjectType = dataObject->getType();
+
+	if (!Data::DataObjectTypes::isAsset(dataObjectType)) {
+		error("Failed to force-load asset, the data object at the expected position wasn't an asset");
+	}
+
+	AssetDefLoaderContext assetDefLoader;
+	loadAssetDef(streamIndex, assetDefLoader, *dataObject.get());
+
+	assignAssets(assetDefLoader.assets, getRuntime()->getHacks());
+
+	outHoldAssets = Common::move(assetDefLoader.assets);
+}
+
+bool Project::getAssetIDByName(const Common::String &assetName, uint32 &outAssetID) const {
+	for (uint32 assetID = 0; assetID < _assetsByID.size(); assetID++) {
+		const AssetDesc *assetDesc = _assetsByID[assetID];
+		if (!assetDesc)
+			continue;
+
+		if (caseInsensitiveEqual(assetName, assetDesc->name)) {
+			outAssetID = assetID;
+			return true;
+		}
+	}
+
+	return false;
 }
 
 size_t Project::getSegmentForStreamIndex(size_t streamIndex) const {
@@ -6976,6 +7244,23 @@ Common::SeekableReadStream* Project::getStreamForSegment(int segmentIndex) {
 	return _segments[segmentIndex].weakStream;
 }
 
+const Common::String *Project::findNameOfLabel(const Label &label) const {
+	for (const LabelSuperGroup &superGroup : _labelSuperGroups) {
+		if (superGroup.superGroupID == label.superGroupID) {
+			size_t firstRootIndex = superGroup.firstRootNodeIndex;
+			size_t totalNodes = superGroup.numTotalNodes;
+
+			for (size_t i = 0; i < totalNodes; i++) {
+				const LabelTree &tree = _labelTree[i + firstRootIndex];
+				if (tree.id == label.id)
+					return &tree.name;
+			}
+		}
+	}
+
+	return nullptr;
+}
+
 Common::SharedPtr<SegmentUnloadSignaller> Project::notifyOnSegmentUnload(int segmentIndex, ISegmentUnloadSignalReceiver *receiver) {
 	Common::SharedPtr<SegmentUnloadSignaller> signaller = _segments[segmentIndex].unloadSignaller;
 	if (signaller)
@@ -6984,7 +7269,7 @@ Common::SharedPtr<SegmentUnloadSignaller> Project::notifyOnSegmentUnload(int seg
 }
 
 void Project::onPostRender() {
-	_playMediaSignaller->playMedia(_runtime, this);
+	_playMediaSignaller->playMedia(getRuntime(), this);
 }
 
 Common::SharedPtr<PlayMediaSignaller> Project::notifyOnPlayMedia(IPlayMediaSignalReceiver *receiver) {
@@ -7155,6 +7440,9 @@ void Project::loadAssetCatalog(const Data::AssetCatalog &assetCatalog) {
 			else
 				assetDesc.typeCode = 0;
 
+			assetDesc.streamID = assetInfo.streamID;
+			assetDesc.filePosition = assetInfo.filePosition;
+
 			_assetsByID[assetDesc.id] = &assetDesc;
 			if (!assetDesc.name.empty())
 				_assetNameToID[assetDesc.name] = assetDesc.id;
@@ -7207,7 +7495,7 @@ Common::SharedPtr<Modifier> Project::loadModifierObject(ModifierLoaderContext &l
 		error("Modifier object failed to load");
 
 	uint32 guid = modifier->getStaticGUID();
-	const Common::HashMap<uint32, Common::SharedPtr<ModifierHooks> > &hooksMap = _runtime->getHacks().modifierHooks;
+	const Common::HashMap<uint32, Common::SharedPtr<ModifierHooks> > &hooksMap = getRuntime()->getHacks().modifierHooks;
 	Common::HashMap<uint32, Common::SharedPtr<ModifierHooks> >::const_iterator hooksIt = hooksMap.find(guid);
 	if (hooksIt != hooksMap.end()) {
 		modifier->setHooks(hooksIt->_value);
@@ -7244,6 +7532,7 @@ void Project::loadLabelMap(const Data::ProjectLabelMap &projectLabelMap) {
 		sg.superGroupID = dataSG.id;
 
 		sg.firstRootNodeIndex = insertionOffset;
+		sg.numRootNodes = dataSG.numChildren;
 
 		for (size_t j = 0; j < dataSG.numChildren; j++)
 			treeQueue[insertionOffset++] = &dataSG.tree[j];
@@ -7436,11 +7725,11 @@ void Project::loadContextualObject(size_t streamIndex, ChildLoaderStack &stack, 
 					error("No element factory defined for structural object");
 				}
 
-				ElementLoaderContext elementLoaderContext(_runtime, streamIndex);
+				ElementLoaderContext elementLoaderContext(getRuntime(), streamIndex);
 				Common::SharedPtr<Element> element = elementFactory->createElement(elementLoaderContext, dataObject);
 
 				uint32 guid = element->getStaticGUID();
-				const Common::HashMap<uint32, Common::SharedPtr<StructuralHooks> > &hooksMap = _runtime->getHacks().structuralHooks;
+				const Common::HashMap<uint32, Common::SharedPtr<StructuralHooks> > &hooksMap = getRuntime()->getHacks().structuralHooks;
 				Common::HashMap<uint32, Common::SharedPtr<StructuralHooks> >::const_iterator hooksIt = hooksMap.find(guid);
 				if (hooksIt != hooksMap.end()) {
 					element->setHooks(hooksIt->_value);
@@ -7731,7 +8020,7 @@ VisualElementRenderProperties &VisualElementRenderProperties::operator=(const Vi
 */
 
 VisualElement::VisualElement()
-	: _rect(0, 0, 0, 0), _cachedAbsoluteOrigin(Common::Point(0, 0)), _contentsDirty(true), _directToScreen(false), _visible(true), _layer(0) {
+	: _rect(0, 0, 0, 0), _cachedAbsoluteOrigin(Common::Point(0, 0)), _contentsDirty(true), _directToScreen(false), _visible(false), _layer(0) {
 }
 
 bool VisualElement::isVisual() const {
@@ -7744,6 +8033,10 @@ bool VisualElement::isTextLabel() const {
 
 bool VisualElement::isVisible() const {
 	return _visible;
+}
+
+bool VisualElement::isVisibleByDefault() const {
+	return _visibleByDefault;
 }
 
 void VisualElement::setVisible(Runtime *runtime, bool visible) {
@@ -7803,6 +8096,29 @@ VThreadState VisualElement::consumeCommand(Runtime *runtime, const Common::Share
 	}
 
 	return Element::consumeCommand(runtime, msg);
+}
+
+bool VisualElement::respondsToEvent(const Event &evt) const {
+	if (Event(EventIDs::kAuthorMessage, 13).respondsTo(evt)) {
+		if (getRuntime()->getHacks().mtiSceneReturnHack && getParent() && getParent()->isSubsection())
+			return true;
+	}
+
+	return Element::respondsToEvent(evt);
+}
+
+VThreadState VisualElement::consumeMessage(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) {
+	if (Event(EventIDs::kAuthorMessage, 13).respondsTo(msg->getEvent())) {
+		if (getRuntime()->getHacks().mtiSceneReturnHack) {
+			if (getParent() && getParent()->isSubsection()) {
+				runtime->addSceneStateTransition(HighLevelSceneTransition(this->getSelfReference().lock().staticCast<Structural>(), HighLevelSceneTransition::kTypeChangeToScene, false, false));
+
+				return kVThreadReturn;
+			}
+		}
+	}
+
+	return Element::consumeMessage(runtime, msg);
 }
 
 bool VisualElement::isMouseInsideDrawableArea(int32 relativeX, int32 relativeY) const {
@@ -8143,9 +8459,15 @@ void VisualElement::debugInspect(IDebugInspectionReport *report) const {
 #endif
 
 MiniscriptInstructionOutcome VisualElement::scriptSetVisibility(MiniscriptThread *thread, const DynamicValue &result) {
-	// FIXME: Need to make this fire Show/Hide events!
+	// FIXME: Need to make this fire Show/Hide events??
 	if (result.getType() == DynamicValueTypes::kBoolean) {
 		const bool targetValue = result.getBool();
+
+		// Weird quirk: The element's visible flag reads as "false" until initial Show events fire, but
+		// setting "visible" here prevents it from showing.  This is necessary for the vidbots in Obsidian's
+		// bureau area, to make them appear turned off initially.
+		_visibleByDefault = targetValue;
+
 		if (_visible != targetValue) {
 			_visible = targetValue;
 			thread->getRuntime()->setSceneGraphDirty();
@@ -8162,7 +8484,7 @@ bool VisualElement::loadCommon(const Common::String &name, uint32 guid, const Da
 
 	_name = name;
 	_guid = guid;
-	_visible = ((elementFlags & Data::ElementFlags::kHidden) == 0);
+	_visibleByDefault = ((elementFlags & Data::ElementFlags::kHidden) == 0);	// Element isn't actually flagged as visible until after Scene Changed, when Show commands are fired
 	_directToScreen = ((elementFlags & Data::ElementFlags::kNotDirectToScreen) == 0);
 	_streamLocator = streamLocator;
 	_sectionID = sectionID;
@@ -8373,7 +8695,7 @@ VThreadState VisualElement::changeVisibilityTask(const ChangeFlagTaskData &taskD
 	if (_visible != taskData.desiredFlag) {
 		setVisible(taskData.runtime, taskData.desiredFlag);
 
-		Common::SharedPtr<MessageProperties> msgProps(new MessageProperties(Event(_visible ? EventIDs::kElementHide : EventIDs::kElementShow, 0), DynamicValue(), getSelfReference()));
+		Common::SharedPtr<MessageProperties> msgProps(new MessageProperties(Event(taskData.desiredFlag ? EventIDs::kElementShow : EventIDs::kElementHide, 0), DynamicValue(), getSelfReference()));
 		Common::SharedPtr<MessageDispatch> dispatch(new MessageDispatch(msgProps, this, false, true, false));
 		taskData.runtime->sendMessageOnVThread(dispatch);
 	}
@@ -8502,10 +8824,23 @@ bool Modifier::readAttribute(MiniscriptThread *thread, DynamicValue &result, con
 		Structural *owner = findStructuralOwner();
 		result.setObject(owner ? owner->getSelfReference() : Common::WeakPtr<RuntimeObject>());
 		return true;
+	} else if (attrib == "previous") {
+		Modifier *sibling = findPrevSibling();
+		if (sibling)
+			result.setObject(sibling->getSelfReference());
+		else
+			result.clear();
+		return true;
+	} else if (attrib == "next") {
+		Modifier *sibling = findNextSibling();
+		if (sibling)
+			result.setObject(sibling->getSelfReference());
+		else
+			result.clear();
+		return true;
 	}
 
 	return false;
-
 }
 
 MiniscriptInstructionOutcome Modifier::writeRefAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &writeProxy, const Common::String &attrib) {
@@ -8554,7 +8889,7 @@ bool Modifier::isKeyboardMessenger() const {
 	return false;
 }
 
-Common::SharedPtr<ModifierSaveLoad> Modifier::getSaveLoad() {
+Common::SharedPtr<ModifierSaveLoad> Modifier::getSaveLoad(Runtime *runtime) {
 	return nullptr;
 }
 
@@ -8576,6 +8911,65 @@ const Common::WeakPtr<RuntimeObject>& Modifier::getParent() const {
 
 void Modifier::setParent(const Common::WeakPtr<RuntimeObject> &parent) {
 	_parent = parent;
+}
+
+Modifier *Modifier::findNextSibling() const {
+	RuntimeObject *parent = getParent().lock().get();
+	if (parent) {
+		IModifierContainer *container = nullptr;
+		if (parent->isModifier())
+			container = static_cast<Modifier *>(parent)->getChildContainer();
+		else if (parent->isStructural())
+			container = static_cast<Structural *>(parent);
+
+		if (container)
+		{
+			const Common::Array<Common::SharedPtr<Modifier> > &neighborhood = container->getModifiers();
+			bool found = false;
+			size_t foundIndex = 0;
+			for (size_t i = 0; i < neighborhood.size(); i++) {
+				if (neighborhood[i].get() == this) {
+					foundIndex = i;
+					found = true;
+					break;
+				}
+			}
+
+			if (found && foundIndex < neighborhood.size() - 1)
+				return neighborhood[foundIndex + 1].get();
+		}
+	}
+
+	return nullptr;
+}
+
+Modifier *Modifier::findPrevSibling() const {
+	RuntimeObject *parent = getParent().lock().get();
+	if (parent) {
+		IModifierContainer *container = nullptr;
+		if (parent->isModifier())
+			container = static_cast<Modifier *>(parent)->getChildContainer();
+		else if (parent->isStructural())
+			container = static_cast<Structural *>(parent);
+
+		if (container) {
+			const Common::Array<Common::SharedPtr<Modifier> > &neighborhood = container->getModifiers();
+			bool found = false;
+			size_t foundIndex = 0;
+			for (size_t i = 0; i < neighborhood.size(); i++) {
+				if (neighborhood[i].get() == this) {
+					foundIndex = i;
+					found = true;
+					break;
+				}
+			}
+
+			if (found && foundIndex > 0)
+				return neighborhood[foundIndex - 1].get();
+		}
+	}
+
+	return nullptr;
 }
 
 bool Modifier::respondsToEvent(const Event &evt) const {
@@ -8650,9 +9044,20 @@ void Modifier::debugInspect(IDebugInspectionReport *report) const {
 		report->declareStaticContents(debugGetTypeName());
 	if (report->declareStatic("guid"))
 		report->declareStaticContents(Common::String::format("%x", getStaticGUID()));
+	if (report->declareStatic("runtimeID"))
+		report->declareStaticContents(Common::String::format("%x", getRuntimeGUID()));
 }
 
 #endif /* MTROPOLIS_DEBUG_ENABLE */
+
+VariableStorage::~VariableStorage() {
+}
+
+VariableModifier::VariableModifier(const Common::SharedPtr<VariableStorage> &storage) : _storage(storage) {
+}
+
+VariableModifier::VariableModifier(const VariableModifier &other) : Modifier(other), _storage(other._storage->clone()) {
+}
 
 bool VariableModifier::isVariable() const {
 	return true;
@@ -8660,6 +9065,19 @@ bool VariableModifier::isVariable() const {
 
 bool VariableModifier::isListVariable() const {
 	return false;
+}
+
+
+Common::SharedPtr<ModifierSaveLoad> VariableModifier::getSaveLoad(Runtime *runtime) {
+	return _storage->getSaveLoad(runtime);
+}
+
+const Common::SharedPtr<VariableStorage> &VariableModifier::getStorage() const {
+	return _storage;
+}
+
+void VariableModifier::setStorage(const Common::SharedPtr<VariableStorage> &storage) {
+	_storage = storage;
 }
 
 bool VariableModifier::readAttribute(MiniscriptThread *thread, DynamicValue &result, const Common::String &attrib) {

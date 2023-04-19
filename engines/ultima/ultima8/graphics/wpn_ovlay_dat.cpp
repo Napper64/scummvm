@@ -19,7 +19,7 @@
  *
  */
 
-#include "ultima/ultima8/misc/pent_include.h"
+#include "ultima/ultima8/misc/debugger.h"
 
 #include "ultima/ultima8/graphics/wpn_ovlay_dat.h"
 
@@ -65,7 +65,7 @@ void WpnOvlayDat::load(RawArchive *overlaydat) {
 			// get Avatar's animation
 			const AnimAction *anim = msf->getAnim(1, action);
 			if (!anim) {
-				perr << "Skipping wpnovlay action " << action << " because avatar animation doesn't exist." << Std::endl;
+				warning("Skipping wpnovlay action %u because avatar animation doesn't exist.", action);
 				continue;
 			}
 

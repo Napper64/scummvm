@@ -109,6 +109,7 @@ extern const SciWorkaroundEntry kStrAt_workarounds[];
 extern const SciWorkaroundEntry kStrCpy_workarounds[];
 extern const SciWorkaroundEntry kStrLen_workarounds[];
 extern const SciWorkaroundEntry kUnLoad_workarounds[];
+extern const SciWorkaroundEntry kWait_workarounds[];
 extern const SciWorkaroundEntry kStringNew_workarounds[];
 extern const SciWorkaroundEntry kScrollWindowAdd_workarounds[];
 
@@ -121,7 +122,7 @@ enum SciMessageWorkaroundType {
 	MSG_WORKAROUND_EXTRACT      // use text from a different record, optionally a substring
 };
 
-enum SciMedia {
+enum SciMedia : uint {
 	SCI_MEDIA_ALL,
 	SCI_MEDIA_FLOPPY,
 	SCI_MEDIA_CD,

@@ -28,8 +28,10 @@
 
 #include "engines/nancy/nancy.h"
 #include "engines/nancy/sound.h"
+#include "engines/nancy/iff.h"
 
 #include "engines/nancy/state/scene.h"
+#include "engines/nancy/state/map.h"
 
 namespace Nancy {
 
@@ -187,7 +189,7 @@ bool readHISHeader(Common::SeekableReadStream *stream, SoundType &type, uint16 &
 	return true;
 }
 
-Audio::SeekableAudioStream *SoundManager::makeHISStream(Common::SeekableReadStream *stream, DisposeAfterUse::Flag disposeAfterUse) {
+Audio::SeekableAudioStream *SoundManager::makeHISStream(Common::SeekableReadStream *stream, DisposeAfterUse::Flag disposeAfterUse, uint32 overrideSamplesPerSec) {
 	char buf[22];
 
 	stream->read(buf, 22);
@@ -240,7 +242,7 @@ Audio::SeekableAudioStream *SoundManager::makeHISStream(Common::SeekableReadStre
 	Common::SeekableSubReadStream *subStream = new Common::SeekableSubReadStream(stream, stream->pos(), stream->pos() + size, disposeAfterUse);
 
 	if (type == kSoundTypeRaw || type == kSoundTypeDiamondware)
-		return Audio::makeRawStream(subStream, samplesPerSec, flags, DisposeAfterUse::YES);
+		return Audio::makeRawStream(subStream, overrideSamplesPerSec == 0 ? samplesPerSec : overrideSamplesPerSec, flags, DisposeAfterUse::YES);
 	else
 		return Audio::makeVorbisStream(subStream, DisposeAfterUse::YES);
 }
@@ -251,33 +253,34 @@ SoundManager::SoundManager() {
 	initSoundChannels();
 }
 
-void SoundManager::loadCommonSounds() {
+void SoundManager::loadCommonSounds(IFF *boot) {
 	// Persistent sounds that are used across the engine. These originally get loaded inside Logo
 	Common::String chunkNames[] = {
-		"CANT", // channel 17
-		"CURT", // channel 18
-		"GLOB", // channel 20
-		"BULS", // channel 22
-		"BUDE", // channel 23
-		"BUOK", // channel 24
+		"CANT", "CURT", "GLOB", "SLID", "BULS", "BUDE", "BUOK", "TH1", "TH2",
 	};
 
 	Common::SeekableReadStream *chunk = nullptr;
 	for (auto const &s : chunkNames) {
-		chunk = g_nancy->getBootChunkStream(s);
+		chunk = boot->getChunkStream(s);
 		if (chunk) {
 			SoundDescription &desc = _commonSounds.getOrCreateVal(s);
-			desc.read(*chunk, SoundDescription::kNormal);
+			desc.readData(*chunk, SoundDescription::kNormal);
 			g_nancy->_sound->loadSound(desc);
+			_channels[desc.channelID].isPersistent = true;
+
+			delete chunk;
 		}
 	}
 
-	// Menu sound is special since it's stored differently and can be
-	// unloaded and loaded again
-	chunk = g_nancy->getBootChunkStream("MSND"); // channel 28
+	// Menu sound is stored differently
+	chunk = boot->getChunkStream("MSND"); // channel 28
 	if (chunk) {
 		SoundDescription &desc = _commonSounds.getOrCreateVal("MSND");
-		desc.read(*chunk, SoundDescription::kMenu);
+		desc.readData(*chunk, SoundDescription::kMenu);
+		g_nancy->_sound->loadSound(desc);
+		_channels[desc.channelID].isPersistent = true;
+
+		delete chunk;
 	}
 }
 
@@ -307,7 +310,7 @@ void SoundManager::loadSound(const SoundDescription &description, bool panning) 
 
 	Common::SeekableReadStream *file = SearchMan.createReadStreamForMember(description.name + (g_nancy->getGameType() == kGameTypeVampire ? ".dwd" : ".his"));
 	if (file) {
-		_channels[description.channelID].stream = makeHISStream(file, DisposeAfterUse::YES);
+		_channels[description.channelID].stream = makeHISStream(file, DisposeAfterUse::YES, description.samplesPerSec);
 	}
 }
 
@@ -324,6 +327,10 @@ void SoundManager::playSound(uint16 channelID) {
 						channelID,
 						chan.volume * 255 / 100,
 						0, DisposeAfterUse::NO);
+
+	if (chan.isPanning) {
+		calculatePan(channelID);
+	}
 }
 
 void SoundManager::playSound(const SoundDescription &description) {
@@ -389,9 +396,13 @@ void SoundManager::stopSound(uint16 channelID) {
 	if (isSoundPlaying(channelID)) {
 		_mixer->stopHandle(chan.handle);
 	}
-	chan.name = Common::String();
-	delete chan.stream;
-	chan.stream = nullptr;
+
+	// Persistent sounds only stop playing but do not get unloaded
+	if (!chan.isPersistent) {
+		chan.name = Common::String();
+		delete chan.stream;
+		chan.stream = nullptr;
+	}
 }
 
 void SoundManager::stopSound(const SoundDescription &description) {
@@ -404,43 +415,91 @@ void SoundManager::stopSound(const Common::String &chunkName) {
 	stopSound(_commonSounds[chunkName]);
 }
 
-// Returns whether the exception was skipped
 void SoundManager::stopAllSounds() {
 	for (uint i = 0; i < 31; ++i) {
 		stopSound(i);
 	}
 }
 
-void SoundManager::calculatePanForAllSounds() {
+void SoundManager::calculatePan(uint16 channelID) {
 	uint16 viewportFrameID = NancySceneState.getSceneInfo().frameID;
 	const State::Scene::SceneSummary &sceneSummary = NancySceneState.getSceneSummary();
-	for (uint i = 0; i < 31; ++i) {
-		Channel &chan = _channels[i];
-		if (chan.isPanning) {
-			switch (sceneSummary.totalViewAngle) {
-			case 180:
-				_mixer->setChannelBalance(chan.handle, CLIP<int32>((viewportFrameID - chan.panAnchorFrame) * sceneSummary.soundPanPerFrame * 364, -32768, 32767) / 256);
-				break;
-			case 360:
-				// TODO
-				_mixer->setChannelBalance(chan.handle, 0);
-				break;
-			default:
-				_mixer->setChannelBalance(chan.handle, 0);
-				break;
+	Channel &chan = _channels[channelID];
+	if (chan.isPanning) {
+		switch (sceneSummary.totalViewAngle) {
+		case 180:
+			_mixer->setChannelBalance(chan.handle, CLIP<int32>((viewportFrameID - chan.panAnchorFrame) * sceneSummary.soundPanPerFrame * 364, -32768, 32767) / 256);
+			break;
+		case 360: {
+			int16 adjustedViewportFrame = viewportFrameID - chan.panAnchorFrame;
+			if (adjustedViewportFrame < 0) {
+				adjustedViewportFrame += sceneSummary.numberOfVideoFrames;
 			}
+
+			// Divide the virtual space into quarters
+			uint16 q1 = sceneSummary.numberOfVideoFrames / 4;
+			uint16 q2 = sceneSummary.numberOfVideoFrames / 2;
+			uint16 q3 = sceneSummary.numberOfVideoFrames * 3 / 4;
+
+			float balance;
+
+			if (adjustedViewportFrame < q1) {
+				balance = (float)adjustedViewportFrame / q1;
+				balance *= 32767;
+				balance = 32768 - balance;
+			} else if (adjustedViewportFrame < q2) {
+				balance = (float)(adjustedViewportFrame - q1) / q1;
+				balance *= 32767;
+			} else if (adjustedViewportFrame < q3) {
+				balance = (float)(adjustedViewportFrame - q2) / q1;
+				balance *= 32767;
+				balance += 32768;
+			} else {
+				balance = (float)(adjustedViewportFrame - q3) / q1;
+				balance *= 32767;
+				balance = 65535 - balance;
+			}
+
+			// The original engine's algorithm is broken and results in flipped
+			// stereo; the following line fixes this bug
+			balance = 65535 - balance;
+
+			_mixer->setChannelBalance(chan.handle, (balance - 32768) / 256);
+			break;
+			}
+		default:
+			_mixer->setChannelBalance(chan.handle, 0);
+			break;
 		}
 	}
 }
 
+void SoundManager::calculatePan(const SoundDescription &description) {
+	if (description.name != "NO SOUND") {
+		calculatePan(description.channelID);
+	}
+}
+
+void SoundManager::calculatePanForAllSounds() {
+	for (uint i = 0; i < 31; ++i) {
+		calculatePan(i);
+	}
+}
+
 void SoundManager::stopAndUnloadSpecificSounds() {
-	// TODO missing if
+	if (g_nancy->getGameType() == kGameTypeVampire && Nancy::State::Map::hasInstance()) {
+		// Don't stop the map sound in certain scenes
+		uint nextScene = NancySceneState.getNextSceneInfo().sceneID;
+		if (nextScene != 0 && (nextScene < 15 || nextScene > 27)) {
+			stopSound(NancyMapState.getSound());
+		}
+	}
 
 	for (uint i = 0; i < 10; ++i) {
 		stopSound(i);
 	}
 
-	stopSound(_commonSounds["MSND"]);
+	stopSound("MSND");
 }
 
 void SoundManager::initSoundChannels() {

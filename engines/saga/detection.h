@@ -39,7 +39,10 @@ enum GameFeatures {
 	GF_IHNM_COLOR_FIX    = 1 << 4,
 	GF_SOME_MAC_RESOURCES= 1 << 5,
 	GF_AGA_GRAPHICS      = 1 << 6,
-	GF_ECS_GRAPHICS      = 1 << 7
+	GF_ECS_GRAPHICS      = 1 << 7,
+	GF_INSTALLER         = 1 << 8,
+	GF_EMBED_FONT        = 1 << 9,
+	GF_POWERPACK_GFX     = 1 << 10,
 };
 
 enum GameFileTypes {
@@ -63,9 +66,9 @@ enum GameFileTypes {
 enum GameResourceList : uint8 {
 	RESOURCELIST_NONE = 0,
 	RESOURCELIST_ITE,
-	RESOURCELIST_ITE_ENGLISH_ECS_CD,
-	RESOURCELIST_ITE_GERMAN_AGA_CD,
-	RESOURCELIST_ITE_GERMAN_ECS_CD,
+	RESOURCELIST_ITE_ENGLISH_ECS,
+	RESOURCELIST_ITE_GERMAN_AGA,
+	RESOURCELIST_ITE_GERMAN_ECS,
 	RESOURCELIST_ITE_DEMO,
 	RESOURCELIST_IHNM,
 	RESOURCELIST_IHNM_DEMO,
@@ -96,8 +99,7 @@ enum GamePatchList : uint8 {
 enum GameIntroList : uint8 {
 	INTROLIST_NONE = 0,
 	INTROLIST_ITE_DEFAULT,
-	INTROLIST_ITE_AMIGA_ENGLISH_AGA_CD,
-	INTROLIST_ITE_AMIGA_ENGLISH_ECS_CD,
+	INTROLIST_ITE_AMIGA_ENGLISH_ECS,
 	INTROLIST_ITE_AMIGA_GERMAN_AGA,
 	INTROLIST_ITE_AMIGA_GERMAN_ECS,
 	INTROLIST_ITE_DOS_DEMO,
@@ -114,6 +116,8 @@ struct SAGAGameDescription {
 	GameFontList fontList;
 	GamePatchList patchList;
 	GameIntroList introList;
+	// Only used if GF_INSTALLER is set
+	ADGameFileDescription filesInArchive[5];
 };
 
 } // End of namespace Saga

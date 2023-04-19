@@ -95,7 +95,7 @@ public:
 
 	void loadCastMemberData();
 	void loadStxtData(int key, TextCastMember *member);
-	void loadPaletteData(PaletteCastMember *member, Common::HashMap<int, PaletteV4>::iterator &p);
+	void loadPaletteData(PaletteCastMember *member);
 	void loadFilmLoopData(FilmLoopCastMember *member);
 	void loadBitmapData(int key, BitmapCastMember *bitmapCast);
 	void loadSoundData(int key, SoundCastMember *soundCast);
@@ -106,7 +106,7 @@ public:
 	CastMember *setCastMember(CastMemberID castId, CastMember *cast);
 	bool eraseCastMember(CastMemberID castId);
 	CastMember *getCastMember(int castId);
-	CastMember *getCastMemberByName(const Common::String &name);
+	CastMember *getCastMemberByNameAndType(const Common::String &name, CastType type);
 	CastMember *getCastMemberByScriptId(int scriptId);
 	CastMemberInfo *getCastMemberInfo(int castId);
 	const Stxt *getStxt(int castId);
@@ -125,7 +125,7 @@ public:
 	Common::String formatCastSummary(int castId);
 
 private:
-	void loadScriptText(Common::SeekableReadStreamEndian &stream, uint16 id);
+	void loadScriptV2(Common::SeekableReadStreamEndian &stream, uint16 id);
 	void loadFontMap(Common::SeekableReadStreamEndian &stream);
 	void loadFontMapV4(Common::SeekableReadStreamEndian &stream);
 	void loadFXmp(Common::SeekableReadStreamEndian &stream);
@@ -142,6 +142,8 @@ public:
 	CharMap _winCharsToMac;
 	FontXPlatformMap _fontXPlatformMap;
 	FontMap _fontMap;
+
+	bool _isProtected;
 
 	Common::HashMap<int, CastMember *> *_loadedCast;
 	Common::HashMap<int, const Stxt *> *_loadedStxts;

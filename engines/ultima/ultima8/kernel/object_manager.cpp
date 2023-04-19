@@ -19,7 +19,7 @@
  *
  */
 
-#include "ultima/ultima8/misc/pent_include.h"
+#include "ultima/ultima8/misc/debugger.h"
 #include "ultima/ultima8/kernel/object_manager.h"
 #include "ultima/ultima8/misc/id_man.h"
 #include "ultima/ultima8/ultima8.h"
@@ -261,13 +261,12 @@ bool ObjectManager::load(Common::ReadStream *rs, uint32 version) {
 	// _objIDs (up to 511 is reserved by U8Game, 666 is reserved for Guardian
 	// barks).
 	// FIXME: Properly fix this objID leak and increment the savegame number.
-	//        This check can then be turned into an savegame corruption check
+	//        This check can then be turned into a savegame corruption check
 	//        for saves with the new savegame version.
 	// We also fail loading when we're out of _objIDs since this could
 	// have caused serious issues when critical _objects haven't been created.
 	if (_objIDs->isFull()) {
-		perr << "Savegame has been corrupted by running out of _objIDs."
-		     << Std::endl;
+		warning("Savegame has been corrupted by running out of _objIDs.");
 		return false;
 	}
 	unsigned int count = 0;
@@ -277,7 +276,7 @@ bool ObjectManager::load(Common::ReadStream *rs, uint32 version) {
 			count++;
 		}
 	}
-	pout << "Reclaimed " << count << " _objIDs on load." << Std::endl;
+	debug(MM_INFO, "Reclaimed %u _objIDs on load.", count);
 
 	// Integrity check items - their ids should match, and if they have
 	// parents, those should be valid.
@@ -336,14 +335,14 @@ Object *ObjectManager::loadObject(Common::ReadStream *rs, Std::string classname,
 	iter = _objectLoaders.find(classname);
 
 	if (iter == _objectLoaders.end()) {
-		perr << "Unknown Object class: " << classname << Std::endl;
+		warning("Unknown Object class: %s", classname.c_str());
 		return nullptr;
 	}
 
 	Object *obj = (*(iter->_value))(rs, version);
 
 	if (!obj) {
-		perr << "Error loading object of type " << classname << Std::endl;
+		warning("Error loading object of type %s", classname.c_str());
 		return nullptr;
 	}
 	uint16 objid = obj->getObjId();
@@ -356,8 +355,7 @@ Object *ObjectManager::loadObject(Common::ReadStream *rs, Std::string classname,
 		else
 			used = _actorIDs->isIDUsed(objid);
 		if (!used) {
-			perr << "Error: object ID " << objid
-			     << " used but marked available. " << Std::endl;
+			warning("Error: object ID %u used but marked available.", objid);
 			return nullptr;
 		}
 	}

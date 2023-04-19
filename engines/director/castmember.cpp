@@ -20,6 +20,7 @@
  */
 
 #include "graphics/macgui/macbutton.h"
+#include "graphics/surface.h"
 #include "image/image_decoder.h"
 #include "video/avi_decoder.h"
 #include "video/qt_decoder.h"
@@ -30,6 +31,8 @@
 #include "director/cursor.h"
 #include "director/channel.h"
 #include "director/movie.h"
+#include "director/picture.h"
+#include "director/score.h"
 #include "director/sprite.h"
 #include "director/sound.h"
 #include "director/window.h"
@@ -92,7 +95,7 @@ void CastMember::setModified(bool modified) {
 BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableReadStreamEndian &stream, uint32 castTag, uint16 version, uint8 flags1)
 		: CastMember(cast, castId, stream) {
 	_type = kCastBitmap;
-	_img = nullptr;
+	_picture = nullptr;
 	_ditheredImg = nullptr;
 	_matte = nullptr;
 	_noMatte = false;
@@ -100,8 +103,10 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableRe
 	_pitch = 0;
 	_flags2 = 0;
 	_regX = _regY = 0;
-	_clut = kClutSystemMac;
+	_clut = 0;
+	_ditheredTargetClut = 0;
 	_bitsPerPixel = 0;
+	_external = false;
 
 	if (version < kFileVer400) {
 		_flags1 = flags1;	// region: 0 - auto, 1 - matte, 2 - disabled
@@ -114,7 +119,9 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableRe
 
 		if (_bytes & 0x8000) {
 			_bitsPerPixel = stream.readUint16();
-			_clut = stream.readSint16() - 1;
+			_clut = stream.readSint16();
+			if (_clut <= 0) // builtin palette
+				_clut -= 1;
 		} else {
 			_bitsPerPixel = 1;
 			_clut = kClutSystemMac;
@@ -123,6 +130,9 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableRe
 		_pitch = _initialRect.width();
 		if (_pitch % 16)
 			_pitch += 16 - (_initialRect.width() % 16);
+
+		_pitch *= _bitsPerPixel;
+		_pitch >>= 3;
 
 	} else if (version >= kFileVer400 && version < kFileVer500) {
 		_flags1 = flags1;
@@ -139,7 +149,9 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableRe
 		if (stream.eos()) {
 			_bitsPerPixel = 0;
 		} else {
-			_clut = stream.readSint16() - 1;
+			_clut = stream.readSint16();
+			if (_clut <= 0) // builtin palette
+				_clut -= 1;
 			stream.readUint16();
 			/* uint16 unk1 = */ stream.readUint16();
 			stream.readUint16();
@@ -152,9 +164,6 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableRe
 
 		if (_bitsPerPixel == 0)
 			_bitsPerPixel = 1;
-
-		if (_bitsPerPixel == 1)
-			_pitch *= 8;
 
 		int tail = 0;
 		byte buf[256];
@@ -202,9 +211,12 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Image::ImageDecode
 	_matte = nullptr;
 	_noMatte = false;
 	_bytes = 0;
-	_img = img;
+	if (img != nullptr) {
+		_picture = new Picture(*img);
+	}
 	_ditheredImg = nullptr;
 	_clut = -1;
+	_ditheredTargetClut = 0;
 	_initialRect = Common::Rect(0, 0, img->getSurface()->w, img->getSurface()->h);
 	_pitch = img->getSurface()->pitch;
 	_bitsPerPixel = img->getSurface()->format.bytesPerPixel * 8;
@@ -213,22 +225,24 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Image::ImageDecode
 	_flags1 = flags1;
 	_flags2 = 0;
 	_tag = 0;
+	_external = false;
 }
 
 BitmapCastMember::~BitmapCastMember() {
-	if (_img)
-		delete _img;
+	delete _picture;
 
-	if (_ditheredImg)
+	if (_ditheredImg) {
+		_ditheredImg->free();
 		delete _ditheredImg;
+	}
 
 	if (_matte)
 		delete _matte;
 }
 
 Graphics::MacWidget *BitmapCastMember::createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) {
-	if (!_img) {
-		warning("BitmapCastMember::createWidget: No image decoder");
+	if (!_picture) {
+		warning("BitmapCastMember::createWidget: No picture");
 		return nullptr;
 	}
 
@@ -238,9 +252,16 @@ Graphics::MacWidget *BitmapCastMember::createWidget(Common::Rect &bbox, Channel 
 
 	// Check if we need to dither the image
 	int dstBpp = g_director->_wm->_pixelformat.bytesPerPixel;
-	int srcBpp = _img->getSurface()->format.bytesPerPixel;
+	int srcBpp = _picture->_surface.format.bytesPerPixel;
 
-	const byte *pal = _img->getPalette();
+	const byte *pal = _picture->_palette;
+	bool previouslyDithered = _ditheredImg != nullptr;
+	if (_ditheredImg) {
+		_ditheredImg->free();
+		delete _ditheredImg;
+		_ditheredImg = nullptr;
+		_ditheredTargetClut = 0;
+	}
 
 	if (dstBpp == 1) {
 		if (srcBpp > 1
@@ -248,13 +269,103 @@ Graphics::MacWidget *BitmapCastMember::createWidget(Common::Rect &bbox, Channel 
 		// needed, here is the code
 #if 0
 		|| (srcBpp == 1 &&
-			memcmp(g_director->_wm->getPalette(), _img->getPalette(), _img->getPaletteColorCount() * 3))
+			memcmp(g_director->_wm->getPalette(), _img->_palette, _img->_paletteSize))
 #endif
 			) {
 
-			_ditheredImg = _img->getSurface()->convertTo(g_director->_wm->_pixelformat, _img->getPalette(), _img->getPaletteColorCount(), g_director->_wm->getPalette(), g_director->_wm->getPaletteSize());
+			_ditheredImg = _picture->_surface.convertTo(g_director->_wm->_pixelformat, _picture->_palette, _picture->_paletteColors, g_director->_wm->getPalette(), g_director->_wm->getPaletteSize());
 
 			pal = g_director->_wm->getPalette();
+		} else {
+			// Convert indexed image to indexed palette
+			Movie *movie = g_director->getCurrentMovie();
+			Cast *cast = movie->getCast();
+			Score *score = movie->getScore();
+			// Get the current score palette. Note that this is the ID of the palette in the list, not the cast member!
+			int currentPaletteId = score->resolvePaletteId(score->getCurrentPalette());
+			if (!currentPaletteId)
+				currentPaletteId = cast->_defaultPalette;
+			PaletteV4 *currentPalette = g_director->getPalette(currentPaletteId);
+			if (!currentPalette) {
+				currentPaletteId = kClutSystemMac;
+				currentPalette = g_director->getPalette(currentPaletteId);
+			}
+			int castPaletteId = score->resolvePaletteId(_clut);
+			// It is possible for Director to have saved an invalid ID in _clut;
+			// if this is the case, do no dithering.
+			if (!castPaletteId)
+				castPaletteId = currentPaletteId;
+
+			// Check if the palette is in the middle of a color fade event
+			bool isColorCycling = score->isPaletteColorCycling();
+
+			// First, check if the palettes are different
+			switch (_bitsPerPixel) {
+			// 1bpp - this is preconverted to 0x00 and 0xff, change nothing.
+			case 1:
+				break;
+			// 2bpp - convert to nearest using the standard 2-bit palette.
+			case 2:
+				{
+					const PaletteV4 &srcPal = g_director->getLoaded4Palette();
+					_ditheredImg = _picture->_surface.convertTo(g_director->_wm->_pixelformat, srcPal.palette, srcPal.length, currentPalette->palette, currentPalette->length, Graphics::kDitherNaive);
+				}
+				break;
+			// 4bpp - if using a builtin palette, use one of the corresponding 4-bit ones.
+			case 4:
+				{
+					const auto pals = g_director->getLoaded16Palettes();
+					// in D4 you aren't allowed to use custom palettes for 4-bit images, so uh...
+					// I guess default to the mac palette?
+					int palIndex = pals.contains(castPaletteId) ? castPaletteId : kClutSystemMac;
+					const PaletteV4 &srcPal = pals.getVal(palIndex);
+					_ditheredImg = _picture->_surface.convertTo(g_director->_wm->_pixelformat, srcPal.palette, srcPal.length, currentPalette->palette, currentPalette->length, Graphics::kDitherNaive);
+				}
+				break;
+			// 8bpp - if using a different palette, and we're not doing a color cycling operation, convert using nearest colour matching
+			case 8:
+				// Only redither 8-bit images if we have the flag set, or it is external
+				if (!movie->_remapPalettesWhenNeeded && !_external)
+					break;
+				if (_external || (castPaletteId != currentPaletteId && !isColorCycling)) {
+					const auto pals = g_director->getLoadedPalettes();
+					int palIndex = pals.contains(castPaletteId) ? castPaletteId : kClutSystemMac;
+					const PaletteV4 &srcPal = pals.getVal(palIndex);
+
+					// If it is an external image, use the included palette.
+					// For BMP images especially, they'll often have the right colors
+					// but in the wrong palette order.
+					const byte *palPtr = _external ? pal : srcPal.palette;
+					int palLength = _external ? _picture->getPaletteSize() : srcPal.length;
+					_ditheredImg = _picture->_surface.convertTo(g_director->_wm->_pixelformat, palPtr, palLength, currentPalette->palette, currentPalette->length, Graphics::kDitherNaive);
+				}
+				break;
+			default:
+				break;
+			}
+
+			if (_ditheredImg) {
+				debugC(4, kDebugImages, "BitmapCastMember::createWidget(): Dithering image from source palette %d to target palette %d", _clut, score->getCurrentPalette());
+				// Save the palette ID so we can check if a redraw is required
+				_ditheredTargetClut = currentPaletteId;
+
+				if (!_external) {
+					// Finally, the first and last colours in the palette are special. No matter what the palette remap
+					// does, we need to scrub those to be the same.
+					const Graphics::Surface *src = &_picture->_surface;
+					for (int y = 0; y < src->h; y++) {
+						for (int x = 0; x < src->w; x++) {
+							const int test = *(const byte *)src->getBasePtr(x, y);
+							if (test == 0 || test == (1 << _bitsPerPixel) - 1) {
+								*(byte *)_ditheredImg->getBasePtr(x, y) = test == 0 ? 0x00 : 0xff;
+							}
+						}
+					}
+				}
+			} else if (previouslyDithered) {
+				debugC(4, kDebugImages, "BitmapCastMember::createWidget(): Removed dithered image, score palette %d matches cast member", score->getCurrentPalette());
+			}
+
 		}
 	}
 
@@ -272,7 +383,7 @@ void BitmapCastMember::copyStretchImg(Graphics::Surface *surface, const Common::
 	if (_ditheredImg)
 		srcSurf = _ditheredImg;
 	else
-		srcSurf = _img->getSurface();
+		srcSurf = &_picture->_surface;
 
 	if (bbox.width() != _initialRect.width() || bbox.height() != _initialRect.height()) {
 
@@ -311,6 +422,48 @@ void BitmapCastMember::copyStretchImg(Graphics::Surface *surface, const Common::
 	} else {
 		surface->copyFrom(*srcSurf);
 	}
+
+	if (g_director->_debugDraw & kDebugDrawCast) {
+		surface->frameRect(Common::Rect(0, 0, surface->w, surface->h), g_director->_wm->_colorWhite);
+
+		const Graphics::Font *font = FontMan.getFontByUsage(Graphics::FontManager::kConsoleFont);
+		font->drawString(surface, Common::String::format("%d", _castId), 2, 2, 10, g_director->_wm->_colorWhite);
+	}
+}
+
+bool BitmapCastMember::isModified() {
+	if (CastMember::isModified()) {
+		// Let's us use "setChanged" when changing the picture through Lingo
+		return true;
+	}
+	// Check for palette changes.
+	// If a bitmap has a custom palette assigned to it, createWidget()
+	// will dither the image so that it fits within the current palette.
+	// When the score palette changes, we need to flag that the widget needs
+	// to be recreated.
+	if (_clut) {
+		Movie *movie = g_director->getCurrentMovie();
+		Cast *cast = movie->getCast();
+		Score *score = movie->getScore();
+		int currentPaletteId = score->resolvePaletteId(score->getCurrentPalette());
+		if (!currentPaletteId)
+			currentPaletteId = cast->_defaultPalette;
+		PaletteV4 *currentPalette = g_director->getPalette(currentPaletteId);
+		if (!currentPalette) {
+			currentPaletteId = kClutSystemMac;
+			currentPalette = g_director->getPalette(currentPaletteId);
+		}
+		int castPaletteId = score->resolvePaletteId(_clut);
+		if (!castPaletteId)
+			castPaletteId = cast->_defaultPalette;
+
+		if (currentPaletteId == castPaletteId) {
+			return _ditheredTargetClut != 0;
+		} else {
+			return _ditheredTargetClut != currentPaletteId;
+		}
+	}
+	return false;
 }
 
 void BitmapCastMember::createMatte(Common::Rect &bbox) {
@@ -387,14 +540,49 @@ Graphics::Surface *BitmapCastMember::getMatte(Common::Rect &bbox) {
 
 Common::String BitmapCastMember::formatInfo() {
 	return Common::String::format(
-		"initialRect: %dx%d@%d,%d, boundingRect: %dx%d@%d,%d, foreColor: %d, backColor: %d, regX: %d, regY: %d, pitch: %d, bitsPerPixel: %d",
+		"initialRect: %dx%d@%d,%d, boundingRect: %dx%d@%d,%d, foreColor: %d, backColor: %d, regX: %d, regY: %d, pitch: %d, bitsPerPixel: %d, palette: %d",
 		_initialRect.width(), _initialRect.height(),
 		_initialRect.left, _initialRect.top,
 		_boundingRect.width(), _boundingRect.height(),
 		_boundingRect.left, _boundingRect.top,
 		getForeColor(), getBackColor(),
-		_regX, _regY, _pitch, _bitsPerPixel
+		_regX, _regY, _pitch, _bitsPerPixel, _clut
 	);
+}
+
+PictureReference *BitmapCastMember::getPicture() const {
+	auto picture = new PictureReference;
+
+	// Not sure if we can make the assumption that the owning
+	// BitmapCastMember will live as long as any reference,
+	// so we'll make a copy of the Picture.
+	picture->_picture = new Picture(*_picture);
+
+	return picture;
+}
+
+void BitmapCastMember::setPicture(PictureReference &picture) {
+	delete _picture;
+	_picture = new Picture(*picture._picture);
+
+	// Force redither
+	delete _ditheredImg;
+	_ditheredImg = nullptr;
+
+	// Make sure we get redrawn
+	setModified(true);
+	// TODO: Should size be adjusted?
+}
+
+void BitmapCastMember::setPicture(Image::ImageDecoder &image, bool adjustSize) {
+	delete _picture;
+	_picture = new Picture(image);
+	if (adjustSize) {
+		auto surf = image.getSurface();
+		_size = surf->pitch * surf->h + _picture->getPaletteSize();
+	}
+	// Make sure we get redrawn
+	setModified(true);
 }
 
 /////////////////////////////////////
@@ -993,7 +1181,7 @@ TextCastMember::TextCastMember(Cast *cast, uint16 castId, Common::SeekableReadSt
 	_maxHeight = _textHeight = 0;
 
 	_bgcolor = 0;
-	_fgcolor = 0;
+	_fgcolor = 0xff;
 
 	_textFlags = 0;
 	_scroll = 0;
@@ -1172,6 +1360,7 @@ void TextCastMember::importStxt(const Stxt *stxt) {
 	_fgpalinfo3 = stxt->_style.b;
 	_ftext = stxt->_ftext;
 	_ptext = stxt->_ptext;
+	_rtext = stxt->_rtext;
 
 	// Rectifying _fontId in case of a fallback font
 	Graphics::MacFont macFont(_fontId, _fontSize, _textSlant);
@@ -1241,19 +1430,21 @@ void TextCastMember::importRTE(byte *text) {
 	//assert(rteList.size() == 3);
 	//child0 is probably font data.
 	//child1 is the raw text.
-	_ptext = _ftext = Common::String((char*)text);
+	_rtext = _ptext = _ftext = Common::String((char*)text);
 	//child2 is positional?
 }
 
-void TextCastMember::setText(const Common::U32String &text) {
+void TextCastMember::setRawText(const Common::String &text) {
 	// Do nothing if text did not change
-	if (_ptext.equals(text))
+	if (_rtext.equals(text))
 		return;
+
+	_rtext = text;
+	_ptext = Common::U32String(text);
 
 	// If text has changed, use the cached formatting from first STXT in this castmember.
 	Common::U32String formatting = Common::String::format("\001\016%04x%02x%04x%04x%04x%04x", _fontId, _textSlant, _fontSize, _fgpalinfo1, _fgpalinfo2, _fgpalinfo3);
-	_ptext = text;
-	_ftext = formatting + text;
+	_ftext = formatting + _ptext;
 	_modified = true;
 }
 
@@ -1279,6 +1470,10 @@ Common::U32String TextCastMember::getText() {
 	return _ptext;
 }
 
+Common::String TextCastMember::getRawText() {
+	return _rtext;
+}
+
 void TextCastMember::setTextSize(int textSize) {
 	if (_widget) {
 		((Graphics::MacText *)_widget)->setTextSize(textSize);
@@ -1296,6 +1491,8 @@ void TextCastMember::updateFromWidget(Graphics::MacWidget *widget) {
 }
 
 Common::String TextCastMember::formatInfo() {
+	Common::String format = formatStringForDump(_ptext.encode());
+
 	return Common::String::format(
 		"initialRect: %dx%d@%d,%d, boundingRect: %dx%d@%d,%d, foreColor: %d, backColor: %d, editable: %d, text: \"%s\"",
 		_initialRect.width(), _initialRect.height(),
@@ -1303,7 +1500,7 @@ Common::String TextCastMember::formatInfo() {
 		_boundingRect.width(), _boundingRect.height(),
 		_boundingRect.left, _boundingRect.top,
 		getForeColor(), getBackColor(),
-		_editable, _ptext.encode().c_str()
+		_editable, format.c_str()
 	);
 
 }
@@ -1464,6 +1661,17 @@ PaletteCastMember::PaletteCastMember(Cast *cast, uint16 castId, Common::Seekable
 	: CastMember(cast, castId, stream) {
 	_type = kCastPalette;
 	_palette = nullptr;
+}
+
+Common::String PaletteCastMember::formatInfo() {
+	Common::String result;
+	if (_palette) {
+		result = "data: ";
+		for (size_t i = 0; i < (size_t)_palette->length; i++) {
+			result += Common::String::format("%02X%02X%02X", _palette->palette[3 * i], _palette->palette[3 * i + 1], _palette->palette[3 * i + 2]);
+		}
+	}
+	return result;
 }
 
 } // End of namespace Director

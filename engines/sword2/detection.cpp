@@ -37,13 +37,15 @@ static const PlainGameDescriptor sword2Games[] = {
 static const char *const directoryGlobs[] = {
 	"clusters",
 	"smacks",
+	"sub",
 	"video",
+	"extras", // GOG.com
 	nullptr
 };
 
 class Sword2MetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
-	Sword2MetaEngineDetection() : AdvancedMetaEngineDetection(Sword2::gameDescriptions, sizeof(Sword2::Sword2GameDescription), sword2Games) {
+	Sword2MetaEngineDetection() : AdvancedMetaEngineDetection(Sword2::gameDescriptions, sizeof(ADGameDescription), sword2Games) {
 		_guiOptions = GUIO3(GUIO_NOMIDI, GUIO_NOASPECT, GAMEOPTION_OBJECT_LABELS);
 		_maxScanDepth = 2;
 		_directoryGlobs = directoryGlobs;

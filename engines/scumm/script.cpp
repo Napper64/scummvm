@@ -558,6 +558,17 @@ int ScummEngine::readVar(uint var) {
 			return !ConfMan.getBool("subtitles");
 		}
 
+#if defined(USE_ENET) && defined(USE_LIBCURL)
+		if (ConfMan.getBool("enable_competitive_mods")) {
+			// HACK: If we're reading var586, competitive mods enabled, playing online,
+			// successfully fetched custom teams, and we're not in one of the three scripts
+			// that cause bugs if 263 is returned here, return 263.
+			if (_game.id == GID_BASEBALL2001 && var == 586 && readVar(399) == 1 && readVar(747) == 1 &&
+				!(_currentRoom == 4 && (vm.slot[_currentScript].number == 2150 || vm.slot[_currentScript].number == 2208 || vm.slot[_currentScript].number == 2210))) {
+				return 263;
+			}
+		}
+#endif
 		assertRange(0, var, _numVariables - 1, "variable (reading)");
 		return _scummVars[var];
 	}
@@ -566,6 +577,26 @@ int ScummEngine::readVar(uint var) {
 		if (_game.heversion >= 80) {
 			var &= 0xFFF;
 			assertRange(0, var, _numRoomVariables - 1, "room variable (reading)");
+
+#if defined(USE_ENET) && defined(USE_LIBCURL)
+			if (ConfMan.getBool("enable_competitive_mods")) {
+				// Mod for Backyard Baseball 2001 online competitive play: increase hit quality
+				// for pitches on the inside corners
+				if (_game.id == GID_BASEBALL2001 &&
+					_currentRoom == 4 && vm.slot[_currentScript].number == 2085 &&  // The script that calculates hit quality
+					readVar(399) == 1 &&  // Check that we're playing online
+					var == 2 &&  // Reading room variable 2, which is the zone that the ball is pitched to
+					readVar(447) == 1  // And the batter is in an open stance
+				) {
+					if (_roomVars[0] == 1 && (_roomVars[var] == 9 || _roomVars[var] == 37)) {  // Right-handed batter
+						return _roomVars[var] + 1;
+					} else if (_roomVars[0] == 2 && (_roomVars[var] == 13 || _roomVars[var] == 41)) {  // Left-handed batter
+						return _roomVars[var] - 1;
+					}
+				}
+			}
+#endif
+
 			return _roomVars[var];
 
 		} else if (_game.version <= 3 && !(_game.id == GID_INDY3 && _game.platform == Common::kPlatformFMTowns) &&
@@ -635,12 +666,13 @@ void ScummEngine::writeVar(uint var, int value) {
 		}
 
 		if (var == VAR_CHARINC) {
-			// Did the user override the talkspeed manually? Then use that.
-			// Otherwise, use the value specified by the game script.
+			// Use the value specified by the game script, everywhere except
+			// at game boot-up: if there was a user override, then use that.
+			//
 			// Note: To determine whether there was a user override, we only
 			// look at the target specific settings, assuming that any global
 			// value is likely to be bogus. See also bug #4008.
-			if (ConfMan.hasKey("talkspeed", _targetName)) {
+			if (_currentRoom == 0 && ConfMan.hasKey("talkspeed", _targetName)) {
 				value = 9 - getTalkSpeed();
 			} else {
 				// Save the new talkspeed value to ConfMan
@@ -992,16 +1024,22 @@ void ScummEngine::runExitScript() {
 	if (VAR_EXIT_SCRIPT2 != 0xFF && VAR(VAR_EXIT_SCRIPT2))
 		runScript(VAR(VAR_EXIT_SCRIPT2), 0, 0, nullptr);
 
-#ifdef ENABLE_SCUMM_7_8
-	// WORKAROUND: The spider lair (room 44) will optionally play the sound
-	// of trickling water (sound 215), but it never stops it. The same sound
-	// effect is also used in room 33, so let's do the same fade out that it
-	// does in that room's exit script.
-	if (_game.id == GID_DIG && _currentRoom == 44) {
+	// WORKAROUND: Once the water has been diverted to the grate, but
+	// before Maggie has been freed, the spider lair (room 44) will play
+	// the sound of trickling water (sound 215). It doesn't seem to trigger
+	// the first time you enter the room, only but if you leave and
+	// re-enter it. Which is probably why it's so rarely noticed.
+	//
+	// The sound is not stopped when you leave the room, so it will keep
+	// playing even where it makes no sense. This also happens with the
+	// original interpreter.
+	//
+	// The same sound effect is also used in the underwater cavern (room
+	// 33), so we do the same fade out as in that room's exit script.
+	if (_game.id == GID_DIG && _currentRoom == 44 && _enableEnhancements) {
 		int scriptCmds[] = { 14, 215, 0x600, 0, 30, 0, 0, 0 };
 		_sound->soundKludge(scriptCmds, ARRAYSIZE(scriptCmds));
 	}
-#endif
 }
 
 void ScummEngine::runEntryScript() {

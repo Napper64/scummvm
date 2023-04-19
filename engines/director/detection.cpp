@@ -23,8 +23,9 @@
 
 #include "engines/advancedDetector.h"
 
+#include "common/config-manager.h"
 #include "common/file.h"
-#include "common/winexe.h"
+#include "common/formats/winexe.h"
 
 #include "director/detection.h"
 #include "director/director.h"
@@ -80,7 +81,7 @@ public:
 	DirectorMetaEngineDetection() : AdvancedMetaEngineDetection(Director::gameDescriptions, sizeof(Director::DirectorGameDescription), directorGames) {
 		_maxScanDepth = 5;
 		_directoryGlobs = Director::directoryGlobs;
-		_flags = kADFlagMatchFullPaths;
+		_flags = kADFlagMatchFullPaths | kADFlagCanPlayUnknownVariants;
 
 		// initialize customTarget hashmap here
 		for (int i = 0; customTargetList[i].name != nullptr; i++)
@@ -102,8 +103,6 @@ public:
 	const DebugChannelDef *getDebugChannels() const override {
 		return debugFlagList;
 	}
-
-	bool canPlayUnknownVariants() const override { return true; }
 
 	ADDetectedGame fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist, ADDetectedGameExtraInfo **extraInfo) const override;
 };
@@ -133,7 +132,7 @@ ADDetectedGame DirectorMetaEngineDetection::fallbackDetect(const FileMap &allFil
 	desc->desc.gameId = "director";
 	desc->desc.extra = "";
 	desc->desc.language = Common::UNK_LANG;
-	desc->desc.flags = ADGF_TAILMD5;
+	desc->desc.flags = ADGF_TAILMD5; // We calculate tail of the projector
 	desc->desc.platform = Common::kPlatformWindows;
 	desc->desc.guiOptions = GUIO0();
 	desc->desc.filesDescriptions[0].fileName = nullptr;
@@ -287,13 +286,18 @@ ADDetectedGame DirectorMetaEngineDetection::fallbackDetect(const FileMap &allFil
 		ADDetectedGame game(&desc->desc);
 
 		FileProperties tmp;
-		if (getFileProperties(allFiles, desc->desc, file->getName(), tmp)) {
+		if (getFileProperties(allFiles, kMD5Tail, file->getName(), tmp)) {
 			game.hasUnknownFiles = true;
 			game.matchedFiles[file->getName()] = tmp;
 		}
 
 		return game;
 	}
+
+	// Now, if we have --start-movie supplied, let's consider that
+	// the developer knows what they're doing and report Director game
+	if (ConfMan.hasKey("start_movie"))
+		return ADDetectedGame(&desc->desc);
 
 	return ADDetectedGame();
 }

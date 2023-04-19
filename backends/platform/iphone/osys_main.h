@@ -158,7 +158,7 @@ public:
 	virtual bool showMouse(bool visible);
 
 	virtual void warpMouse(int x, int y);
-	virtual void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor = 255, bool dontScale = false, const Graphics::PixelFormat *format = NULL);
+	virtual void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor = 255, bool dontScale = false, const Graphics::PixelFormat *format = NULL, const byte *mask = NULL);
 	virtual void setCursorPalette(const byte *colors, uint start, uint num);
 
 	virtual bool pollEvent(Common::Event &event);
@@ -183,6 +183,8 @@ public:
 	virtual Common::String getDefaultConfigFileName();
 
 	virtual void logMessage(LogMessageType::Type type, const char *message);
+
+	virtual Common::String getDefaultLogFileName() { return Common::String("/var/mobile/.scummvm.log"); }
 
 protected:
 	void initVideoContext();

@@ -52,6 +52,12 @@ protected:
 
 	int			_editScrollOffset;
 
+	int			_selCaretPos;
+	int			_selOffset;
+	bool		_shiftPressed;
+	bool		_isDragging;
+	bool		_disableSelection;
+
 	Graphics::TextAlign _align;
 	Graphics::TextAlign _drawAlign;
 
@@ -60,6 +66,7 @@ protected:
 	ThemeEngine::TextInversionState  _inversion;
 
 public:
+	EditableWidget(GuiObject *boss, int x, int y, int w, int h, bool scale, const Common::U32String &tooltip = Common::U32String(), uint32 cmd = 0);
 	EditableWidget(GuiObject *boss, int x, int y, int w, int h, const Common::U32String &tooltip = Common::U32String(), uint32 cmd = 0);
 	EditableWidget(GuiObject *boss, const Common::String &name, const Common::U32String &tooltip = Common::U32String(), uint32 cmd = 0);
 	~EditableWidget() override;
@@ -70,10 +77,15 @@ public:
 	virtual const Common::U32String &getEditString() const	{ return _editString; }
 
 	void handleTickle() override;
+	void handleMouseDown(int x, int y, int button, int clickCount) override;
+	void handleMouseUp(int x, int y, int button, int clickCount) override;
+	void handleMouseMoved(int x, int y, int button) override;
 	bool handleKeyDown(Common::KeyState state) override;
+	bool handleKeyUp(Common::KeyState state) override;
 	void reflowLayout() override;
 
 	bool setCaretPos(int newPos);
+	void setSelectionOffset(int newOffset);
 
 protected:
 	virtual void startEditMode() = 0;
@@ -86,6 +98,7 @@ protected:
 	 */
 	virtual Common::Rect getEditRect() const = 0;
 	virtual int getCaretOffset() const;
+	virtual int getSelectionCarretOffset() const;
 	void drawCaret(bool erase);
 	bool adjustOffset();
 	void makeCaretVisible();
@@ -99,6 +112,8 @@ protected:
 
 	int caretVisualPos(int logicalPos);
 	int caretLogicalPos() const;
+
+	void clearSelection();
 };
 
 } // End of namespace GUI

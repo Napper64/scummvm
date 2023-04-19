@@ -59,7 +59,6 @@
 #include "graphics/surface.h"
 #include "common/config-manager.h"
 #include "common/file.h"
-#include "common/translation.h"
 
 static const DebugChannelDef debugFlagList[] = {
 	{Glk::kDebugCore, "core", "Core engine debug level"},
@@ -228,6 +227,10 @@ void GlkMetaEngineDetection::detectClashes() const {
 #ifndef RELEASE_BUILD
 	Glk::TADS::TADSMetaEngine::detectClashes(map);
 #endif
+}
+
+uint GlkMetaEngineDetection::getMD5Bytes() const {
+	return 5000;
 }
 
 REGISTER_PLUGIN_STATIC(GLK_DETECTION, PLUGIN_TYPE_ENGINE_DETECTION, GlkMetaEngineDetection);

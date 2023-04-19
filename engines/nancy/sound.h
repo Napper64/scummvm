@@ -36,6 +36,8 @@ class SeekableAudioStream;
 
 namespace Nancy {
 
+class IFF;
+
 class NancyEngine;
 
 class SoundManager {
@@ -43,7 +45,7 @@ public:
 	SoundManager();
 	~SoundManager();
 
-	void loadCommonSounds();
+	void loadCommonSounds(IFF *boot);
 
 	// Load a sound into a channel without starting it
 	void loadSound(const SoundDescription &description, bool panning = false);
@@ -64,13 +66,15 @@ public:
 	void stopSound(const SoundDescription &description);
 	void stopSound(const Common::String &chunkName);
 	void stopAllSounds();
-	
+
+	void calculatePan(uint16 channelID);
+	void calculatePan(const SoundDescription &description);
 	void calculatePanForAllSounds();
 
 	// Used when changing scenes
 	void stopAndUnloadSpecificSounds();
 
-	static Audio::SeekableAudioStream *makeHISStream(Common::SeekableReadStream *stream, DisposeAfterUse::Flag disposeAfterUse);
+	static Audio::SeekableAudioStream *makeHISStream(Common::SeekableReadStream *stream, DisposeAfterUse::Flag disposeAfterUse, uint32 overrideSamplesPerSec = 0);
 
 protected:
 	struct Channel {
@@ -82,6 +86,7 @@ protected:
 		bool isPanning = false;
 		Audio::SeekableAudioStream *stream = nullptr;
 		Audio::SoundHandle handle;
+		bool isPersistent = false;
 	};
 
 	void initSoundChannels();

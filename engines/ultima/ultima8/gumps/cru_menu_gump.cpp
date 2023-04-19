@@ -35,10 +35,9 @@
 #include "ultima/ultima8/graphics/palette_manager.h"
 #include "ultima/ultima8/audio/music_process.h"
 #include "ultima/ultima8/world/get_object.h"
-#include "ultima/ultima8/meta_engine.h"
+#include "ultima/ultima8/metaengine.h"
 
 #include "engines/dialogs.h"
-#include "common/translation.h"
 #include "gui/saveload.h"
 
 namespace Ultima {
@@ -53,8 +52,7 @@ CruMenuGump::CruMenuGump()
 	: ModalGump(0, 0, 640, 480, 0, FLAG_DONT_SAVE) {
 
 	Mouse *mouse = Mouse::get_instance();
-	mouse->pushMouseCursor();
-	mouse->setMouseCursor(Mouse::MOUSE_HAND);
+	mouse->pushMouseCursor(Mouse::MOUSE_HAND);
 
 	// Save old music state
 	MusicProcess *musicprocess = MusicProcess::get_instance();

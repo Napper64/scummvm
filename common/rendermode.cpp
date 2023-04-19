@@ -30,10 +30,12 @@ namespace Common {
 
 
 const RenderModeDescription g_renderModes[] = {
-	// I18N: Hercules is graphics card name
+	// I18N: Hercules is a graphics card name, Green is color
 	{ "hercGreen", _s("Hercules Green"), kRenderHercG },
+	// I18N: Hercules is a graphics card name, Amber is color
 	{ "hercAmber", _s("Hercules Amber"), kRenderHercA },
 	{ "cga", "CGA", kRenderCGA },
+	// I18N: Composite is a video mode of RGB composite channels
 	{ "cgaComp", "CGA Composite", kRenderCGAComp },
 	// I18N: CGA black-and-white
 	{ "cgaBW", "CGA b/w", kRenderCGA_BW },
@@ -48,6 +50,9 @@ const RenderModeDescription g_renderModes[] = {
 	{ "macintosh", "Macintosh", kRenderMacintosh },
 	// I18N: Macintosh black-and-white
 	{ "macintoshbw", _s("Macintosh b/w"), kRenderMacintoshBW },
+	{ "cpc", "Amstrad CPC", kRenderCPC },
+	{ "zx", "ZX Spectrum", kRenderZX },
+	{ "c64", "Commodore 64", kRenderC64 },
 	{nullptr, nullptr, kRenderDefault}
 };
 
@@ -74,7 +79,10 @@ static const RenderGUIOMapping s_renderGUIOMapping[] = {
 	{ kRenderMacintosh,		GUIO_RENDERMACINTOSH },
 	{ kRenderMacintoshBW,	GUIO_RENDERMACINTOSHBW },
 	{ kRenderCGAComp,	    GUIO_RENDERCGACOMP },
-	{ kRenderCGA_BW,	    GUIO_RENDERCGABW }
+	{ kRenderCGA_BW,	    GUIO_RENDERCGABW },
+	{ kRenderCPC,		    GUIO_RENDERCPC },
+	{ kRenderZX,			GUIO_RENDERZX },
+	{ kRenderC64,			GUIO_RENDERC64 }
 };
 
 DECLARE_TRANSLATION_ADDITIONAL_CONTEXT("Hercules Green", "lowres")

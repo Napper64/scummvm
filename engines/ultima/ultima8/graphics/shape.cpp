@@ -19,7 +19,7 @@
  *
  */
 
-#include "ultima/ultima8/misc/pent_include.h"
+#include "ultima/ultima8/misc/debugger.h"
 
 #include "ultima/ultima8/graphics/shape.h"
 #include "ultima/ultima8/graphics/shape_frame.h"
@@ -65,7 +65,7 @@ void Shape::loadFrames(const uint8 *data, uint32 size, const ConvertShapeFormat 
 
 	if (!format) {
 		// Should be fatal?
-		perr << "Error: Unable to detect shape format" << Std::endl;
+		warning("Unable to detect shape format");
 		return;
 	}
 

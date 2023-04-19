@@ -46,7 +46,7 @@
 #include "engines/grim/update/update.h"
 
 #include "common/algorithm.h"
-#include "common/zlib.h"
+#include "common/compression/zlib.h"
 #include "common/memstream.h"
 #include "common/file.h"
 #include "common/config-manager.h"
@@ -138,6 +138,7 @@ ResourceLoader::ResourceLoader() {
 			SearchMan.listMatchingMembers(files, "year?mus.lab");
 			SearchMan.listMatchingMembers(files, "local.lab");
 			SearchMan.listMatchingMembers(files, "credits.lab");
+			SearchMan.listMatchingMembers(files, "rus_font.lab");
 
 			if (g_grim->isRemastered()) {
 				SearchMan.listMatchingMembers(files, "commentary.lab");
@@ -394,7 +395,7 @@ Font *ResourceLoader::loadFont(const Common::String &filename) {
 	if (!stream)
 		error("Could not find font file %s", filename.c_str());
 
-	Font *result = new Font();
+	BitmapFont *result = new BitmapFont();
 	result->load(filename, stream);
 	delete stream;
 

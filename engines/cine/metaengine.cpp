@@ -96,14 +96,8 @@ public:
 
 bool CineMetaEngine::hasFeature(MetaEngineFeature f) const {
 	return
-		(f == kSupportsListSaves) ||
 		(f == kSupportsLoadingDuringStartup) ||
-		(f == kSupportsDeleteSave) ||
-		(f == kSavesSupportMetaInfo) ||
-		(f == kSavesSupportThumbnail) ||
-		(f == kSavesSupportCreationDate) ||
-		(f == kSavesSupportPlayTime) ||
-		(f == kSavesUseExtendedFormat);
+		checkExtendedSaves(f);
 }
 
 bool Cine::CineEngine::hasFeature(EngineFeature f) const {
@@ -160,14 +154,14 @@ SaveStateList CineMetaEngine::listSaves(const char *target) const {
 				SaveStateDescriptor saveStateDesc(this, slotNum, saveDesc);
 
 				if (saveStateDesc.getDescription().empty()) {
-					if (saveStateDesc.isAutosave()) {
+					if (slotNum == getAutosaveSlot()) {
 						saveStateDesc.setDescription(_("Unnamed autosave"));
 					} else {
 						saveStateDesc.setDescription(_("Unnamed savegame"));
 					}
 				}
 
-				if (saveStateDesc.isAutosave()) {
+				if (slotNum == getAutosaveSlot()) {
 					foundAutosave = true;
 				}
 
@@ -243,7 +237,9 @@ SaveStateDescriptor CineMetaEngine::querySaveMetaInfos(const char *target, int s
 
 	// No saving on empty autosave slot
 	if (slot == getAutosaveSlot()) {
-		return SaveStateDescriptor(this, slot, _("Empty autosave"));
+		SaveStateDescriptor desc(this, slot, _("Empty autosave"));
+		desc.setAutosave(true);
+		return desc;
 	}
 
 	return SaveStateDescriptor();
@@ -353,4 +349,3 @@ bool CineEngine::canSaveGameStateCurrently() {
 }
 
 } // End of namespace Cine
-

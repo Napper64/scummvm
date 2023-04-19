@@ -367,12 +367,13 @@ KeyMap::iterator KeyBinder::get_sdlkey_index(const Common::KeyState &key) {
 }
 
 bool KeyBinder::HandleEvent(const Common::Event *ev) {
-	Common::KeyState key = ev->kbd.keycode;
+	Common::KeyState key = ev->kbd;
 	KeyMap::iterator sdlkey_index;
 
 	if (ev->type != Common::EVENT_KEYDOWN)
 		return false;
 
+	key.flags &= ~Common::KBD_STICKY;
 	sdlkey_index = get_sdlkey_index(key);
 	if (sdlkey_index != _bindings.end())
 		return DoAction((*sdlkey_index)._value);
@@ -596,9 +597,12 @@ void KeyBinder::ParseLine(char *line) {
 }
 
 void KeyBinder::LoadFromFileInternal(const char *filename) {
-	Common::ReadStream *keyfile;
+	Common::ReadStream *keyfile = nullptr;
 
 	openFile(keyfile, filename);
+	if (!keyfile)
+		::error("Keybinder: can't open file %s", filename);
+
 	char temp[1024]; // 1024 should be long enough
 	while (!keyfile->eos()) {
 		strgets(temp, 1024, keyfile);

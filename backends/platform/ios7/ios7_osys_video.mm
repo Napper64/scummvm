@@ -25,29 +25,29 @@
 #include "backends/platform/ios7/ios7_osys_main.h"
 #include "backends/platform/ios7/ios7_video.h"
 
-#include "graphics/conversion.h"
+#include "graphics/blit.h"
 #include "backends/platform/ios7/ios7_app_delegate.h"
 
-@interface iOS7AlertHandler : NSObject<UIAlertViewDelegate>
-@end
-
-@implementation iOS7AlertHandler
-
-- (void)alertView:(UIAlertView *)alertView willDismissWithButtonIndex:(NSInteger)buttonIndex {
-	OSystem_iOS7::sharedInstance()->quit();
-	abort();
-}
-
-@end
+#define UIViewParentController(__view) ({ \
+	UIResponder *__responder = __view; \
+	while ([__responder isKindOfClass:[UIView class]]) \
+		__responder = [__responder nextResponder]; \
+	(UIViewController *)__responder; \
+})
 
 static void displayAlert(void *ctx) {
-	UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Fatal Error"
-	                                                message:[NSString stringWithCString:(const char *)ctx encoding:NSUTF8StringEncoding]
-	                                               delegate:[[iOS7AlertHandler alloc] init]
-	                                      cancelButtonTitle:@"OK"
-	                                      otherButtonTitles:nil];
-	[alert show];
-	[alert autorelease];
+	UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"Fatal Error"
+								message:[NSString stringWithCString:(const char *)ctx 	encoding:NSUTF8StringEncoding]
+								preferredStyle:UIAlertControllerStyleAlert];
+
+	UIAlertAction* defaultAction = [UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault
+	   handler:^(UIAlertAction * action) {
+		OSystem_iOS7::sharedInstance()->quit();
+		abort();
+	}];
+
+	[alert addAction:defaultAction];
+	[UIViewParentController([iOS7AppDelegate iPhoneView]) presentViewController:alert animated:YES completion:nil];
 }
 
 void OSystem_iOS7::fatalError() {
@@ -84,6 +84,7 @@ void OSystem_iOS7::engineInit() {
 	dispatch_async(dispatch_get_main_queue(), ^{
 		[[UIApplication sharedApplication] setIdleTimerDisabled:YES];
 	});
+	[[iOS7AppDelegate iPhoneView] setIsInGame:YES];
 }
 
 void OSystem_iOS7::engineDone() {
@@ -92,6 +93,7 @@ void OSystem_iOS7::engineDone() {
 	dispatch_async(dispatch_get_main_queue(), ^{
 		[[UIApplication sharedApplication] setIdleTimerDisabled:NO];
 	});
+	[[iOS7AppDelegate iPhoneView] setIsInGame:NO];
 }
 
 void OSystem_iOS7::initVideoContext() {
@@ -101,6 +103,10 @@ void OSystem_iOS7::initVideoContext() {
 #ifdef USE_RGB_COLOR
 Common::List<Graphics::PixelFormat> OSystem_iOS7::getSupportedFormats() const {
 	Common::List<Graphics::PixelFormat> list;
+	// ABGR8888 (big endian)
+	list.push_back(Graphics::PixelFormat(4, 8, 8, 8, 8, 0, 8, 16, 24));
+	// RGBA8888 (big endian)
+	list.push_back(Graphics::PixelFormat(4, 8, 8, 8, 8, 24, 16, 8, 0));
 	// RGB565
 	list.push_back(Graphics::PixelFormat(2, 5, 6, 5, 0, 11, 5, 0, 0));
 	// CLUT8
@@ -138,9 +144,19 @@ void OSystem_iOS7::initSize(uint width, uint height, const Graphics::PixelFormat
 	// Create the screen texture right here. We need to do this here, since
 	// when a game requests hi-color mode, we actually set the framebuffer
 	// to the texture buffer to avoid an additional copy step.
-	execute_on_main_thread(^ {
-		[[iOS7AppDelegate iPhoneView] createScreenTexture];
-	});
+	// Free any previous screen texture and create new to handle format changes
+	_videoContext->screenTexture.free();
+
+	if (format && *format == Graphics::PixelFormat(4, 8, 8, 8, 8, 0, 8, 16, 24)) {
+		// ABGR8888 (big endian)
+		_videoContext->screenTexture.create((uint16) getSizeNextPOT(_videoContext->screenWidth), (uint16) getSizeNextPOT(_videoContext->screenHeight), Graphics::PixelFormat(4, 8, 8, 8, 8, 0, 8, 16, 24));
+	} else if (format && *format == Graphics::PixelFormat(4, 8, 8, 8, 8, 24, 16, 8, 0)) {
+		// RGBA8888 (big endian)
+		_videoContext->screenTexture.create((uint16) getSizeNextPOT(_videoContext->screenWidth), (uint16) getSizeNextPOT(_videoContext->screenHeight), Graphics::PixelFormat(4, 8, 8, 8, 8, 24, 16, 8, 0));
+	} else {
+		// Assume RGB565
+		_videoContext->screenTexture.create((uint16) getSizeNextPOT(_videoContext->screenWidth), (uint16) getSizeNextPOT(_videoContext->screenHeight), Graphics::PixelFormat(2, 5, 6, 5, 0, 11, 5, 0, 0));
+	}
 
 	// In case the client code tries to set up a non supported mode, we will
 	// fall back to CLUT8 and set the transaction error accordingly.
@@ -148,6 +164,10 @@ void OSystem_iOS7::initSize(uint width, uint height, const Graphics::PixelFormat
 		format = 0;
 		_gfxTransactionError = kTransactionFormatNotSupported;
 	}
+
+	execute_on_main_thread(^{
+		[[iOS7AppDelegate iPhoneView] setGameScreenCoords];
+	});
 
 	if (!format || format->bytesPerPixel == 1) {
 		_framebuffer.create(width, height, Graphics::PixelFormat::createFormatCLUT8());
@@ -482,8 +502,11 @@ void OSystem_iOS7::dirtyFullOverlayScreen() {
 	}
 }
 
-void OSystem_iOS7::setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format) {
+void OSystem_iOS7::setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format, const byte *mask) {
 	//printf("setMouseCursor(%p, %u, %u, %i, %i, %u, %d, %p)\n", (const void *)buf, w, h, hotspotX, hotspotY, keycolor, dontScale, (const void *)format);
+
+	if (mask)
+		printf("OSystem_iOS7::setMouseCursor: Masks are not supported");
 
 	const Graphics::PixelFormat pixelFormat = format ? *format : Graphics::PixelFormat::createFormatCLUT8();
 #if 0
@@ -583,9 +606,18 @@ void OSystem_iOS7::updateMouseTexture() {
 
 void OSystem_iOS7::setShowKeyboard(bool show) {
 	if (show) {
+#if TARGET_OS_IOS
 		execute_on_main_thread(^ {
 			[[iOS7AppDelegate iPhoneView] showKeyboard];
 		});
+#elif TARGET_OS_TV
+		// Delay the showing of keyboard 1 second so the user
+		// is able to see the message
+		dispatch_time_t delay = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC));
+		dispatch_after(delay, dispatch_get_main_queue(), ^(void){
+			[[iOS7AppDelegate iPhoneView] showKeyboard];
+		});
+#endif
 	} else {
 		// Do not hide the keyboard in portrait mode as it is shown automatically and not
 		// just when asked with the kFeatureVirtualKeyboard.
@@ -598,5 +630,9 @@ void OSystem_iOS7::setShowKeyboard(bool show) {
 }
 
 bool OSystem_iOS7::isKeyboardShown() const {
-	return [[iOS7AppDelegate iPhoneView] isKeyboardShown];
+	__block bool isShown = false;
+	execute_on_main_thread(^{
+		isShown = [[iOS7AppDelegate iPhoneView] isKeyboardShown];
+	});
+	return isShown;
 }

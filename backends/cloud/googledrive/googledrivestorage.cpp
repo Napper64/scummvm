@@ -32,7 +32,7 @@
 #include "backends/networking/curl/networkreadstream.h"
 #include "common/config-manager.h"
 #include "common/debug.h"
-#include "common/json.h"
+#include "common/formats/json.h"
 #include "common/debug.h"
 
 namespace Cloud {
@@ -47,6 +47,10 @@ GoogleDriveStorage::GoogleDriveStorage(Common::String token, Common::String refr
 
 GoogleDriveStorage::GoogleDriveStorage(Common::String code, Networking::ErrorCallback cb) {
 	getAccessToken(code, cb);
+}
+
+GoogleDriveStorage::GoogleDriveStorage(Networking::JsonResponse codeFlowJson, Networking::ErrorCallback cb) {
+	codeFlowComplete(cb, codeFlowJson);
 }
 
 GoogleDriveStorage::~GoogleDriveStorage() {}

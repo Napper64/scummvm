@@ -758,11 +758,6 @@ bool Console::cmdDiskDump(int argc, const char **argv) {
 		}
 	}
 
-	if (resourceType == kResourceTypeInvalid) {
-		debugPrintf("Resource type '%s' is not valid\n", argv[1]);
-		return true;
-	}
-
 	if (resourceAll) {
 		// "*" used, dump everything of that type
 		Common::List<ResourceId> resources = _engine->getResMan()->listResources(resourceType, -1);
@@ -2995,10 +2990,18 @@ bool Console::cmdStack(int argc, const char **argv) {
 	int nr = atoi(argv[1]);
 
 	for (int i = nr; i > 0; i--) {
-		if ((xs.sp - xs.fp - i) == 0)
+		bool isArgc = (xs.sp - xs.variables_argp - i == 0);
+		if (isArgc)
+			debugPrintf("-- parameters --\n");
+		if (xs.tempCount && ((xs.sp - xs.fp - i) == 0))
 			debugPrintf("-- temp variables --\n");
+		if (xs.sp - xs.fp - xs.tempCount - i == 0)
+			debugPrintf("-- local stack --\n");
 		if (xs.sp - i >= _engine->_gamestate->stack_base)
-			debugPrintf("ST:%04x = %04x:%04x\n", (unsigned)(xs.sp - i - _engine->_gamestate->stack_base), PRINT_REG(xs.sp[-i]));
+			debugPrintf("ST:%04x = %04x:%04x%s\n",
+				(unsigned)(xs.sp - i - _engine->_gamestate->stack_base),
+				PRINT_REG(xs.sp[-i]),
+				(isArgc ? "  argc" : ""));
 	}
 
 	return true;
@@ -4552,6 +4555,9 @@ bool Console::cmdMapVocab994(int argc, const char **argv) {
 	}
 
 	Resource *resource = _engine->_resMan->findResource(ResourceId(kResourceTypeVocab, 994), false);
+	if (resource == nullptr) {
+		return true;
+	}
 	const Object *obj = s->_segMan->getObject(reg);
 	SciSpan<const uint16> data = resource->subspan<const uint16>(0);
 	uint32 first = atoi(argv[2]);

@@ -41,6 +41,8 @@ OpenGLRenderer::OpenGLRenderer(int screenW, int screenH, Common::RenderMode rend
 	_verts = (Vertex *)malloc(sizeof(Vertex) * kVertexArraySize);
 	_coords = (Coord *)malloc(sizeof(Coord) * kCoordsArraySize);
 	_texturePixelFormat = OpenGLTexture::getRGBAPixelFormat();
+	_isAccelerated = true;
+	_variableStippleArray = nullptr;
 }
 
 OpenGLRenderer::~OpenGLRenderer() {
@@ -87,11 +89,6 @@ void OpenGLRenderer::setViewport(const Common::Rect &rect) {
 	_unscaledViewport = rect;
 	glViewport(_viewport.left, g_system->getHeight() - _viewport.bottom, _viewport.width(), _viewport.height());
 	glScissor(_viewport.left, g_system->getHeight() - _viewport.bottom, _viewport.width(), _viewport.height());
-}
-
-void OpenGLRenderer::clear() {
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glColor3f(1.0f, 1.0f, 1.0f);
 }
 
 void OpenGLRenderer::drawTexturedRect2D(const Common::Rect &screenRect, const Common::Rect &textureRect, Texture *texture) {
@@ -147,6 +144,7 @@ void OpenGLRenderer::drawTexturedRect2D(const Common::Rect &screenRect, const Co
 	glDisable(GL_BLEND);
 	glDepthMask(GL_TRUE);
 	glEnable(GL_DEPTH_TEST);
+	glBindTexture(GL_TEXTURE_2D, 0); // Bind the default (empty) texture to avoid darker colors!
 	glFlush();
 }
 
@@ -173,35 +171,54 @@ void OpenGLRenderer::positionCamera(const Math::Vector3d &pos, const Math::Vecto
 	glTranslatef(-pos.x(), -pos.y(), -pos.z());
 }
 
-void OpenGLRenderer::renderShoot(byte color, const Common::Point position, const Common::Rect viewArea) {
-	uint8 r, g, b;
-	readFromPalette(color, r, g, b); // TODO: should use opposite color
+void OpenGLRenderer::renderSensorShoot(byte color, const Math::Vector3d sensor, const Math::Vector3d player, const Common::Rect viewArea) {
+	glColor3ub(255, 255, 255);
+	glLineWidth(20);
+	polygonOffset(true);
+	glEnableClientState(GL_VERTEX_ARRAY);
+	copyToVertexArray(0, sensor);
+	copyToVertexArray(1, player);
+	glVertexPointer(3, GL_FLOAT, 0, _verts);
+	glDrawArrays(GL_LINES, 0, 2);
+	glDisableClientState(GL_VERTEX_ARRAY);
+	polygonOffset(false);
+	glLineWidth(1);
+}
+
+void OpenGLRenderer::renderPlayerShoot(byte color, const Common::Point position, const Common::Rect viewArea) {
+	uint8 a, r, g, b;
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	glOrtho(0, _screenW, _screenH, 0, 0, 1);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
+	if (_renderMode == Common::kRenderCGA || _renderMode == Common::kRenderZX) {
+		r = g = b = 255;
+	} else {
+		uint32 pixel = 0x0;
+		glReadPixels(g_system->getWidth() / 2, g_system->getHeight() / 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, &pixel);
+		_texturePixelFormat.colorToARGB(pixel, a, r, g, b);
+		color = indexFromColor(r, g, b);
+		readFromPalette((color + 3) % (_renderMode == Common::kRenderCGA ? 4 : 16), r, g, b);
+	}
 
 	glDisable(GL_DEPTH_TEST);
 	glDepthMask(GL_FALSE);
 
 	glColor3ub(r, g, b);
 
-	int viewPort[4];
-	glGetIntegerv(GL_VIEWPORT, viewPort);
-
-	glLineWidth(10); // It will not work in every OpenGL implementation since the
+	glLineWidth(5); // It will not work in every OpenGL implementation since the
 					 // spec doesn't require support for line widths other than 1
 	glEnableClientState(GL_VERTEX_ARRAY);
-	copyToVertexArray(0, Math::Vector3d(viewArea.left, viewArea.height() + viewArea.top - 1, 0));
+	copyToVertexArray(0, Math::Vector3d(viewArea.left, viewArea.height() + viewArea.top, 0));
 	copyToVertexArray(1, Math::Vector3d(position.x, position.y, 0));
-	copyToVertexArray(2, Math::Vector3d(viewArea.left, viewArea.height() + viewArea.top - 1, 0));
+	copyToVertexArray(2, Math::Vector3d(viewArea.left, viewArea.height() + viewArea.top + 3, 0));
 	copyToVertexArray(3, Math::Vector3d(position.x, position.y, 0));
 
-	copyToVertexArray(4, Math::Vector3d(viewArea.right, viewArea.width() - viewArea.bottom, 0));
+	copyToVertexArray(4, Math::Vector3d(viewArea.right, viewArea.height() + viewArea.top, 0));
 	copyToVertexArray(5, Math::Vector3d(position.x, position.y, 0));
-	copyToVertexArray(6, Math::Vector3d(viewArea.right, viewArea.width() - viewArea.bottom, 0));
+	copyToVertexArray(6, Math::Vector3d(viewArea.right, viewArea.height() + viewArea.top + 3, 0));
 	copyToVertexArray(7, Math::Vector3d(position.x, position.y, 0));
 
 	glVertexPointer(3, GL_FLOAT, 0, _verts);
@@ -226,7 +243,9 @@ void OpenGLRenderer::renderFace(const Common::Array<Math::Vector3d> &vertices) {
 		copyToVertexArray(0, v0);
 		copyToVertexArray(1, v1);
 		glVertexPointer(3, GL_FLOAT, 0, _verts);
+		glLineWidth(MAX(1, g_system->getWidth() / 192));
 		glDrawArrays(GL_LINES, 0, 2);
+		glLineWidth(1);
 		glDisableClientState(GL_VERTEX_ARRAY);
 		return;
 	}
@@ -256,21 +275,54 @@ void OpenGLRenderer::polygonOffset(bool enabled) {
 	}
 }
 
+void OpenGLRenderer::setStippleData(byte *data) {
+	if (!data)
+		return;
+
+	_variableStippleArray = data;
+	//for (int i = 0; i < 128; i++)
+	//	_variableStippleArray[i] = data[(i / 16) % 4];
+}
+
+void OpenGLRenderer::useStipple(bool enabled) {
+	if (enabled) {
+		glEnable(GL_POLYGON_OFFSET_FILL);
+		glPolygonOffset(0.0f, -1.0f);
+		glEnable(GL_POLYGON_STIPPLE);
+		if (_renderMode == Common::kRenderZX  ||
+			_renderMode == Common::kRenderCPC ||
+			_renderMode == Common::kRenderCGA)
+			glPolygonStipple(_variableStippleArray);
+		else
+			glPolygonStipple(_defaultStippleArray);
+	} else {
+		glPolygonOffset(0, 0);
+		glDisable(GL_POLYGON_OFFSET_FILL);
+		glDisable(GL_POLYGON_STIPPLE);
+	}
+}
+
 void OpenGLRenderer::useColor(uint8 r, uint8 g, uint8 b) {
 	glColor3ub(r, g, b);
 }
 
-void OpenGLRenderer::setSkyColor(uint8 color) {
+void OpenGLRenderer::clear(uint8 color) {
 	uint8 r, g, b;
-	assert(getRGBAt(color, r, g, b)); // TODO: move check inside this function
+
+	if (_colorRemaps && _colorRemaps->contains(color)) {
+		color = (*_colorRemaps)[color];
+	}
+
+	readFromPalette(color, r, g, b);
 	glClearColor(r / 255., g / 255., b / 255., 1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 void OpenGLRenderer::drawFloor(uint8 color) {
-	uint8 r, g, b;
-	assert(getRGBAt(color, r, g, b)); // TODO: move check inside this function
-	glColor3ub(r, g, b);
+	uint8 r1, g1, b1, r2, g2, b2;
+	byte *stipple;
+	assert(getRGBAt(color, r1, g1, b1, r2, g2, b2, stipple)); // TODO: move check inside this function
+	glColor3ub(r1, g1, b1);
 
 	glEnableClientState(GL_VERTEX_ARRAY);
 	copyToVertexArray(0, Math::Vector3d(-100000.0, 0.0, -100000.0));
@@ -283,5 +335,14 @@ void OpenGLRenderer::drawFloor(uint8 color) {
 }
 
 void OpenGLRenderer::flipBuffer() {}
+
+Graphics::Surface *OpenGLRenderer::getScreenshot() {
+	Common::Rect screen = viewport();
+	Graphics::Surface *s = new Graphics::Surface();
+	s->create(screen.width(), screen.height(), OpenGLTexture::getRGBAPixelFormat());
+	glReadPixels(screen.left, screen.top, screen.width(), screen.height(), GL_RGBA, GL_UNSIGNED_BYTE, s->getPixels());
+	flipVertical(s);
+	return s;
+}
 
 } // End of namespace Freescape

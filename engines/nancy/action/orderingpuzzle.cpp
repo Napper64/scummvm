@@ -19,6 +19,8 @@
  *
  */
 
+#include "common/serializer.h"
+
 #include "engines/nancy/nancy.h"
 #include "engines/nancy/graphics.h"
 #include "engines/nancy/resource.h"
@@ -35,66 +37,77 @@ namespace Action {
 
 void OrderingPuzzle::init() {
 	// Screen position is initialized in readData and fits exactly the bounds of all elements on screen.
-	// This is a hacky way to make this particular action record work with this implementation's graphics manager
+	g_nancy->_resource->loadImage(_imageName, _image);
 	_drawSurface.create(_screenPosition.width(), _screenPosition.height(), g_nancy->_graphicsManager->getInputPixelFormat());
-	clearAllElements();
+
+	if (_image.hasPalette()) {
+		uint8 palette[256 * 3];
+		_image.grabPalette(palette, 0, 256);
+		_drawSurface.setPalette(palette, 0, 256);
+	}
 
 	setTransparent(true);
-
-	g_nancy->_resource->loadImage(_imageName, _image);
-
 	setVisible(false);
+	clearAllElements();
 
 	RenderObject::init();
 }
 
 void OrderingPuzzle::readData(Common::SeekableReadStream &stream) {
 	readFilename(stream, _imageName);
-	uint16 numElements = stream.readUint16LE();
+	Common::Serializer ser(&stream, nullptr);
+	ser.setVersion(g_nancy->getGameType());
 
-	_srcRects.reserve(numElements);
-	for (uint i = 0; i < numElements; ++i) {
-		_srcRects.push_back(Common::Rect());
-		readRect(stream, _srcRects.back());
+	uint16 numElements;
+	if (ser.getVersion() == kGameTypeVampire) {
+		// Hardcoded in The Vampire Diaries
+		numElements = 5;
+	} else {
+		ser.syncAsUint16LE(numElements);
 	}
 
-	stream.skip(16 * (15 - numElements));
-
-	_destRects.reserve(numElements);
-	_drawnElements.reserve(numElements);
+	_srcRects.resize(numElements);
 	for (uint i = 0; i < numElements; ++i) {
-		_destRects.push_back(Common::Rect());
-		readRect(stream, _destRects.back());
+		readRect(stream, _srcRects[i]);
+	}
+
+	ser.skip(16 * (15 - numElements), kGameTypeNancy1);
+
+	_destRects.resize(numElements);
+	_drawnElements.resize(numElements, false);
+	for (uint i = 0; i < numElements; ++i) {
+		readRect(stream, _destRects[i]);
 
 		if (i == 0) {
 			_screenPosition = _destRects[i];
 		} else {
 			_screenPosition.extend(_destRects[i]);
 		}
-
-		_drawnElements.push_back(false);
 	}
 
-	stream.skip(16 * (15 - numElements));
+	ser.skip(16 * (15 - numElements), kGameTypeNancy1);
 
-	_sequenceLength = stream.readUint16LE();
-
-	_correctSequence.reserve(15);
-	for (uint i = 0; i < 15; ++i) {
-		_correctSequence.push_back(stream.readByte());
+	if (ser.getVersion() == kGameTypeVampire) {
+		_sequenceLength = 5;
+	} else {
+		ser.syncAsUint16LE(_sequenceLength);
 	}
 
-	_clickSound.read(stream, SoundDescription::kNormal);
-	_solveExitScene.readData(stream);
-	stream.skip(2); // shouldStopRendering, useless
-	_flagOnSolve.label = stream.readSint16LE();
-	_flagOnSolve.flag = (NancyFlag)stream.readByte();
-	_solveSoundDelay = stream.readUint16LE();
-	_solveSound.read(stream, SoundDescription::kNormal);
-	_exitScene.readData(stream);
-	stream.skip(2); // shouldStopRendering, useless
-	_flagOnExit.label = stream.readSint16LE();
-	_flagOnExit.flag = (NancyFlag)stream.readByte();
+	_correctSequence.resize(_sequenceLength);
+	for (uint i = 0; i < _sequenceLength; ++i) {
+		ser.syncAsByte(_correctSequence[i]);
+	}
+
+	ser.skip(15 - _sequenceLength, kGameTypeNancy1);
+
+	if (ser.getVersion() != kGameTypeVampire) {
+		_clickSound.readData(stream, SoundDescription::kNormal);
+	}
+
+	_solveExitScene.readData(stream, ser.getVersion() == kGameTypeVampire);
+	ser.syncAsUint16LE(_solveSoundDelay);
+	_solveSound.readData(stream, SoundDescription::kNormal);
+	_exitScene.readData(stream, ser.getVersion() == kGameTypeVampire);
 	readRect(stream, _exitHotspot);
 }
 
@@ -103,24 +116,31 @@ void OrderingPuzzle::execute() {
 	case kBegin:
 		init();
 		registerGraphics();
-		g_nancy->_sound->loadSound(_clickSound);
+		if (g_nancy->getGameType () != kGameTypeVampire) {
+			g_nancy->_sound->loadSound(_clickSound);
+		}
 		g_nancy->_sound->loadSound(_solveSound);
 		_state = kRun;
 		// fall through
 	case kRun:
 		switch (_solveState) {
 		case kNotSolved:
-			if (_clickedSequence.size() != _sequenceLength) {
+			if (_clickedSequence.size() <  _sequenceLength) {
 				return;
 			}
 
 			for (uint i = 0; i < _sequenceLength; ++i) {
+
 				if (_clickedSequence[i] != (int16)_correctSequence[i]) {
+					if (_clickedSequence.size() > (g_nancy->getGameType() == kGameTypeVampire ? 4 : (uint)_sequenceLength + 1)) {
+						clearAllElements();
+					}
+
 					return;
 				}
 			}
 
-			NancySceneState.setEventFlag(_flagOnSolve);
+			NancySceneState.setEventFlag(_solveExitScene._flag);
 			_solveSoundPlayTime = g_nancy->getTotalPlayTime() + _solveSoundDelay * 1000;
 			_solveState = kPlaySound;
 			// fall through
@@ -141,14 +161,17 @@ void OrderingPuzzle::execute() {
 		}
 		break;
 	case kActionTrigger:
-		g_nancy->_sound->stopSound(_clickSound);
+		if (g_nancy->getGameType() == kGameTypeVampire) {
+			g_nancy->_sound->stopSound("BUOK");
+		} else {
+			g_nancy->_sound->stopSound(_clickSound);
+		}
 		g_nancy->_sound->stopSound(_solveSound);
 
 		if (_solveState == kNotSolved) {
-			NancySceneState.changeScene(_exitScene);
-			NancySceneState.setEventFlag(_flagOnExit);
+			_exitScene.execute();
 		} else {
-			NancySceneState.changeScene(_solveExitScene);
+			NancySceneState.changeScene(_solveExitScene._sceneChange);
 		}
 
 		finishExecution();
@@ -175,7 +198,11 @@ void OrderingPuzzle::handleInput(NancyInput &input) {
 			g_nancy->_cursorManager->setCursorType(CursorManager::kHotspot);
 
 			if (input.input & NancyInput::kLeftMouseButtonUp) {
-				g_nancy->_sound->playSound(_clickSound);
+				if (g_nancy->getGameType() == kGameTypeVampire) {
+					g_nancy->_sound->playSound("BUOK");
+				} else {
+					g_nancy->_sound->playSound(_clickSound);
+				}
 
 				for (uint j = 0; j < _clickedSequence.size(); ++j) {
 					if (_clickedSequence[j] == i && _drawnElements[i] == true) {
@@ -189,21 +216,10 @@ void OrderingPuzzle::handleInput(NancyInput &input) {
 				}
 
 				_clickedSequence.push_back(i);
-
-				if (_clickedSequence.size() > (uint)_sequenceLength + 1) {
-					clearAllElements();
-				} else {
-					drawElement(i);
-				}
+				drawElement(i);
 			}
 			return;
 		}
-	}
-}
-
-void OrderingPuzzle::onPause(bool pause) {
-	if (!pause) {
-		registerGraphics();
 	}
 }
 

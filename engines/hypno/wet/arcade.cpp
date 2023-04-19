@@ -216,7 +216,8 @@ void WetEngine::findNextSegment(ArcadeShooting *arc) {
 						_segmentOffset = 8;
 						_segmentRepetition = 0;
 						_segmentShootSequenceOffset = 8;
-					}
+					} else if (_arcadeMode == "Y3")
+						_skipLevel = true;
 				} else {
 					_loseLevel = true;
 					return;
@@ -408,9 +409,9 @@ void WetEngine::runAfterArcade(ArcadeShooting *arc) {
 		}
 	}
 
-	if (isDemo() && _variant != "Demo" && _restoredContentEnabled) {
+	if (isDemo() && _variant != "Demo" && _variant != "M&MCD" && _restoredContentEnabled) {
 		showDemoScore();
-	} else if (!isDemo() || _variant == "Demo" || _variant == "Gen4") {
+	} else if (!isDemo() || _variant == "Demo" || _variant == "M&MCD" || _variant == "Gen4") {
 		byte *palette;
 		Graphics::Surface *frame = decodeFrame("c_misc/zones.smk", 12, &palette);
 		loadPalette(palette, 0, 256);
@@ -441,6 +442,7 @@ void WetEngine::runAfterArcade(ArcadeShooting *arc) {
 				case Common::EVENT_RETURN_TO_LAUNCHER:
 					break;
 
+				case Common::EVENT_LBUTTONDOWN:
 				case Common::EVENT_KEYDOWN:
 					bonusCounter = _bonus;
 					drawString("scifi08.fgx", Common::String::format("%-20s = %3d pts", "BONUS", _bonus), 60, 116, 0, c);
@@ -555,7 +557,7 @@ void WetEngine::runBeforeArcade(ArcadeShooting *arc) {
 	resetStatistics();
 	_checkpoint = _currentLevel;
 	MVideo *video;
-	if (!isDemo()) {
+	if (!isDemo() || ((_variant == "Demo" || _variant == "M&MCD") && _restoredContentEnabled)) {
 
 		saveProfile(_name, int(arc->id));
 		byte *palette;
@@ -591,6 +593,7 @@ void WetEngine::runBeforeArcade(ArcadeShooting *arc) {
 				case Common::EVENT_RETURN_TO_LAUNCHER:
 					break;
 
+				case Common::EVENT_LBUTTONDOWN:
 				case Common::EVENT_KEYDOWN:
 					if (showedBriefing) {
 						endedBriefing = true;
@@ -620,6 +623,12 @@ void WetEngine::runBeforeArcade(ArcadeShooting *arc) {
 
 	if (!arc->beforeVideo.empty()) {
 		video = new MVideo(arc->beforeVideo, Common::Point(0, 0), false, true, false);
+		runIntro(*video);
+		delete video;
+	}
+
+	if (arc->mode == "Y2" && !arc->additionalVideo.empty()) {
+		video = new MVideo(arc->additionalVideo, Common::Point(0, 0), false, true, false);
 		runIntro(*video);
 		delete video;
 	}

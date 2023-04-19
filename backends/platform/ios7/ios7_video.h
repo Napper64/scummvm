@@ -25,6 +25,7 @@
 #include <UIKit/UIKit.h>
 #include <Foundation/Foundation.h>
 #include <QuartzCore/QuartzCore.h>
+#include <Accelerate/Accelerate.h>
 
 #include <OpenGLES/EAGL.h>
 #include <OpenGLES/ES2/gl.h>
@@ -41,13 +42,14 @@ typedef struct {
 	GLfloat u,v;
 } GLVertex;
 
+uint getSizeNextPOT(uint size);
+
 @interface iPhoneView : UIView {
 	VideoContext _videoContext;
 
 	Common::List<InternalEvent> _events;
 	NSLock *_eventLock;
 	SoftKeyboard *_keyboardView;
-	BOOL _keyboardVisible;
 	Common::List<GameController*> _controllers;
 
 	UIBackgroundTaskIdentifier _backgroundSaveStateTask;
@@ -92,12 +94,13 @@ typedef struct {
 }
 
 @property (nonatomic, assign) CGPoint pointerPosition;
+@property (nonatomic, assign) BOOL isInGame;
 
 - (id)initWithFrame:(struct CGRect)frame;
 
 - (VideoContext *)getVideoContext;
 
-- (void)createScreenTexture;
+- (void)setGameScreenCoords;
 - (void)initSurface;
 - (void)setViewTransformation;
 
@@ -113,11 +116,15 @@ typedef struct {
 - (void)updateMouseCursorScaling;
 - (void)updateMouseCursor;
 
+#if TARGET_OS_IOS
 - (void)deviceOrientationChanged:(UIDeviceOrientation)orientation;
+#endif
 
 - (void)showKeyboard;
 - (void)hideKeyboard;
 - (BOOL)isKeyboardShown;
+
+- (void)handleMainMenuKey;
 
 - (void)applicationSuspend;
 - (void)applicationResume;

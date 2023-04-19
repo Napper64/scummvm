@@ -20,6 +20,7 @@
  */
 
 #include "gui/browser.h"
+#include "gui/shaderbrowser-dialog.h"
 #include "gui/themebrowser.h"
 #include "gui/message.h"
 #include "gui/gui-manager.h"
@@ -28,11 +29,11 @@
 #include "gui/widgets/tab.h"
 #include "gui/ThemeEval.h"
 #include "gui/launcher.h"
+#include "gui/textviewer.h"
 
 #include "backends/keymapper/keymapper.h"
 #include "backends/keymapper/remap-widget.h"
 
-#include "common/achievements.h"
 #include "common/fs.h"
 #include "common/config-manager.h"
 #include "common/gui_options.h"
@@ -45,6 +46,8 @@
 #include "common/util.h"
 #include "common/text-to-speech.h"
 
+#include "engines/achievements.h"
+
 #include "audio/mididrv.h"
 #include "audio/musicplugin.h"
 #include "audio/mixer.h"
@@ -55,8 +58,9 @@
 #ifdef USE_CLOUD
 #ifdef USE_LIBCURL
 #include "backends/cloud/cloudmanager.h"
+#include "gui/cloudconnectionwizard.h"
 #include "gui/downloaddialog.h"
-#include "gui/downloadiconsdialog.h"
+#include "gui/downloadpacksdialog.h"
 #endif
 
 #ifdef USE_SDL_NET
@@ -94,6 +98,7 @@ enum {
 	kPluginsPathClearCmd	= 'clpl',
 	kChooseThemeCmd			= 'chtf',
 	kUpdateIconsCmd			= 'upic',
+	kUpdateShadersCmd		= 'upsh',
 	kChooseShaderCmd        = 'chsh',
 	kClearShaderCmd         = 'clsh',
 	kUpdatesCheckCmd		= 'updc',
@@ -102,6 +107,8 @@ enum {
 	kGraphicsTabContainerReflowCmd = 'gtcr',
 	kScalerPopUpCmd			= 'scPU',
 	kFullscreenToggled		= 'oful',
+	kRandomSeedClearCmd     = 'rndc',
+	kViewLogCmd             = 'vwlg',
 };
 
 enum {
@@ -123,12 +130,11 @@ enum {
 	kDownloadStorageCmd = 'dlst',
 	kRunServerCmd = 'rnsv',
 	kCloudTabContainerReflowCmd = 'ctcr',
+	kOpenCloudConnectionWizardCmd = 'OpCW',
 	kServerPortClearCmd = 'spcl',
 	kChooseRootDirCmd = 'chrp',
 	kRootPathClearCmd = 'clrp',
-	kConnectStorageCmd = 'Cnnt',
 	kOpenUrlStorageCmd = 'OpUr',
-	kPasteCodeStorageCmd = 'PsCd',
 	kDisconnectStorageCmd = 'DcSt',
 	kEnableStorageCmd = 'EnSt'
 };
@@ -254,7 +260,7 @@ void OptionsDialog::init() {
 		const Plugin *plugin = nullptr;
 		EngineMan.findTarget(_domain, &plugin);
 		if (plugin) {
-			const MetaEngineDetection &metaEngineDetection = plugin->get<MetaEngineDetection>();		
+			const MetaEngineDetection &metaEngineDetection = plugin->get<MetaEngineDetection>();
 			_guioptions = metaEngineDetection.parseAndCustomizeGuiOptions(_guioptionsString, _domain);
 		} else {
 			_guioptions = parseGameGUIOptions(_guioptionsString);
@@ -271,7 +277,7 @@ void OptionsDialog::build() {
 		const Plugin *plugin = nullptr;
 		EngineMan.findTarget(_domain, &plugin);
 		if (plugin) {
-			const MetaEngineDetection &metaEngineDetection = plugin->get<MetaEngineDetection>();		
+			const MetaEngineDetection &metaEngineDetection = plugin->get<MetaEngineDetection>();
 			_guioptions = metaEngineDetection.parseAndCustomizeGuiOptions(_guioptionsString, _domain);
 		} else {
 			_guioptions = parseGameGUIOptions(_guioptionsString);
@@ -342,59 +348,6 @@ void OptionsDialog::build() {
 			_renderModePopUp->setSelectedTag(sel);
 		}
 
-		_stretchPopUp->setSelected(0);
-
-		if (g_system->hasFeature(OSystem::kFeatureStretchMode)) {
-			if (ConfMan.hasKey("stretch_mode", _domain)) {
-				const OSystem::GraphicsMode *sm = g_system->getSupportedStretchModes();
-				Common::String stretchMode(ConfMan.get("stretch_mode", _domain));
-				int stretchCount = 1;
-				while (sm->name) {
-					stretchCount++;
-					if (scumm_stricmp(sm->name, stretchMode.c_str()) == 0)
-						_stretchPopUp->setSelected(stretchCount);
-					sm++;
-				}
-			}
-		} else {
-			_stretchPopUpDesc->setVisible(false);
-			_stretchPopUp->setVisible(false);
-			_stretchPopUp->setEnabled(false);
-		}
-
-		_scalerPopUp->setSelected(0);
-		_scaleFactorPopUp->setSelected(0);
-
-		if (g_system->hasFeature(OSystem::kFeatureScalers)) {
-			if (ConfMan.hasKey("scaler", _domain)) {
-				const PluginList &scalerPlugins = ScalerMan.getPlugins();
-				Common::String scaler(ConfMan.get("scaler", _domain));
-
-				for (uint scalerIndex = 0; scalerIndex < scalerPlugins.size(); scalerIndex++) {
-					if (scumm_stricmp(scalerPlugins[scalerIndex]->get<ScalerPluginObject>().getName(), scaler.c_str()) != 0)
-						continue;
-
-					_scalerPopUp->setSelectedTag(scalerIndex);
-					updateScaleFactors(scalerIndex);
-
-					if (ConfMan.hasKey("scale_factor", _domain)) {
-						int scaleFactor = ConfMan.getInt("scale_factor", _domain);
-						if (scalerPlugins[scalerIndex]->get<ScalerPluginObject>().hasFactor(scaleFactor))
-							_scaleFactorPopUp->setSelectedTag(scaleFactor);
-					}
-
-					break;
-				}
-
-			}
-		} else {
-			_scalerPopUpDesc->setVisible(false);
-			_scalerPopUp->setVisible(false);
-			_scalerPopUp->setEnabled(false);
-			_scaleFactorPopUp->setVisible(false);
-			_scaleFactorPopUp->setEnabled(false);
-		}
-
 		// Fullscreen setting
 		if (g_system->hasFeature(OSystem::kFeatureFullscreenMode)) {
 			_fullscreenCheckbox->setState(ConfMan.getBool("fullscreen", _domain));
@@ -421,16 +374,64 @@ void OptionsDialog::build() {
 			_aspectCheckbox->setState(ConfMan.getBool("aspect_ratio", _domain));
 		}
 
-		_vsyncCheckbox->setState(ConfMan.getBool("vsync", _domain));
+		if (g_system->hasFeature(OSystem::kFeatureVSync)) {
+			_vsyncCheckbox->setState(ConfMan.getBool("vsync", _domain));
+			if (ConfMan.isKeyTemporary("vsync"))
+				_vsyncCheckbox->setOverride(true);
+		}
+	}
 
-		_rendererTypePopUp->setEnabled(true);
-		_rendererTypePopUp->setSelectedTag(Graphics::Renderer::parseTypeCode(ConfMan.get("renderer", _domain)));
+	if (_stretchPopUp) {
+		if (g_system->hasFeature(OSystem::kFeatureStretchMode)) {
+			_stretchPopUp->setSelected(0);
 
-		_antiAliasPopUp->setEnabled(true);
-		if (ConfMan.hasKey("antialiasing", _domain)) {
-			_antiAliasPopUp->setSelectedTag(ConfMan.getInt("antialiasing", _domain));
+			if (ConfMan.hasKey("stretch_mode", _domain)) {
+				const OSystem::GraphicsMode *sm = g_system->getSupportedStretchModes();
+				Common::String stretchMode(ConfMan.get("stretch_mode", _domain));
+				int stretchCount = 1;
+				while (sm->name) {
+					stretchCount++;
+					if (scumm_stricmp(sm->name, stretchMode.c_str()) == 0)
+						_stretchPopUp->setSelected(stretchCount);
+					sm++;
+				}
+			}
 		} else {
-			_antiAliasPopUp->setSelectedTag(-1);
+			_stretchPopUpDesc->setVisible(false);
+			_stretchPopUp->setVisible(false);
+		}
+	}
+
+	if (_scalerPopUp) {
+		if (g_system->hasFeature(OSystem::kFeatureScalers)) {
+			_scalerPopUp->setSelected(0);
+			_scaleFactorPopUp->setSelected(0);
+
+			if (ConfMan.hasKey("scaler", _domain)) {
+				const PluginList &scalerPlugins = ScalerMan.getPlugins();
+				Common::String scaler(ConfMan.get("scaler", _domain));
+
+				for (uint scalerIndex = 0; scalerIndex < scalerPlugins.size(); scalerIndex++) {
+					if (scumm_stricmp(scalerPlugins[scalerIndex]->get<ScalerPluginObject>().getName(), scaler.c_str()) != 0)
+						continue;
+
+					_scalerPopUp->setSelectedTag(scalerIndex);
+					updateScaleFactors(scalerIndex);
+
+					if (ConfMan.hasKey("scale_factor", _domain)) {
+						int scaleFactor = ConfMan.getInt("scale_factor", _domain);
+						if (scalerPlugins[scalerIndex]->get<ScalerPluginObject>().hasFactor(scaleFactor))
+							_scaleFactorPopUp->setSelectedTag(scaleFactor);
+					}
+
+					break;
+				}
+
+			}
+		} else {
+			_scalerPopUpDesc->setVisible(false);
+			_scalerPopUp->setVisible(false);
+			_scaleFactorPopUp->setVisible(false);
 		}
 	}
 
@@ -452,6 +453,20 @@ void OptionsDialog::build() {
 			_shader->setVisible(false);
 			_shaderButton->setVisible(false);
 			_shaderClearButton->setVisible(false);
+		}
+	}
+
+	if (_rendererTypePopUp) {
+		_rendererTypePopUp->setEnabled(true);
+		_rendererTypePopUp->setSelectedTag(Graphics::Renderer::parseTypeCode(ConfMan.get("renderer", _domain)));
+	}
+
+	if (_antiAliasPopUp) {
+		_antiAliasPopUp->setEnabled(true);
+		if (ConfMan.hasKey("antialiasing", _domain)) {
+			_antiAliasPopUp->setSelectedTag(ConfMan.getInt("antialiasing", _domain));
+		} else {
+			_antiAliasPopUp->setSelectedTag(uint32(-1));
 		}
 	}
 
@@ -599,11 +614,15 @@ void OptionsDialog::apply() {
 			}
 			if (ConfMan.getBool("aspect_ratio", _domain) != _aspectCheckbox->getState())
 				graphicsModeChanged = true;
-			if (ConfMan.getBool("vsync", _domain) != _vsyncCheckbox->getState())
-				graphicsModeChanged = true;
+			if (g_system->hasFeature(OSystem::kFeatureVSync)) {
+				if (ConfMan.getBool("vsync", _domain) != _vsyncCheckbox->getState()) {
+					graphicsModeChanged = true;
+					ConfMan.setBool("vsync", _vsyncCheckbox->getState(), _domain);
+					_vsyncCheckbox->setOverride(false);
+				}
+			}
 
 			ConfMan.setBool("aspect_ratio", _aspectCheckbox->getState(), _domain);
-			ConfMan.setBool("vsync", _vsyncCheckbox->getState(), _domain);
 
 			bool isSet = false;
 
@@ -638,73 +657,81 @@ void OptionsDialog::apply() {
 				}
 			}
 
-			isSet = false;
-			if ((int32)_stretchPopUp->getSelectedTag() >= 0) {
-				const OSystem::GraphicsMode *sm = g_system->getSupportedStretchModes();
+			if (g_system->hasFeature(OSystem::kFeatureStretchMode)) {
+				isSet = false;
+				if ((int32)_stretchPopUp->getSelectedTag() >= 0) {
+					const OSystem::GraphicsMode *sm = g_system->getSupportedStretchModes();
 
-				while (sm->name) {
-					if (sm->id == (int)_stretchPopUp->getSelectedTag()) {
-						if (ConfMan.get("stretch_mode", _domain) != sm->name) {
-							graphicsModeChanged = true;
-							ConfMan.set("stretch_mode", sm->name, _domain);
-							_stretchPopUpDesc->setFontColor(ThemeEngine::FontColor::kFontColorNormal);
+					while (sm->name) {
+						if (sm->id == (int)_stretchPopUp->getSelectedTag()) {
+							if (ConfMan.get("stretch_mode", _domain) != sm->name) {
+								graphicsModeChanged = true;
+								ConfMan.set("stretch_mode", sm->name, _domain);
+								_stretchPopUpDesc->setFontColor(ThemeEngine::FontColor::kFontColorNormal);
+							}
+							isSet = true;
+							break;
 						}
-						isSet = true;
-						break;
+						sm++;
 					}
-					sm++;
+				}
+				if (!isSet) {
+					_stretchPopUpDesc->setFontColor(ThemeEngine::FontColor::kFontColorNormal);
+					ConfMan.removeKey("stretch_mode", _domain);
+					if (g_system->getStretchMode() != g_system->getDefaultStretchMode())
+						graphicsModeChanged = true;
 				}
 			}
-			if (!isSet) {
-				_stretchPopUpDesc->setFontColor(ThemeEngine::FontColor::kFontColorNormal);
-				ConfMan.removeKey("stretch_mode", _domain);
-				if (g_system->getStretchMode() != g_system->getDefaultStretchMode())
-					graphicsModeChanged = true;
-			}
 
-			isSet = false;
-			const PluginList &scalerPlugins = ScalerMan.getPlugins();
-			if ((int32)_scalerPopUp->getSelectedTag() >= 0) {
-				const char *name = scalerPlugins[_scalerPopUp->getSelectedTag()]->get<ScalerPluginObject>().getName();
-				if (ConfMan.get("scaler", _domain) != name) {
-					graphicsModeChanged = true;
-					ConfMan.set("scaler", name, _domain);
+			if (g_system->hasFeature(OSystem::kFeatureScalers)) {
+				isSet = false;
+				const PluginList &scalerPlugins = ScalerMan.getPlugins();
+				if ((int32)_scalerPopUp->getSelectedTag() >= 0) {
+					const char *name = scalerPlugins[_scalerPopUp->getSelectedTag()]->get<ScalerPluginObject>().getName();
+					if (ConfMan.get("scaler", _domain) != name) {
+						graphicsModeChanged = true;
+						ConfMan.set("scaler", name, _domain);
+						_scalerPopUpDesc->setFontColor(ThemeEngine::FontColor::kFontColorNormal);
+					}
+
+					int factor = _scaleFactorPopUp->getSelectedTag();
+					if (ConfMan.getInt("scale_factor", _domain) != factor) {
+						ConfMan.setInt("scale_factor", factor, _domain);
+						graphicsModeChanged = true;
+						_scalerPopUpDesc->setFontColor(ThemeEngine::FontColor::kFontColorNormal);
+					}
+					isSet = true;
+				}
+				if (!isSet) {
+					ConfMan.removeKey("scaler", _domain);
+					ConfMan.removeKey("scale_factor", _domain);
 					_scalerPopUpDesc->setFontColor(ThemeEngine::FontColor::kFontColorNormal);
+
+					uint defaultScaler = g_system->getDefaultScaler();
+					uint defaultScaleFactor = g_system->getDefaultScaleFactor();
+					if (g_system->getScaler() != defaultScaler)
+						graphicsModeChanged = true;
+					else if (g_system->getScaleFactor() != defaultScaleFactor)
+						graphicsModeChanged = true;
 				}
+			}
 
-				int factor = _scaleFactorPopUp->getSelectedTag();
-				if (ConfMan.getInt("scale_factor", _domain) != factor) {
-					ConfMan.setInt("scale_factor", factor, _domain);
-					graphicsModeChanged = true;
-					_scalerPopUpDesc->setFontColor(ThemeEngine::FontColor::kFontColorNormal);
+			if (_rendererTypePopUp) {
+				if (_rendererTypePopUp->getSelectedTag() > 0) {
+					Graphics::RendererType selected = (Graphics::RendererType) _rendererTypePopUp->getSelectedTag();
+					ConfMan.set("renderer", Graphics::Renderer::getTypeCode(selected), _domain);
+				} else {
+					ConfMan.removeKey("renderer", _domain);
 				}
-				isSet = true;
-			}
-			if (!isSet) {
-				ConfMan.removeKey("scaler", _domain);
-				ConfMan.removeKey("scale_factor", _domain);
-				_scalerPopUpDesc->setFontColor(ThemeEngine::FontColor::kFontColorNormal);
-
-				uint defaultScaler = g_system->getDefaultScaler();
-				uint defaultScaleFactor = g_system->getDefaultScaleFactor();
-				if (g_system->getScaler() != defaultScaler)
-					graphicsModeChanged = true;
-				else if (g_system->getScaleFactor() != defaultScaleFactor)
-					graphicsModeChanged = true;
 			}
 
-			if (_rendererTypePopUp->getSelectedTag() > 0) {
-				Graphics::RendererType selected = (Graphics::RendererType) _rendererTypePopUp->getSelectedTag();
-				ConfMan.set("renderer", Graphics::Renderer::getTypeCode(selected), _domain);
-			} else {
-				ConfMan.removeKey("renderer", _domain);
-			}
-
-			if (_antiAliasPopUp->getSelectedTag() != (uint32)-1) {
-				uint level = _antiAliasPopUp->getSelectedTag();
-				ConfMan.setInt("antialiasing", level, _domain);
-			} else {
-				ConfMan.removeKey("antialiasing", _domain);
+			if (_antiAliasPopUp) {
+				if (_antiAliasPopUp->getSelectedTag() != (uint32)-1) {
+					uint level = _antiAliasPopUp->getSelectedTag();
+					ConfMan.setInt("antialiasing", level, _domain);
+				} else {
+					ConfMan.removeKey("antialiasing", _domain);
+				}
 			}
 
 		} else {
@@ -759,6 +786,8 @@ void OptionsDialog::apply() {
 			g_system->setFeatureState(OSystem::kFeatureFullscreenMode, ConfMan.getBool("fullscreen", _domain));
 		if (ConfMan.hasKey("filtering"))
 			g_system->setFeatureState(OSystem::kFeatureFilteringMode, ConfMan.getBool("filtering", _domain));
+		if (ConfMan.hasKey("vsync"))
+			g_system->setFeatureState(OSystem::kFeatureVSync, ConfMan.getBool("vsync", _domain));
 
 		OSystem::TransactionError gfxError = g_system->endGFXTransaction();
 
@@ -820,6 +849,12 @@ void OptionsDialog::apply() {
 				ConfMan.setBool("filtering", g_system->getFeatureState(OSystem::kFeatureFilteringMode), _domain);
 				message += Common::U32String("\n");
 				message += _("the filtering setting could not be changed");
+			}
+
+			if (gfxError & OSystem::kTransactionVSyncFailed) {
+				ConfMan.setBool("vsync", g_system->getFeatureState(OSystem::kFeatureVSync), _domain);
+				message += Common::U32String("\n");
+				message += _("the vsync setting could not be changed");
 			}
 
 			if (gfxError & OSystem::kTransactionShaderChangeFailed) {
@@ -1148,13 +1183,12 @@ void OptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 data
 		g_gui.scheduleTopDialogRedraw();
 		break;
 	case kChooseShaderCmd: {
-		BrowserDialog browser(_("Select shader"), false);
+		ShaderBrowserDialog browser(ConfMan.get("shader", _domain));
 		if (browser.runModal() > 0) {
 			// User made his choice...
-			Common::FSNode file(browser.getResult());
-			_shader->setLabel(file.getPath());
+			_shader->setLabel(browser.getResult());
 
-			if (!file.getPath().empty() && (file.getPath().decode() != _c("None", "path")))
+			if (!browser.getResult().empty() && (browser.getResult().decode() != _c("None", "path")))
 				_shaderClearButton->setEnabled(true);
 			else
 				_shaderClearButton->setEnabled(false);
@@ -1201,18 +1235,26 @@ void OptionsDialog::setGraphicSettingsState(bool enabled) {
 	_gfxPopUp->setEnabled(enabled);
 	_renderModePopUpDesc->setEnabled(enabled);
 	_renderModePopUp->setEnabled(enabled);
-	_vsyncCheckbox->setEnabled(enabled);
-	_rendererTypePopUpDesc->setEnabled(enabled);
-	_rendererTypePopUp->setEnabled(enabled);
-	_antiAliasPopUpDesc->setEnabled(enabled);
-	_antiAliasPopUp->setEnabled(enabled);
+
+	if (_rendererTypePopUp) {
+		_rendererTypePopUpDesc->setEnabled(enabled);
+		_rendererTypePopUp->setEnabled(enabled);
+	}
+
+	if (_antiAliasPopUp) {
+		_antiAliasPopUpDesc->setEnabled(enabled);
+		_antiAliasPopUp->setEnabled(enabled);
+	}
 
 	if (g_system->hasFeature(OSystem::kFeatureStretchMode)) {
 		_stretchPopUpDesc->setEnabled(enabled);
 		_stretchPopUp->setEnabled(enabled);
 	} else {
-		_stretchPopUpDesc->setEnabled(false);
-		_stretchPopUp->setEnabled(false);
+		// Happens when we switch to backend that doesn't support stretch modes
+		if (_stretchPopUp) {
+			_stretchPopUpDesc->setEnabled(false);
+			_stretchPopUp->setEnabled(false);
+		}
 	}
 
 	if (g_system->hasFeature(OSystem::kFeatureScalers)) {
@@ -1220,9 +1262,12 @@ void OptionsDialog::setGraphicSettingsState(bool enabled) {
 		_scalerPopUp->setEnabled(enabled);
 		_scaleFactorPopUp->setEnabled(enabled);
 	} else {
-		_scalerPopUpDesc->setEnabled(false);
-		_scalerPopUp->setEnabled(false);
-		_scaleFactorPopUp->setEnabled(false);
+		// Happens when we switch to backend that doesn't support scalers
+		if (_scalerPopUp) {
+			_scalerPopUpDesc->setEnabled(false);
+			_scalerPopUp->setEnabled(false);
+			_scaleFactorPopUp->setEnabled(false);
+		}
 	}
 
 	if (g_system->hasFeature(OSystem::kFeatureShaders)) {
@@ -1250,6 +1295,10 @@ void OptionsDialog::setGraphicSettingsState(bool enabled) {
 		_aspectCheckbox->setEnabled(false);
 	else
 		_aspectCheckbox->setEnabled(enabled);
+
+	if (g_system->hasFeature(OSystem::kFeatureVSync))
+		_vsyncCheckbox->setEnabled(enabled);
+
 }
 
 void OptionsDialog::setAudioSettingsState(bool enabled) {
@@ -1410,14 +1459,30 @@ void OptionsDialog::addAchievementsControls(GuiObject *boss, const Common::Strin
 	uint16 nAchieved = 0;
 	uint16 nHidden = 0;
 	uint16 nMax = AchMan.getAchievementCount();
-
 	uint16 lineHeight = g_gui.xmlEval()->getVar("Globals.Line.Height");
 	uint16 yStep = lineHeight;
 	uint16 ySmallStep = yStep / 3;
 	uint16 yPos = lineHeight + yStep * 3;
-	uint16 progressBarWidth = 240;
-	uint16 width = g_system->getOverlayWidth() <= 320 ? 240 : 410;
-	uint16 commentDelta = g_system->getOverlayWidth() <= 320 ? 25 : 30;
+
+	uint16 width;
+	uint16 textline_numchars;  // max number of chars in textline
+	uint16 progressBarWidth;
+	uint16 commentDelta = g_system->getOverlayWidth() <= 320 ? 20 : 30; // textline left tabbing
+	float scale_factor = g_gui.getScaleFactor();
+
+	if (g_system->getOverlayWidth() > 320) { // hires
+		width = 440 + 800 * (scale_factor - 1);
+		textline_numchars = 70 + 80 * (scale_factor - 1);
+		progressBarWidth = 240;
+		commentDelta *= scale_factor;
+		if (g_system->getOverlayWidth() - width < 100) {
+			width = g_system->getOverlayWidth() - 100 * scale_factor; // clamp width to at least 100px smaller than overlay to prevent glitchy scrollbars
+		}
+	} else { // lores
+		width = 250 + 480 * (scale_factor - 1);
+		textline_numchars = 40 + 60 * (scale_factor - 1);
+		progressBarWidth = 130;
+	}
 
 	for (int16 viewAchieved = 1; viewAchieved >= 0; viewAchieved--) {
 		// run this twice, first view all achieved, then view all non-hidden & non-achieved
@@ -1445,11 +1510,19 @@ void OptionsDialog::addAchievementsControls(GuiObject *boss, const Common::Strin
 			checkBox->setState(isAchieved);
 			yPos += yStep;
 
-	        if (!descr->comment.empty()) {
-				new StaticTextWidget(scrollContainer, lineHeight + commentDelta, yPos, width - commentDelta, yStep, Common::U32String(descr->comment), Graphics::kTextAlignStart, Common::U32String(), ThemeEngine::kFontStyleNormal);
+			if (!descr->comment.empty()) {
+				uint16 str_chars = descr->comment.size(), printed_chars = 0, i = 0;
+				Common::U32String comment_line(descr->comment);
+				while ((str_chars - printed_chars) > textline_numchars) { // check if string needs to go on multiple lines
+					for (i = (printed_chars + textline_numchars - 1); comment_line[i] != ' ' && i > 0; i--) {}; // find a space to avoid breaking words
+					new StaticTextWidget(scrollContainer, lineHeight + commentDelta, yPos, width - commentDelta, yStep, Common::U32String(comment_line.begin() + (!printed_chars ? 0 : (printed_chars + 1)), comment_line.begin() + i), Graphics::kTextAlignStart, Common::U32String(), ThemeEngine::kFontStyleNormal);
+					yPos += yStep;
+					printed_chars = i;
+					i++; // to skip trailing space when leaving the loop
+				}
+				new StaticTextWidget(scrollContainer, lineHeight + commentDelta, yPos, width - commentDelta, yStep, Common::U32String(comment_line.begin() + i, comment_line.end()), Graphics::kTextAlignStart, Common::U32String(), ThemeEngine::kFontStyleNormal);
 				yPos += yStep;
 			}
-
 			yPos += ySmallStep;
 		}
 	}
@@ -1536,32 +1609,36 @@ void OptionsDialog::addGraphicControls(GuiObject *boss, const Common::String &pr
 	}
 
 	// The Stretch mode popup
-	const OSystem::GraphicsMode *sm = g_system->getSupportedStretchModes();
-	_stretchPopUpDesc = new StaticTextWidget(boss, prefix + "grStretchModePopupDesc", _("Stretch mode:"));
-	if (ConfMan.isKeyTemporary("stretch_mode"))
-		_stretchPopUpDesc->setFontColor(ThemeEngine::FontColor::kFontColorOverride);
-	_stretchPopUp = new PopUpWidget(boss, prefix + "grStretchModePopup");
+	if (g_system->hasFeature(OSystem::kFeatureStretchMode)) {
+		const OSystem::GraphicsMode *sm = g_system->getSupportedStretchModes();
+		_stretchPopUpDesc = new StaticTextWidget(boss, prefix + "grStretchModePopupDesc", _("Stretch mode:"));
+		if (ConfMan.isKeyTemporary("stretch_mode"))
+			_stretchPopUpDesc->setFontColor(ThemeEngine::FontColor::kFontColorOverride);
+		_stretchPopUp = new PopUpWidget(boss, prefix + "grStretchModePopup");
 
-	_stretchPopUp->appendEntry(_("<default>"));
-	_stretchPopUp->appendEntry(Common::U32String());
-	while (sm->name) {
-		_stretchPopUp->appendEntry(_c(sm->description, context), sm->id);
-		sm++;
+		_stretchPopUp->appendEntry(_("<default>"));
+		_stretchPopUp->appendEntry(Common::U32String());
+		while (sm->name) {
+			_stretchPopUp->appendEntry(_c(sm->description, context), sm->id);
+			sm++;
+		}
 	}
 
 	// The Scaler popup
-	const PluginList &scalerPlugins = ScalerMan.getPlugins();
-	_scalerPopUpDesc = new StaticTextWidget(boss, prefix + "grScalerPopupDesc", _("Scaler:"));
-	_scalerPopUp = new PopUpWidget(boss, prefix + "grScalerPopup", Common::U32String(), kScalerPopUpCmd);
+	if (g_system->hasFeature(OSystem::kFeatureScalers)) {
+		const PluginList &scalerPlugins = ScalerMan.getPlugins();
+		_scalerPopUpDesc = new StaticTextWidget(boss, prefix + "grScalerPopupDesc", _("Scaler:"));
+		_scalerPopUp = new PopUpWidget(boss, prefix + "grScalerPopup", Common::U32String(), kScalerPopUpCmd);
 
-	_scalerPopUp->appendEntry(_("<default>"));
-	_scalerPopUp->appendEntry(Common::U32String());
-	for (uint scalerIndex = 0; scalerIndex < scalerPlugins.size(); scalerIndex++) {
-		_scalerPopUp->appendEntry(_c(scalerPlugins[scalerIndex]->get<ScalerPluginObject>().getPrettyName(), context), scalerIndex);
+		_scalerPopUp->appendEntry(_("<default>"));
+		_scalerPopUp->appendEntry(Common::U32String());
+		for (uint scalerIndex = 0; scalerIndex < scalerPlugins.size(); scalerIndex++) {
+			_scalerPopUp->appendEntry(_c(scalerPlugins[scalerIndex]->get<ScalerPluginObject>().getPrettyName(), context), scalerIndex);
+		}
+
+		_scaleFactorPopUp = new PopUpWidget(boss, prefix + "grScaleFactorPopup");
+		updateScaleFactors(_scalerPopUp->getSelectedTag());
 	}
-
-	_scaleFactorPopUp = new PopUpWidget(boss, prefix + "grScaleFactorPopup");
-	updateScaleFactors(_scalerPopUp->getSelectedTag());
 
 	if (g_system->hasFeature(OSystem::kFeatureShaders)) {
 		if (g_system->getOverlayWidth() > 320)
@@ -1571,44 +1648,50 @@ void OptionsDialog::addGraphicControls(GuiObject *boss, const Common::String &pr
 		_shader = new StaticTextWidget(boss, prefix + "grShader", _c("None", "shader"), _("Specifies path to the shader used for scaling the game screen"));
 
 		_shaderClearButton = addClearButton(boss, prefix + "grShaderClearButton", kClearShaderCmd);
+
+#ifdef USE_CLOUD
+#ifdef USE_LIBCURL
+		new ButtonWidget(boss, prefix + "UpdateShadersButton", _("Update Shaders"), _("Check for updates of shader packs"), kUpdateShadersCmd);
+#endif
+#endif
 	}
 
 	// Fullscreen checkbox
 	_fullscreenCheckbox = new CheckboxWidget(boss, prefix + "grFullscreenCheckbox", _("Fullscreen mode"), Common::U32String(), kFullscreenToggled);
 
-	_vsyncCheckbox = new CheckboxWidget(boss, prefix + "grVSyncCheckbox", _("V-Sync"), _("Wait for the vertical sync to refresh the screen in order to prevent tearing artifacts"));
+	if (g_system->hasFeature(OSystem::kFeatureVSync))
+		_vsyncCheckbox = new CheckboxWidget(boss, prefix + "grVSyncCheckbox", _("V-Sync"), _("Wait for the vertical sync to refresh the screen in order to prevent tearing artifacts"));
 
-	if (g_system->getOverlayWidth() > 320)
-		_rendererTypePopUpDesc = new StaticTextWidget(boss, prefix + "grRendererTypePopupDesc", _("Game 3D Renderer:"));
-	else
-		_rendererTypePopUpDesc = new StaticTextWidget(boss, prefix + "grRendererTypePopupDesc", _c("Game 3D Renderer:", "lowres"));
-
-	_rendererTypePopUp = new PopUpWidget(boss, prefix + "grRendererTypePopup");
-	_rendererTypePopUp->appendEntry(_("<default>"), Graphics::kRendererTypeDefault);
-	_rendererTypePopUp->appendEntry("");
 	Common::Array<Graphics::RendererTypeDescription> rt = Graphics::Renderer::listTypes();
-	for (Common::Array<Graphics::RendererTypeDescription>::iterator it = rt.begin();
-	        it != rt.end(); ++it) {
-		if (g_system->getOverlayWidth() > 320) {
-			_rendererTypePopUp->appendEntry(_(it->description), it->id);
-		} else {
-			_rendererTypePopUp->appendEntry(_c(it->description, "lowres"), it->id);
+	if (!rt.empty()) {
+		if (g_system->getOverlayWidth() > 320)
+			_rendererTypePopUpDesc = new StaticTextWidget(boss, prefix + "grRendererTypePopupDesc", _("Game 3D Renderer:"));
+		else
+			_rendererTypePopUpDesc = new StaticTextWidget(boss, prefix + "grRendererTypePopupDesc", _c("Game 3D Renderer:", "lowres"));
+
+		_rendererTypePopUp = new PopUpWidget(boss, prefix + "grRendererTypePopup");
+		_rendererTypePopUp->appendEntry(_("<default>"), Graphics::kRendererTypeDefault);
+		_rendererTypePopUp->appendEntry("");
+		for (Common::Array<Graphics::RendererTypeDescription>::iterator it = rt.begin();
+		        it != rt.end(); ++it) {
+			if (g_system->getOverlayWidth() > 320) {
+				_rendererTypePopUp->appendEntry(_(it->description), it->id);
+			} else {
+				_rendererTypePopUp->appendEntry(_c(it->description, "lowres"), it->id);
+			}
 		}
 	}
 
-	_antiAliasPopUpDesc = new StaticTextWidget(boss, prefix + "grAntiAliasPopupDesc", _("3D Anti-aliasing:"));
-	_antiAliasPopUp = new PopUpWidget(boss, prefix + "grAntiAliasPopup");
-	_antiAliasPopUp->appendEntry(_("<default>"), -1);
-	_antiAliasPopUp->appendEntry("");
-	_antiAliasPopUp->appendEntry(_("Disabled"), 0);
 	const Common::Array<uint> levels = g_system->getSupportedAntiAliasingLevels();
-	for (uint i = 0; i < levels.size(); i++) {
-		_antiAliasPopUp->appendEntry(Common::String::format("%dx", levels[i]), levels[i]);
-	}
-	if (levels.empty()) {
-		// Don't show the anti-aliasing selection menu when it is not supported
-		_antiAliasPopUpDesc->setVisible(false);
-		_antiAliasPopUp->setVisible(false);
+	if (!levels.empty()) {
+		_antiAliasPopUpDesc = new StaticTextWidget(boss, prefix + "grAntiAliasPopupDesc", _("3D Anti-aliasing:"));
+		_antiAliasPopUp = new PopUpWidget(boss, prefix + "grAntiAliasPopup");
+		_antiAliasPopUp->appendEntry(_("<default>"), uint32(-1));
+		_antiAliasPopUp->appendEntry("");
+		_antiAliasPopUp->appendEntry(_("Disabled"), 0);
+		for (uint i = 0; i < levels.size(); i++) {
+			_antiAliasPopUp->appendEntry(Common::String::format("%dx", levels[i]), levels[i]);
+		}
 	}
 
 	// Filtering checkbox
@@ -1945,6 +2028,10 @@ void OptionsDialog::setupGraphicsTab() {
 		// Fixes crash when switching from SDL Surface to OpenGL
 		if (!_shader && g_system->hasFeature(OSystem::kFeatureShaders)) {
 			rebuild();
+		} else if (!_scalerPopUp && g_system->hasFeature(OSystem::kFeatureScalers)) {
+			rebuild();
+		} else if (!_stretchPopUp && g_system->hasFeature(OSystem::kFeatureStretchMode)) {
+			rebuild();
 		}
 		setGraphicSettingsState(_enableGraphicSettings);
 	}
@@ -1955,9 +2042,6 @@ void OptionsDialog::setupGraphicsTab() {
 	if (g_system->hasFeature(OSystem::kFeatureStretchMode)) {
 		_stretchPopUpDesc->setVisible(true);
 		_stretchPopUp->setVisible(true);
-	} else {
-		_stretchPopUpDesc->setVisible(false);
-		_stretchPopUp->setVisible(false);
 	}
 	_fullscreenCheckbox->setVisible(true);
 	if (g_system->hasFeature(OSystem::kFeatureFilteringMode))
@@ -1973,10 +2057,6 @@ void OptionsDialog::setupGraphicsTab() {
 			_scalerPopUpDesc->setFontColor(ThemeEngine::FontColor::kFontColorOverride);
 		_scalerPopUp->setVisible(true);
 		_scaleFactorPopUp->setVisible(true);
-	} else {
-		_scalerPopUpDesc->setVisible(false);
-		_scalerPopUp->setVisible(false);
-		_scaleFactorPopUp->setVisible(false);
 	}
 
 	if (g_system->hasFeature(OSystem::kFeatureShaders)) {
@@ -2069,13 +2149,7 @@ GlobalOptionsDialog::GlobalOptionsDialog(LauncherDialog *launcher)
 
 	_connectingStorage = false;
 	_storageWizardNotConnectedHint = nullptr;
-	_storageWizardOpenLinkHint = nullptr;
-	_storageWizardLink = nullptr;
-	_storageWizardCodeHint = nullptr;
-	_storageWizardCodeBox = nullptr;
-	_storageWizardPasteButton = nullptr;
 	_storageWizardConnectButton = nullptr;
-	_storageWizardConnectionStatusHint = nullptr;
 	_redrawCloudTab = false;
 #endif
 #ifdef USE_SDL_NET
@@ -2204,12 +2278,18 @@ void GlobalOptionsDialog::build() {
 	addPathsControls(tab, "GlobalOptions_Paths.", g_system->getOverlayWidth() <= 320);
 
 	//
-	// 6) The miscellaneous tab
+	// 6) The GUI tab
 	//
-	if (g_system->getOverlayWidth() > 320)
-		tab->addTab(_("Misc"), "GlobalOptions_Misc", false);
-	else
-		tab->addTab(_c("Misc", "lowres"), "GlobalOptions_Misc", false);
+	tab->addTab(_("GUI"), "GlobalOptions_GUI", false);
+	ScrollContainerWidget *guiContainer = new ScrollContainerWidget(tab, "GlobalOptions_GUI.Container", "GlobalOptions_GUI_Container");
+	guiContainer->setTarget(this);
+	guiContainer->setBackgroundType(ThemeEngine::kWidgetBackgroundNo);
+	addGUIControls(guiContainer, "GlobalOptions_GUI_Container.", g_system->getOverlayWidth() <= 320);
+
+	//
+	// 7) The miscellaneous tab
+	//
+	tab->addTab(_("Misc"), "GlobalOptions_Misc", false);
 	ScrollContainerWidget *miscContainer = new ScrollContainerWidget(tab, "GlobalOptions_Misc.Container", "GlobalOptions_Misc_Container");
 	miscContainer->setTarget(this);
 	miscContainer->setBackgroundType(ThemeEngine::kWidgetBackgroundNo);
@@ -2218,7 +2298,7 @@ void GlobalOptionsDialog::build() {
 #ifdef USE_CLOUD
 #ifdef USE_LIBCURL
 	//
-	// 7) The Cloud tab (remote storages)
+	// 8) The Cloud tab (remote storages)
 	//
 	if (g_system->getOverlayWidth() > 320)
 		tab->addTab(_("Cloud"), "GlobalOptions_Cloud", false);
@@ -2234,7 +2314,7 @@ void GlobalOptionsDialog::build() {
 #endif // USE_LIBCURL
 #ifdef USE_SDL_NET
 	//
-	// 8) The LAN tab (local "cloud" webserver)
+	// 9) The LAN tab (local "cloud" webserver)
 	//
 	if (g_system->getOverlayWidth() > 320)
 		tab->addTab(_("LAN"), "GlobalOptions_Network");
@@ -2244,7 +2324,9 @@ void GlobalOptionsDialog::build() {
 #endif // USE_SDL_NET
 #endif // USE_CLOUD
 
-	//Accessibility
+	//
+	// 10) Accessibility
+	//
 #ifdef USE_TTS
 	if (g_system->getOverlayWidth() > 320)
 		tab->addTab(_("Accessibility"), "GlobalOptions_Accessibility");
@@ -2311,6 +2393,8 @@ void GlobalOptionsDialog::build() {
 		if (value == savePeriodValues[i])
 			_autosavePeriodPopUp->setSelected(i);
 	}
+
+	_debugLevelPopUp->setSelected(gDebugLevel + 1);
 
 	ThemeEngine::GraphicsMode mode = ThemeEngine::findMode(ConfMan.get("gui_renderer"));
 	if (mode == ThemeEngine::kGfxDisabled)
@@ -2398,10 +2482,28 @@ void GlobalOptionsDialog::addPathsControls(GuiObject *boss, const Common::String
 	Common::U32String confPath = ConfMan.getCustomConfigFileName();
 	if (confPath.empty())
 		confPath = g_system->getDefaultConfigFileName();
-	StaticTextWidget* configPathWidget = new StaticTextWidget(boss, prefix + "ConfigPath", _("ScummVM config path: ") + confPath, confPath);
+	StaticTextWidget *configPathWidget = new StaticTextWidget(boss, prefix + "ConfigPath", _("ScummVM config path: ") + confPath, confPath);
 	if (ConfMan.isKeyTemporary("config"))
 		configPathWidget->setFontColor(ThemeEngine::FontColor::kFontColorOverride);
 
+	Common::U32String logPath = g_system->getDefaultLogFileName();
+	bool colorOverride = false;
+
+	if (ConfMan.hasKey("logfile")) {
+		logPath = ConfMan.get("logfile");
+
+		if (ConfMan.isKeyTemporary("logfile"))
+			colorOverride = true;
+	}
+	_logPath = new StaticTextWidget(boss, prefix + "LogPath", _("ScummVM log path: ") + logPath, logPath);
+
+	if (colorOverride)
+		_logPath->setFontColor(ThemeEngine::FontColor::kFontColorOverride);
+
+	ButtonWidget *viewButton = new ButtonWidget(boss, prefix + "ViewButton", _("View"), Common::U32String(), kViewLogCmd);
+
+	if (logPath.empty())
+		viewButton->setEnabled(false);
 
 	Common::U32String browserPath = _("<default>");
 	if (ConfMan.hasKey("browser_lastpath"))
@@ -2412,7 +2514,7 @@ void GlobalOptionsDialog::addPathsControls(GuiObject *boss, const Common::String
 	_browserPathClearButton = addClearButton(boss, prefix + "BrowserPathClearButton", kBrowserPathClearCmd);
 }
 
-void GlobalOptionsDialog::addMiscControls(GuiObject *boss, const Common::String &prefix, bool lowres) {
+void GlobalOptionsDialog::addGUIControls(GuiObject *boss, const Common::String &prefix, bool lowres) {
 	new ButtonWidget(boss, prefix + "ThemeButton", _("Theme:"), Common::U32String(), kChooseThemeCmd);
 	_curTheme = new StaticTextWidget(boss, prefix + "CurTheme", g_gui.theme()->getThemeName());
 	if (ConfMan.isKeyTemporary("gui_theme"))
@@ -2436,20 +2538,10 @@ void GlobalOptionsDialog::addMiscControls(GuiObject *boss, const Common::String 
 			_rendererPopUp->appendEntry(_(GUI::ThemeEngine::_rendererModes[i].shortname), GUI::ThemeEngine::_rendererModes[i].mode);
 	}
 
-	if (!lowres)
-		_autosavePeriodPopUpDesc = new StaticTextWidget(boss, prefix + "AutosavePeriodPopupDesc", _("Autosave:"));
-	else
-		_autosavePeriodPopUpDesc = new StaticTextWidget(boss, prefix + "AutosavePeriodPopupDesc", _c("Autosave:", "lowres"));
-	_autosavePeriodPopUp = new PopUpWidget(boss, prefix + "AutosavePeriodPopup");
-
-	for (int i = 0; savePeriodLabels[i]; i++) {
-		_autosavePeriodPopUp->appendEntry(_(savePeriodLabels[i]), savePeriodValues[i]);
-	}
-
 	if (!g_system->hasFeature(OSystem::kFeatureNoQuit)) {
 		_guiReturnToLauncherAtExit = new CheckboxWidget(boss, prefix + "ReturnToLauncherAtExit",
-			_("Always return to the launcher when leaving a game"),
-			_("Always return to the launcher when leaving a game instead of closing ScummVM.")
+			_("Return to the launcher when leaving a game"),
+			_("Return to the launcher when leaving a game instead of closing ScummVM\n(this feature is not supported by all games).")
 		);
 
 		_guiReturnToLauncherAtExit->setState(ConfMan.getBool("gui_return_to_launcher_at_exit", _domain));
@@ -2461,17 +2553,6 @@ void GlobalOptionsDialog::addMiscControls(GuiObject *boss, const Common::String 
 	);
 
 	_guiConfirmExit->setState(ConfMan.getBool("confirm_exit", _domain));
-
-#ifdef USE_DISCORD
-	_discordRpcCheckbox = new CheckboxWidget(boss, prefix + "DiscordRpc",
-		_("Enable Discord integration"),
-		_("Show information about the games you are playing on Discord if the Discord client is running.")
-	);
-
-	_discordRpcCheckbox->setState(ConfMan.getBool("discord_rpc", _domain));
-#endif
-
-	// TODO: joystick setting
 
 #ifdef USE_TRANSLATION
 	_guiLanguagePopUpDesc = new StaticTextWidget(boss, prefix + "GuiLanguagePopupDesc", _("GUI language:"), _("Language of ScummVM GUI"));
@@ -2520,6 +2601,59 @@ void GlobalOptionsDialog::addMiscControls(GuiObject *boss, const Common::String 
 		_useSystemDialogsCheckbox->setState(ConfMan.getBool("gui_browser_native", _domain));
 	}
 
+#ifdef USE_CLOUD
+#ifdef USE_LIBCURL
+	new ButtonWidget(boss, prefix + "UpdateIconsButton", _("Update Icons"),  _("Check for updates of icon packs"), kUpdateIconsCmd);
+#endif
+#endif
+}
+
+void GlobalOptionsDialog::addMiscControls(GuiObject *boss, const Common::String &prefix, bool lowres) {
+	if (!lowres)
+		_autosavePeriodPopUpDesc = new StaticTextWidget(boss, prefix + "AutosavePeriodPopupDesc", _("Autosave:"));
+	else
+		_autosavePeriodPopUpDesc = new StaticTextWidget(boss, prefix + "AutosavePeriodPopupDesc", _c("Autosave:", "lowres"));
+	_autosavePeriodPopUp = new PopUpWidget(boss, prefix + "AutosavePeriodPopup");
+
+	for (int i = 0; savePeriodLabels[i]; i++) {
+		_autosavePeriodPopUp->appendEntry(_(savePeriodLabels[i]), savePeriodValues[i]);
+	}
+
+	Common::String seed;
+	if (ConfMan.hasKey("random_seed"))
+		seed = Common::String::format("%u", ConfMan.getInt("random_seed"));
+
+	_randomSeedDesc = new StaticTextWidget(boss, prefix + "RandomSeedDesc", _("Random seed:"), _("Seed for initializing all random number generators"));
+
+	if (ConfMan.isKeyTemporary("random_seed"))
+		_randomSeedDesc->setFontColor(ThemeEngine::FontColor::kFontColorOverride);
+
+	_randomSeed = new EditTextWidget(boss, prefix + "RandomSeedEditText", seed, Common::U32String());
+	_randomSeedClearButton = addClearButton(boss, prefix + "RandomSeedClearButton", kRandomSeedClearCmd);
+
+	new StaticTextWidget(boss, prefix + "DebugLevelPopupDesc", _("Debug level:"));
+	_debugLevelPopUp = new PopUpWidget(boss, prefix + "DebugLevelPopup");
+
+	// I18N: Debug level -1, no messages
+	_debugLevelPopUp->appendEntry(_("None"), (uint32)-1);
+
+	for (int i = 0; i < 11; i++)
+		_debugLevelPopUp->appendEntry(Common::U32String::format("%d", i), i);
+
+	// I18N: Debug level 11, all messages
+	_debugLevelPopUp->appendEntry(_("11 (all)"), 11);
+
+#ifdef USE_DISCORD
+	_discordRpcCheckbox = new CheckboxWidget(boss, prefix + "DiscordRpc",
+		_("Enable Discord integration"),
+		_("Show information about the games you are playing on Discord if the Discord client is running.")
+	);
+
+	_discordRpcCheckbox->setState(ConfMan.getBool("discord_rpc", _domain));
+#endif
+
+	// TODO: joystick setting
+
 #ifdef USE_UPDATES
 	if (g_system->getUpdateManager()) {
 		_updatesPopUpDesc = new StaticTextWidget(boss, prefix + "UpdatesPopupDesc", _("Update check:"), _("How often to check ScummVM updates"));
@@ -2536,12 +2670,6 @@ void GlobalOptionsDialog::addMiscControls(GuiObject *boss, const Common::String 
 		new ButtonWidget(boss, prefix + "UpdatesCheckManuallyButton", _("Check now"), Common::U32String(), kUpdatesCheckCmd);
 	}
 #endif // USE_UPDATES
-
-#ifdef USE_CLOUD
-#ifdef USE_LIBCURL
-	new ButtonWidget(boss, prefix + "UpdateIconsButton", _("Update Icons"), Common::U32String(), kUpdateIconsCmd);
-#endif
-#endif
 }
 
 #ifdef USE_CLOUD
@@ -2556,9 +2684,9 @@ void GlobalOptionsDialog::addCloudControls(GuiObject *boss, const Common::String
 	_storagePopUp->setSelected(_selectedStorageIndex);
 
 	if (lowres)
-		_storageDisabledHint = new StaticTextWidget(boss, prefix + "StorageDisabledHint", _c("4. Storage is not yet enabled. Verify that username is correct and enable it:", "lowres"));
+		_storageDisabledHint = new StaticTextWidget(boss, prefix + "StorageDisabledHint", _c("Storage is not yet enabled. Verify that username is correct and enable it:", "lowres"));
 	else
-		_storageDisabledHint = new StaticTextWidget(boss, prefix + "StorageDisabledHint", _("4. Storage is not yet enabled. Verify that username is correct and enable it:"));
+		_storageDisabledHint = new StaticTextWidget(boss, prefix + "StorageDisabledHint", _("Storage is not yet enabled. Verify that username is correct and enable it:"));
 	_storageEnableButton = new ButtonWidget(boss, prefix + "StorageEnableButton", _("Enable storage"), _("Confirm you want to use this account for this storage"), kEnableStorageCmd);
 
 	_storageUsernameDesc = new StaticTextWidget(boss, prefix + "StorageUsernameDesc", _("Username:"), _("Username used by this storage"));
@@ -2588,19 +2716,10 @@ void GlobalOptionsDialog::addCloudControls(GuiObject *boss, const Common::String
 	_storageDisconnectButton = new ButtonWidget(boss, prefix + "DisconnectButton", _("Disconnect"), _("Stop using this storage on this device"), kDisconnectStorageCmd);
 
 	if (lowres)
-		_storageWizardNotConnectedHint = new StaticTextWidget(boss, prefix + "StorageWizardNotConnectedHint", _c("This storage is not connected yet! To connect,", "lowres"));
+		_storageWizardNotConnectedHint = new StaticTextWidget(boss, prefix + "StorageWizardNotConnectedHint", _c("This storage is not connected yet!", "lowres"));
 	else
-		_storageWizardNotConnectedHint = new StaticTextWidget(boss, prefix + "StorageWizardNotConnectedHint", _("This storage is not connected yet! To connect,"));
-	_storageWizardOpenLinkHint = new StaticTextWidget(boss, prefix + "StorageWizardOpenLinkHint", _("1. Open this link:"));
-	_storageWizardLink = new ButtonWidget(boss, prefix + "StorageWizardLink", Common::U32String("https://cloud.scummvm.org/"), _("Open URL"), kOpenUrlStorageCmd);
-	if (lowres)
-		_storageWizardCodeHint = new StaticTextWidget(boss, prefix + "StorageWizardCodeHint", _c("2. Get the code and enter it here:", "lowres"));
-	else
-		_storageWizardCodeHint = new StaticTextWidget(boss, prefix + "StorageWizardCodeHint", _("2. Get the code and enter it here:"));
-	_storageWizardCodeBox = new EditTextWidget(boss, prefix + "StorageWizardCodeBox", Common::U32String(), Common::U32String(), 0, 0, ThemeEngine::kFontStyleConsole);
-	_storageWizardPasteButton = new ButtonWidget(boss, prefix + "StorageWizardPasteButton", _("Paste"), _("Paste code from clipboard"), kPasteCodeStorageCmd);
-	_storageWizardConnectButton = new ButtonWidget(boss, prefix + "StorageWizardConnectButton", _("3. Connect"), _("Connect your cloud storage account"), kConnectStorageCmd);
-	_storageWizardConnectionStatusHint = new StaticTextWidget(boss, prefix + "StorageWizardConnectionStatusHint", Common::U32String("..."));
+		_storageWizardNotConnectedHint = new StaticTextWidget(boss, prefix + "StorageWizardNotConnectedHint", _("This storage is not connected yet!"));
+	_storageWizardConnectButton = new ButtonWidget(boss, prefix + "StorageWizardConnectButton", _("Connect"), _("Connect your cloud storage account"), kOpenCloudConnectionWizardCmd);
 
 	setupCloudTab();
 }
@@ -2809,6 +2928,12 @@ void GlobalOptionsDialog::apply() {
 	else
 		_autosavePeriodPopUp->setSelected(0);
 
+	if (gDebugLevel != (int32)(_debugLevelPopUp->getSelectedTag())) {
+		gDebugLevel = (int32)(_debugLevelPopUp->getSelectedTag());
+
+		warning("Debug level set to %d", gDebugLevel);
+	}
+
 #ifdef USE_UPDATES
 	if (g_system->getUpdateManager()) {
 		ConfMan.setInt("updates_check", _updatesPopUp->getSelectedTag());
@@ -2889,6 +3014,27 @@ void GlobalOptionsDialog::apply() {
 		ConfMan.setBool("discord_rpc", _discordRpcCheckbox->getState(), _domain);
 	}
 #endif // USE_DISCORD
+
+	bool differs = false;
+	if (ConfMan.hasKey("random_seed")) {
+		if (_randomSeed->getEditString().empty()) {
+			differs = true;
+		} else if ((uint32)_randomSeed->getEditString().asUint64() != (uint32)ConfMan.getInt("random_seed")) {
+			differs = true;
+		}
+	} else {
+		if (!_randomSeed->getEditString().empty())
+			differs = true;
+	}
+
+	if (differs) {
+		if (_randomSeed->getEditString().empty())
+			ConfMan.removeKey("random_seed", _domain);
+		else
+			ConfMan.setInt("random_seed", (uint32)_randomSeed->getEditString().asUint64());
+
+		_randomSeedDesc->setFontColor(ThemeEngine::FontColor::kFontColorNormal);
+	}
 
 	GUI::ThemeEngine::GraphicsMode gfxMode = (GUI::ThemeEngine::GraphicsMode)_rendererPopUp->getSelectedTag();
 	Common::String oldGfxConfig = ConfMan.get("gui_renderer");
@@ -3058,7 +3204,18 @@ void GlobalOptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint3
 
 #ifdef USE_LIBCURL
 	case kUpdateIconsCmd: {
-		DownloadIconsDialog dia;
+		DownloadPacksDialog dia(_("icon packs"), "LIST", "gui-icons*.dat");
+		dia.runModal();
+
+		// Refresh the icons
+		g_gui.initIconsSet();
+		break;
+	}
+#endif
+
+#ifdef USE_LIBCURL
+	case kUpdateShadersCmd: {
+		DownloadPacksDialog dia(_("shader packs"), "LIST-SHADERS", "shaders*.dat");
 		dia.runModal();
 		break;
 	}
@@ -3088,6 +3245,19 @@ void GlobalOptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint3
 		_browserPath->setLabel(_("Last browser path: ") + _("<default>"));
 
 		break;
+	case kViewLogCmd: {
+		Common::String logPath;
+
+		if (ConfMan.hasKey("logfile"))
+			logPath = ConfMan.get("logfile");
+		else
+			logPath = g_system->getDefaultLogFileName();
+
+		TextViewerDialog viewer(logPath);
+		viewer.runModal();
+		g_gui.scheduleTopDialogRedraw();
+		break;
+	}
 #ifdef USE_CLOUD
 #ifdef USE_SDL_NET
 	case kRootPathClearCmd:
@@ -3122,15 +3292,27 @@ void GlobalOptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint3
 		}
 		break;
 	}
+	case kRandomSeedClearCmd: {
+		if (_randomSeed) {
+			_randomSeed->setEditString(Common::U32String());
+		}
+		g_gui.scheduleTopDialogRedraw();
+		break;
+	}
 #ifdef USE_CLOUD
 #ifdef USE_LIBCURL
 	case kCloudTabContainerReflowCmd: {
 		setupCloudTab();
 		break;
 	}
+	case kOpenCloudConnectionWizardCmd: {
+		CloudConnectionWizard wizard;
+		wizard.runModal();
+		setupCloudTab();
+		reflowLayout();
+		break;
+	}
 	case kStoragePopUpCmd: {
-		if (_storageWizardCodeBox)
-			_storageWizardCodeBox->setEditString(Common::U32String());
 		// update container's scrollbar
 		reflowLayout();
 		break;
@@ -3178,61 +3360,7 @@ void GlobalOptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint3
 		}
 		break;
 	}
-	case kPasteCodeStorageCmd: {
-		if (g_system->hasTextInClipboard()) {
-			Common::U32String message = g_system->getTextFromClipboard();
-			if (!message.empty()) {
-				_storageWizardCodeBox->setEditString(message);
-				_redrawCloudTab = true;
-			}
-		}
-		break;
-	}
-	case kConnectStorageCmd: {
-		Common::String code = "";
-		if (_storageWizardCodeBox)
-			code = _storageWizardCodeBox->getEditString().encode();
-		if (code.size() == 0)
-			return;
-
-		if (CloudMan.isWorking()) {
-			bool cancel = true;
-
-			MessageDialog alert(_("Another Storage is working now. Do you want to interrupt it?"), _("Yes"), _("No"));
-			if (alert.runModal() == GUI::kMessageOK) {
-				if (CloudMan.isDownloading())
-					CloudMan.cancelDownload();
-				if (CloudMan.isSyncing())
-					CloudMan.cancelSync();
-
-				// I believe it still would return `true` here, but just in case
-				if (CloudMan.isWorking()) {
-					MessageDialog alert2(_("Wait until current Storage finishes up and try again."));
-					alert2.runModal();
-				} else {
-					cancel = false;
-				}
-			}
-
-			if (cancel) {
-				return;
-			}
-		}
-
-		if (_storageWizardConnectionStatusHint)
-			_storageWizardConnectionStatusHint->setLabel(_("Connecting..."));
-		CloudMan.connectStorage(
-			_selectedStorageIndex, code,
-			new Common::Callback<GlobalOptionsDialog, Networking::ErrorResponse>(this, &GlobalOptionsDialog::storageConnectionCallback)
-		);
-		_connectingStorage = true;
-		_redrawCloudTab = true;
-		break;
-	}
 	case kDisconnectStorageCmd: {
-		if (_storageWizardCodeBox)
-			_storageWizardCodeBox->setEditString(Common::U32String());
-
 		if (_selectedStorageIndex == CloudMan.getStorageIndex() && CloudMan.isWorking()) {
 			bool cancel = true;
 
@@ -3427,8 +3555,8 @@ void GlobalOptionsDialog::setupCloudTab() {
 	if (_storageUsedSpaceDesc) _storageUsedSpaceDesc->setVisible(shownConnectedInfo);
 	if (_storageUsedSpace) {
 		uint64 usedSpace = CloudMan.getStorageUsedSpace(_selectedStorageIndex);
-		Common::String usedSpaceNumber, usedSpaceUnits;
-		usedSpaceNumber = Common::getHumanReadableBytes(usedSpace, usedSpaceUnits);
+		const char *usedSpaceUnits;
+		Common::String usedSpaceNumber = Common::getHumanReadableBytes(usedSpace, usedSpaceUnits);
 		_storageUsedSpace->setLabel(Common::U32String::format("%s %S", usedSpaceNumber.c_str(), _(usedSpaceUnits).c_str()));
 		_storageUsedSpace->setVisible(shownConnectedInfo);
 	}
@@ -3490,27 +3618,9 @@ void GlobalOptionsDialog::setupCloudTab() {
 	shown = (!shownConnectedInfo && shown);
 	bool wizardEnabled = !_connectingStorage;
 	if (_storageWizardNotConnectedHint) _storageWizardNotConnectedHint->setVisible(shown);
-	if (_storageWizardOpenLinkHint) _storageWizardOpenLinkHint->setVisible(shown);
-	if (_storageWizardLink) {
-		_storageWizardLink->setVisible(shown);
-		_storageWizardLink->setEnabled(g_system->hasFeature(OSystem::kFeatureOpenUrl) && wizardEnabled);
-	}
-	if (_storageWizardCodeHint) _storageWizardCodeHint->setVisible(shown);
-	if (_storageWizardCodeBox) {
-		_storageWizardCodeBox->setVisible(shown);
-		_storageWizardCodeBox->setEnabled(wizardEnabled);
-	}
-	if (_storageWizardPasteButton) {
-		_storageWizardPasteButton->setVisible(shown && g_system->hasFeature(OSystem::kFeatureClipboardSupport));
-		_storageWizardPasteButton->setEnabled(wizardEnabled);
-	}
 	if (_storageWizardConnectButton) {
 		_storageWizardConnectButton->setVisible(shown);
 		_storageWizardConnectButton->setEnabled(wizardEnabled);
-	}
-	if (_storageWizardConnectionStatusHint) {
-		_storageWizardConnectionStatusHint->setVisible(shown && _storageWizardConnectionStatusHint->getLabel() != "...");
-		_storageWizardConnectionStatusHint->setEnabled(wizardEnabled);
 	}
 
 	if (!shownConnectedInfo) {
@@ -3522,13 +3632,7 @@ void GlobalOptionsDialog::setupCloudTab() {
 		shiftUp = y - shiftUp;
 
 		shiftWidget(_storageWizardNotConnectedHint, "GlobalOptions_Cloud_Container.StorageWizardNotConnectedHint", 0, -shiftUp);
-		shiftWidget(_storageWizardOpenLinkHint, "GlobalOptions_Cloud_Container.StorageWizardOpenLinkHint", 0, -shiftUp);
-		shiftWidget(_storageWizardLink, "GlobalOptions_Cloud_Container.StorageWizardLink", 0, -shiftUp);
-		shiftWidget(_storageWizardCodeHint, "GlobalOptions_Cloud_Container.StorageWizardCodeHint", 0, -shiftUp);
-		shiftWidget(_storageWizardCodeBox, "GlobalOptions_Cloud_Container.StorageWizardCodeBox", 0, -shiftUp);
-		shiftWidget(_storageWizardPasteButton, "GlobalOptions_Cloud_Container.StorageWizardPasteButton", 0, -shiftUp);
 		shiftWidget(_storageWizardConnectButton, "GlobalOptions_Cloud_Container.StorageWizardConnectButton", 0, -shiftUp);
-		shiftWidget(_storageWizardConnectionStatusHint, "GlobalOptions_Cloud_Container.StorageWizardConnectionStatusHint", 0, -shiftUp);
 	}
 }
 
@@ -3599,25 +3703,6 @@ void GlobalOptionsDialog::reflowNetworkTabLayout() {
 #endif // USE_SDL_NET
 
 #ifdef USE_LIBCURL
-void GlobalOptionsDialog::storageConnectionCallback(Networking::ErrorResponse response) {
-	Common::U32String message("...");
-	if (!response.failed && !response.interrupted) {
-		// success
-		g_system->displayMessageOnOSD(_("Storage connected."));
-	} else {
-		message = _("Failed to connect storage.");
-		if (response.failed) {
-			message = _("Failed to connect storage: ") + _(response.response.c_str());
-		}
-	}
-
-	if (_storageWizardConnectionStatusHint)
-		_storageWizardConnectionStatusHint->setLabel(message);
-
-	_redrawCloudTab = true;
-	_connectingStorage = false;
-}
-
 void GlobalOptionsDialog::storageSavesSyncedCallback(Cloud::Storage::BoolResponse response) {
 	_redrawCloudTab = true;
 }
@@ -3642,14 +3727,7 @@ bool OptionsDialog::testGraphicsSettings() {
 	Graphics::ManagedSurface *pm5544 = Graphics::renderPM5544(xres, yres);
 
 	byte palette[768];
-	const uint32 *p = pm5544->getPalette();
-
-	for (int i = 0; i < 256; i++) {
-		palette[i * 3 + 0] =  p[i]        & 0xff;
-		palette[i * 3 + 1] = (p[i] >> 8)  & 0xff;
-		palette[i * 3 + 2] = (p[i] >> 16) & 0xff;
-	}
-
+	pm5544->grabPalette(palette, 0, 256);
 	g_system->getPaletteManager()->setPalette(palette, 0, 256);
 
 	g_system->copyRectToScreen(pm5544->surfacePtr()->getPixels(), pm5544->surfacePtr()->pitch, 0, 0, xres, yres);

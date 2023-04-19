@@ -19,7 +19,7 @@
  *
  */
 
-#include "ultima/ultima8/misc/pent_include.h"
+#include "ultima/ultima8/misc/debugger.h"
 
 #include "ultima/ultima8/graphics/palette_manager.h"
 #include "ultima/ultima8/graphics/render_surface.h"
@@ -298,7 +298,7 @@ void PaletteManager::getTransformMatrix(int16 matrix[12], PalTransforms trans) {
 
 	// Unknown
 	default: {
-		perr << "Unknown Palette Transformation: " << trans << Std::endl;
+		warning("Unknown Palette Transformation: %d", trans);
 		matrix[0] = 0x800;
 		matrix[1] = 0;
 		matrix[2] = 0;

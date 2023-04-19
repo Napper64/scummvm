@@ -19,6 +19,8 @@
  *
  */
 
+#include "common/translation.h"
+
 namespace Agi {
 
 #define GAMEOPTIONS_DEFAULT                   GUIO4(GAMEOPTION_ORIGINAL_SAVELOAD,GAMEOPTION_DISABLE_MOUSE,GAMEOPTION_USE_HERCULES_FONT,GAMEOPTION_COMMAND_PROMPT_WINDOW)
@@ -371,6 +373,9 @@ static const AGIGameDescription gameDescriptions[] = {
 	// Gold Rush! (CoCo3 360k/720k) [AGI 2.072]
 	GAME_PS("goldrush", "updated", "c49bf56bf91e31a4601a604e51ef8bfb", 744, 0x2440, GID_GOLDRUSH, Common::kPlatformCoCo3),
 
+	// King's Quest 1 (DOS) 1.0U [AGI 2.272]
+	GAME("kq1", "1.0U 1986", "f3464778c9ae1a9e1fbed566f917b3d7", 0x2272, GID_KQ1),
+
 	// King's Quest 1 (Amiga) 1.0U      # 2.082
 	// The original game did not have menus, they are enabled under ScummVM
 	GAME_PO("kq1", "1.0U 1986", "246c695324f1c514aee2b904fa352fad", 0x2440, GID_KQ1, Common::kPlatformAmiga, GAMEOPTIONS_AMIGA),
@@ -518,6 +523,13 @@ static const AGIGameDescription gameDescriptions[] = {
 
 	// King's Quest 3 (PC 3.5") 2.14 3/15/88 [AGI 2.936]
 	GAME("kq3", "2.14 1988-03-15 3.5\"", "d3d17b77b3b3cd13246749231d9473cd", 0x2936, GID_KQ3),
+
+	// King's Quest 3 (PC 3.5") 2.14 3/15/88 [AGI 2.936] "For MCGA"
+	GAME("kq3", "2.14 1988-03-15 3.5\" MCGA", "7650e659c7bc0f1e9f8a410b7a2e9de6", 0x2936, GID_KQ3),
+
+	// King's Quest 3 (PC 3.5") 2.14 3/15/88 [AGI 2.936] with fanmade Spanish translation
+	// TRAC #13494
+	GAME_LPS("kq3", "2.14 1988-03-15 3.5\"", "87956c92d23f53d81bf2ee9e08fdc64c", 390, Common::ES_ESP, 0x2936, GID_KQ3, Common::kPlatformDOS),
 
 	// King's Quest 3 (CoCo3 158k/360k) 1.0C [AGI 2.023]
 	GAME_PS("kq3", "", "5a6be7d16b1c742c369ef5cc64fefdd2", 429, 0x2440, GID_KQ3, Common::kPlatformCoCo3),
@@ -711,6 +723,9 @@ static const AGIGameDescription gameDescriptions[] = {
 	// Police Quest 1 (PC) 2.0G 12/3/87; with Hebrew translation
 	GAME_LVFPN("pq1", "2.0G 1987-12-03", "PQ1.WAG", "59e1b2fb6d025968b8ed7388f107c7b5", -1, Common::HE_ISR, 0x2917, GF_EXTCHAR, GID_PQ1, Common::kPlatformDOS, GType_V2, GAMEOPTIONS_DEFAULT),
 
+	// Police Quest 1 (PC) 2.0G 12/3/87; with Spanish translation (TRAC #14369)
+	GAME_LPS("pq1", "2.0G 1987-12-03", "5d151f2f4c4e0675534d49b13529da3f", 360, Common::ES_ESP, 0x2917, GID_PQ1, Common::kPlatformDOS),
+
 	// Police Quest 1 (CoCo3 360k) [AGI 2.023]
 	GAME_PS("pq1", "", "28a077041f75aab78f66804800940085", 375, 0x2440, GID_PQ1, Common::kPlatformCoCo3),
 
@@ -815,6 +830,9 @@ static const AGIGameDescription gameDescriptions[] = {
 
 	// Space Quest 2 (PC 3.5") 2.0F [AGI 2.936]
 	GAME("sq2", "2.0F 1989-01-05 3.5\"", "28add5125484302d213911df60d2aded", 0x2936, GID_SQ2),
+
+	// Space Quest 2 (PC 5.25") 2.0F [AGI 2.936]
+	GAME("sq2", "2.0F 1989-01-05 3.5\"", "bb5a44d0bea416f2cd4c3385eaa21af4", 0x2936, GID_SQ2),
 
 	// Space Quest 2 (CoCo3 360k) [AGI 2.023]
 	GAME_PS("sq2", "", "12973d39b892dc9d280257fd271e9597", 768, 0x2440, GID_SQ2, Common::kPlatformCoCo3),
@@ -993,6 +1011,7 @@ static const AGIGameDescription gameDescriptions[] = {
 	FANMADE_L("Naturette 1 (French v1.2)", "d3665622cc41aeb9c7ecf4fa43f20e53", Common::FR_FRA),
 	FANMADE_FO("Naturette 2: Daughter of the Moon (v1.0)", "bdf76a45621c7f56d1c9d40292c6137a", GF_AGIMOUSE, GAMEOPTIONS_FANMADE_MOUSE),	// AGIPAL
 	FANMADE_FO("Naturette 3: Adventure in Treeworld (v1.0a)", "6dbb0e7fc75fec442e6d9e5a06f1530e", GF_AGIMOUSE, GAMEOPTIONS_FANMADE_MOUSE),	// AGIPAL
+	FANMADE_FO("Naturette 3: Adventure in Treeworld (v1.0c)", "f6d4950e22fac1951b221df15d3b1e9a", GF_AGIMOUSE, GAMEOPTIONS_FANMADE_MOUSE),	// AGIPAL
 	FANMADE_FO("Naturette 4: From a Planet to Another Planet (Not Finished)", "13be8cd9cf35aeff0a39b8757057fbc8", GF_AGIMOUSE, GAMEOPTIONS_FANMADE_MOUSE),
 	// FIXME: Actually Naturette 4 has both English and French language support built into it. How to add that information?
 	FANMADE_FO("Naturette 4: From a Planet to Another Planet (2007-10-05)", "8253706b6ef5423a79413b216760297c", GF_AGIMOUSE, GAMEOPTIONS_FANMADE_MOUSE),	// AGIPAL
@@ -1018,6 +1037,7 @@ static const AGIGameDescription gameDescriptions[] = {
 	FANMADE("Quest for Ladies (demo v1.1 Apr 1)", "3f6e02f16e1154a0daf296c8895edd97"),
 	FANMADE("Quest for Ladies (demo v1.1 Apr 6)", "f75e7b6a0769a3fa926eea0854711591"),
 	FANMADE("Quest for Piracy 1 - Enter the Silver Pirate (v0.15)", "d23f5c2a26f6dc60c686f8a2436ea4a6"),
+	FANMADE_L("Quest for the Toilet", "402d71a73f5eb236ad569f80695d3db2", Common::IT_ITA),
 	FANMADE("Quest for a Record Deal", "f4fbd7abf056d2d3204f790da5ac89ab"),
 	FANMADE("Ralph's Quest (v0.1)", "5cf56378aa01a26ec30f25295f0750ca"),
 	FANMADE_L("Residence 44 Quest (v0.99)", "7c5cc64200660c70240053b33d379d7d", Common::NL_NLD),

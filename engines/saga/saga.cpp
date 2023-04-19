@@ -25,6 +25,8 @@
 #include "common/system.h"
 #include "common/events.h"
 #include "common/translation.h"
+#include "common/compression/unarj.h"
+#include "common/compression/unzip.h"
 
 #include "audio/mixer.h"
 
@@ -273,6 +275,9 @@ SagaEngine::SagaEngine(OSystem *syst, const SAGAGameDescription *gameDesc)
 	// Mac CD Wyrmkeep
 	SearchMan.addSubDirectoryMatching(gameDataDir, "patch");
 
+	if (getPlatform() == Common::Platform::kPlatformMacintosh)
+		SearchMan.addSubDirectoryMatching(gameDataDir, "ITE Data Files");
+
 	_displayClip.left = _displayClip.top = 0;
 }
 
@@ -342,6 +347,21 @@ SagaEngine::~SagaEngine() {
 
 Common::Error SagaEngine::run() {
 	setTotalPlayTime(0);
+
+	if (getFeatures() & GF_INSTALLER) {
+		Common::Array<Common::String> filenames;
+		for (const ADGameFileDescription *gameArchiveDescription = getArchivesDescriptions();
+		     gameArchiveDescription->fileName; gameArchiveDescription++)
+			filenames.push_back(gameArchiveDescription->fileName);
+		Common::Archive *archive = nullptr;
+		if (filenames.size() == 1 && filenames[0].hasSuffix(".exe"))
+			archive = Common::makeZipArchive(filenames[0], true);
+		else
+			archive = Common::makeArjArchive(filenames, true);
+		if (!archive)
+			error("Error opening archive");
+		SearchMan.add("archive", archive, DisposeAfterUse::YES);
+	}
 
 	// Assign default values to the config manager, in case settings are missing
 	ConfMan.registerDefault("talkspeed", "255");
@@ -692,36 +712,36 @@ void SagaEngine::getExcuseInfo(int verb, const char *&textString, int &soundReso
 }
 
 ColorId SagaEngine::KnownColor2ColorId(KnownColor knownColor) {
-	ColorId colorId = kITEColorTransBlack;
+	ColorId colorId = kITEDOSColorTransBlack;
 
 	if (getGameId() == GID_ITE) {
 		switch (knownColor) {
 		case(kKnownColorTransparent):
-			colorId = kITEColorTransBlack;
+			colorId = iteColorTransBlack();
 			break;
 		case (kKnownColorBrightWhite):
-			colorId = kITEColorBrightWhite;
+			colorId = iteColorBrightWhite();
 			break;
 		case (kKnownColorWhite):
-			colorId = kITEColorWhite;
+			colorId = iteColorWhite();
 			break;
 		case (kKnownColorBlack):
-			colorId = kITEColorBlack;
+			colorId = iteColorBlack();
 			break;
 		case (kKnownColorSubtitleTextColor):
-			colorId = (ColorId)255;
+			colorId = isECS() ? kITEECSColorWhite : (ColorId)255;
 			break;
 		case (kKnownColorSubtitleEffectColorPC98):
 			colorId = (ColorId)210;
 			break;
 		case (kKnownColorVerbText):
-			colorId = kITEColorBlue;
+			colorId = isECS() ? kITEECSBottomColorBlue : kITEDOSColorBlue;
 			break;
 		case (kKnownColorVerbTextShadow):
-			colorId = kITEColorBlack;
+			colorId = isECS() ? kITEECSColorBlack : kITEDOSColorBlack;
 			break;
 		case (kKnownColorVerbTextActive):
-			colorId = (ColorId)96;
+			colorId = isECS() ? kITEECSBottomColorYellow60 : kITEDOSColorYellow60;
 			break;
 
 		default:

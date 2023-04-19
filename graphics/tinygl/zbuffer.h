@@ -115,6 +115,10 @@ struct FrameBuffer {
 		return _pbuf.getRawBuffer();
 	}
 
+	byte *getPixelBuffer(int pixel) {
+		return _pbuf.getRawBuffer(pixel);
+	}
+
 	int getPixelBufferWidth() {
 		return _pbufWidth;
 	}
@@ -123,11 +127,15 @@ struct FrameBuffer {
 		return _pbufHeight;
 	}
 
+	int getPixelBufferPitch() {
+		return _pbufPitch;
+	}
+
 	const uint *getZBuffer() {
 		return _zbuf;
 	}
 
-	Graphics::Surface *copyToBuffer(const Graphics::PixelFormat &dstFormat) {
+	Graphics::Surface *copyFromFrameBuffer(const Graphics::PixelFormat &dstFormat) {
 		Graphics::Surface tmp;
 		tmp.init(_pbufWidth, _pbufHeight, _pbufPitch, _pbuf.getRawBuffer(), _pbufFormat);
 		return tmp.convertTo(dstFormat);
@@ -742,6 +750,7 @@ private:
 void gl_free(void *p);
 void *gl_malloc(int size);
 void *gl_zalloc(int size);
+void *gl_realloc(void *p, int size);
 
 } // end of namespace TinyGL
 

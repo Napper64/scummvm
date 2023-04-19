@@ -167,7 +167,7 @@ public:
 	// Colors
 	void setBlankColor(int r, int g, int b) { _currentBlankColour = _renderSurface.format.RGBToColor(r & 255, g & 255, b & 255);};
 	void setBurnColor(int r, int g, int b) {
-		_currentBurnG = r;
+		_currentBurnR = r;
 		_currentBurnG = g;
 		_currentBurnB = b;
 	}
@@ -199,6 +199,9 @@ public:
 	void blur_saveSettings(Common::WriteStream *stream);
 	void blur_loadSettings(Common::SeekableReadStream *stream);
 	bool blur_createSettings(int numParams, VariableStack *&stack);
+
+	uint getWinWidth() { return _winWidth; }
+	uint getWinHeight() { return _winHeight; }
 
 private:
 	SludgeEngine *_vm;

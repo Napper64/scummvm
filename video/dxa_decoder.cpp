@@ -29,9 +29,9 @@
 
 #include "video/dxa_decoder.h"
 
-#ifdef USE_ZLIB
-  #include "common/zlib.h"
-#endif
+#include "audio/decoders/wave.h"
+
+#include "common/compression/gzio.h"
 
 namespace Video {
 
@@ -62,8 +62,15 @@ bool DXADecoder::loadStream(Common::SeekableReadStream *stream) {
 }
 
 void DXADecoder::readSoundData(Common::SeekableReadStream *stream) {
-	// Skip over the tag by default
-	stream->readUint32BE();
+	uint32 tag = stream->readUint32BE();
+
+	if (tag == MKTAG('W','A','V','E')) {
+		uint32 size = stream->readUint32BE();
+
+		addStreamTrack(Audio::makeWAVStream(stream->readStream(size), DisposeAfterUse::YES));
+	} else if (tag != MKTAG('N','U','L','L')) {
+		stream->skip(-4);
+	}
 }
 
 DXADecoder::DXAVideoTrack::DXAVideoTrack(Common::SeekableReadStream *stream) {
@@ -169,17 +176,13 @@ void DXADecoder::DXAVideoTrack::setFrameStartPos() {
 }
 
 void DXADecoder::DXAVideoTrack::decodeZlib(byte *data, int size, int totalSize) {
-#ifdef USE_ZLIB
-	unsigned long dstLen = totalSize;
-	Common::uncompress(data, &dstLen, _inBuffer, size);
-#endif
+	Common::GzioReadStream::zlibDecompress(data, totalSize, _inBuffer, size);
 }
 
 #define BLOCKW 4
 #define BLOCKH 4
 
 void DXADecoder::DXAVideoTrack::decode12(int size) {
-#ifdef USE_ZLIB
 	if (!_decompBuffer) {
 		_decompBuffer = new byte[_decompBufferSize]();
 	}
@@ -215,7 +218,7 @@ void DXADecoder::DXAVideoTrack::decode12(int size) {
 						  ((*dat & 0x0F) << shiftTbl[type-10].sh2);
 					dat++;
 				} else {
-					diffMap = *(unsigned short*)dat;
+					diffMap = READ_BE_UINT16(dat);
 					dat += 2;
 				}
 
@@ -273,11 +276,9 @@ void DXADecoder::DXAVideoTrack::decode12(int size) {
 			}
 		}
 	}
-#endif
 }
 
 void DXADecoder::DXAVideoTrack::decode13(int size) {
-#ifdef USE_ZLIB
 	uint8 *codeBuf, *dataBuf, *motBuf, *maskBuf;
 
 	if (!_decompBuffer) {
@@ -459,7 +460,6 @@ void DXADecoder::DXAVideoTrack::decode13(int size) {
 			}
 		}
 	}
-#endif
 }
 
 const Graphics::Surface *DXADecoder::DXAVideoTrack::decodeNextFrame() {

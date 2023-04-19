@@ -156,14 +156,16 @@ public:
 	~Scene();
 
 	int32 _needChangeScene = LBA1SceneId::Citadel_Island_Prison;
-	int32 _currentSceneIdx = LBA1SceneId::Citadel_Island_Prison;
+	int32 _currentSceneIdx = LBA1SceneId::Citadel_Island_Prison; // NumCube
 	int32 _previousSceneIdx = LBA1SceneId::Citadel_Island_Prison;
+
+	int32 _planet = -1;
 
 	int32 _holomapTrajectory = -1;
 
 	TextBankId _sceneTextBank = TextBankId::None;
-	int32 _alphaLight = ANGLE_315;
-	int32 _betaLight = ANGLE_334;
+	int32 _alphaLight = 0;
+	int32 _betaLight = 0;
 
 	IVec3 _newHeroPos;
 
@@ -174,7 +176,7 @@ public:
 	ScenePositionType _heroPositionType = ScenePositionType::kNoPosition; // twinsenPositionModeInNewCube
 
 	// ACTORS
-	int32 _sceneNumActors = 0;
+	int32 _nbObjets = 0;
 	ActorStruct *_sceneHero = nullptr;
 
 	/** Meca penguin actor index */
@@ -183,7 +185,7 @@ public:
 	/** Current followed actor in scene */
 	int16 _currentlyFollowedActor = OWN_ACTOR_SCENE_INDEX;
 	/** Current actor in zone - climbing a ladder */
-	bool _currentActorInZone = false;
+	bool _flagClimbing = false;
 	bool _enableEnhancements = false;
 	/** Current actor manipulated in scripts */
 	int16 _currentScriptValue = 0;

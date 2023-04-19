@@ -19,14 +19,15 @@
  *
  */
 
-#include "common/achievements.h"
 #include "common/translation.h"
 
-#include "engines/wintermute/wintermute.h"
-#include "engines/wintermute/base/base_persistence_manager.h"
+#include "engines/achievements.h"
 
-#include "engines/wintermute/keymapper_tables.h"
-#include "engines/wintermute/achievements_tables.h"
+#include "wintermute/wintermute.h"
+#include "wintermute/base/base_persistence_manager.h"
+
+#include "wintermute/keymapper_tables.h"
+#include "wintermute/achievements_tables.h"
 
 // Detection related files.
 #include "wintermute/detection.h"
@@ -225,7 +226,7 @@ public:
 			if (!file->getName().hasSuffixIgnoreCase(".dcp")) continue;
 
 			FileProperties tmp;
-			if (AdvancedMetaEngine::getFilePropertiesExtern(md5Bytes, allFiles, s_fallbackDesc, file->getName(), tmp)) {
+			if (AdvancedMetaEngine::getFilePropertiesExtern(md5Bytes, allFiles, kMD5Head, file->getName(), tmp)) {
 				game.hasUnknownFiles = true;
 				game.matchedFiles[file->getName()] = tmp;
 			}

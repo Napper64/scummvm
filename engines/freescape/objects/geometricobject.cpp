@@ -26,6 +26,8 @@
 
 namespace Freescape {
 
+extern FCLInstructionVector *duplicateCondition(FCLInstructionVector *condition);
+
 int GeometricObject::numberOfColoursForObjectOfType(ObjectType type) {
 	switch (type) {
 	default:
@@ -124,7 +126,12 @@ GeometricObject::GeometricObject(
 	_flags = flags_;
 
 	if (isDestroyed()) // If the object is destroyed, restore it
-		_flags = _flags & ~0x20;
+		restore();
+
+	if (isInitiallyInvisible())
+		makeInvisible();
+	else
+		makeVisible();
 
 	_objectID = objectID_;
 	_origin = origin_;
@@ -166,7 +173,7 @@ GeometricObject::GeometricObject(
 void GeometricObject::setOrigin(Math::Vector3d origin_) {
 	_origin = origin_;
 	computeBoundingBox();
-};
+}
 
 void GeometricObject::scale(int factor) {
 	_origin = _origin / factor;
@@ -181,14 +188,18 @@ void GeometricObject::scale(int factor) {
 }
 
 Object *GeometricObject::duplicate() {
-	Common::Array<uint8> *colours_copy = nullptr;
-	Common::Array<uint16> *ordinates_copy = nullptr;
+	Common::Array<uint8> *coloursCopy = nullptr;
+	Common::Array<uint16> *ordinatesCopy = nullptr;
+	FCLInstructionVector *conditionCopy = nullptr;
 
 	if (_colours)
-		colours_copy = new Common::Array<uint8>(*_colours);
+		coloursCopy = new Common::Array<uint8>(*_colours);
 
 	if (_ordinates)
-		ordinates_copy = new Common::Array<uint16>(*_ordinates);
+		ordinatesCopy = new Common::Array<uint16>(*_ordinates);
+
+	conditionCopy = duplicateCondition(&_condition);
+	assert(conditionCopy);
 
 	return new GeometricObject(
 		_type,
@@ -196,9 +207,9 @@ Object *GeometricObject::duplicate() {
 		_flags,
 		_origin,
 		_size,
-		colours_copy,
-		ordinates_copy,
-		_condition,
+		coloursCopy,
+		ordinatesCopy,
+		*conditionCopy,
 		_conditionSource);
 }
 

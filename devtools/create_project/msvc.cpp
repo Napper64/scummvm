@@ -31,8 +31,8 @@ namespace CreateProjectTool {
 //////////////////////////////////////////////////////////////////////////
 // MSVC Provider (Base class)
 //////////////////////////////////////////////////////////////////////////
-MSVCProvider::MSVCProvider(StringList &global_warnings, std::map<std::string, StringList> &project_warnings, const int version, const MSVCVersion &msvc)
-	: ProjectProvider(global_warnings, project_warnings, version), _msvcVersion(msvc) {
+MSVCProvider::MSVCProvider(StringList &global_warnings, std::map<std::string, StringList> &project_warnings, StringList &global_errors, const int version, const MSVCVersion &msvc)
+	: ProjectProvider(global_warnings, project_warnings, global_errors, version), _msvcVersion(msvc) {
 
 	_enableLanguageExtensions = tokenize(ENABLE_LANGUAGE_EXTENSIONS, ',');
 	_disableEditAndContinue = tokenize(DISABLE_EDIT_AND_CONTINUE, ',');
@@ -65,8 +65,10 @@ std::string MSVCProvider::getLibraryFromFeature(const char *feature, const Build
 		{       "png", "libpng16.lib",              "libpng16d.lib", nullptr,                                           nullptr },
 		{       "gif", "gif.lib",                   nullptr,         nullptr,                                           nullptr },
 		{      "faad", "faad.lib",                  nullptr,         nullptr,                                           "libfaad.lib" },
+		{    "mikmod", "mikmod.lib",                nullptr,         nullptr,                                           nullptr },
 		{     "mpeg2", "mpeg2.lib",                 nullptr,         nullptr,                                           "libmpeg2.lib" },
 		{ "theoradec", "theora.lib",                nullptr,         nullptr,                                           "libtheora_static.lib" },
+		{       "vpx", "vpx.lib",                   nullptr,         nullptr,                                           nullptr },
 		{ "freetype2", "freetype.lib",              "freetyped.lib", nullptr,                                           nullptr },
 		{      "jpeg", "jpeg.lib",                  nullptr,         nullptr,                                           "jpeg-static.lib" },
 		{"fluidsynth", "fluidsynth.lib",            nullptr,         nullptr,                                           "libfluidsynth.lib" },
@@ -79,7 +81,8 @@ std::string MSVCProvider::getLibraryFromFeature(const char *feature, const Build
 		// Feature flags with library dependencies
 		{   "updates", "winsparkle.lib",            nullptr,         nullptr,                                           nullptr },
 		{       "tts", nullptr,                     nullptr,         "sapi.lib",                                        nullptr },
-		{    "opengl", nullptr,                     nullptr,         "opengl32.lib",                                    nullptr }
+		{    "opengl", nullptr,                     nullptr,         "opengl32.lib",                                    nullptr },
+		{      "enet", nullptr,                     nullptr,         "winmm.lib ws2_32.lib",                            nullptr }
 	};
 
 	// HACK for switching SDL_net to SDL2_net

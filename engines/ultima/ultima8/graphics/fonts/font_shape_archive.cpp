@@ -19,7 +19,7 @@
  *
  */
 
-#include "ultima/ultima8/misc/pent_include.h"
+#include "ultima/ultima8/misc/debugger.h"
 
 #include "ultima/ultima8/graphics/fonts/font_shape_archive.h"
 #include "ultima/ultima8/misc/util.h"
@@ -50,7 +50,7 @@ void FontShapeArchive::cache(uint32 shapenum) {
 
 	if (!_format) {
 		delete [] data;
-		perr << "Error: Unable to detect shape format for flex." << Std::endl;
+		warning("Unable to detect shape format for flex.");
 		return;
 	}
 
@@ -73,8 +73,7 @@ void FontShapeArchive::setHVLeads() {
 		Std::vector<Std::string> vals;
 		SplitString(leaddesc, ',', vals);
 		if (vals.size() != 2) {
-			perr << "Invalid hlead/vlead description: " << leaddesc
-			     << Std::endl;
+			warning("Invalid hlead/vlead description: %s", leaddesc.c_str());
 			continue;
 		}
 

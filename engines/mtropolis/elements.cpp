@@ -426,7 +426,7 @@ MovieElement::MovieElement()
 	: _cacheBitmap(false), _alternate(false), _playEveryFrame(false), _reversed(false), /* _haveFiredAtLastCel(false), */
 	  /* _haveFiredAtFirstCel(false), */_shouldPlayIfNotPaused(true), _needsReset(true), _currentPlayState(kMediaStateStopped),
 	  _assetID(0), _maxTimestamp(0), _timeScale(0), _currentTimestamp(0), _volume(100),
-	  _displayFrame(nullptr), _runtime(nullptr) {
+	  _displayFrame(nullptr) {
 }
 
 MovieElement::~MovieElement() {
@@ -449,8 +449,6 @@ bool MovieElement::load(ElementLoaderContext &context, const Data::MovieElement 
 	_playEveryFrame = ((data.animationFlags & Data::AnimationFlags::kPlayEveryFrame) != 0);
 	_assetID = data.assetID;
 	_volume = data.volume;
-
-	_runtime = context.runtime;
 
 	return true;
 }
@@ -536,11 +534,11 @@ VThreadState MovieElement::consumeCommand(Runtime *runtime, const Common::Shared
 		return kVThreadReturn;
 	}
 
-	return Structural::consumeCommand(runtime, msg);
+	return VisualElement::consumeCommand(runtime, msg);
 }
 
 void MovieElement::activate() {
-	Project *project = _runtime->getProject();
+	Project *project = getRuntime()->getProject();
 	Common::SharedPtr<Asset> asset = project->getAssetByID(_assetID).lock();
 
 	if (!asset) {
@@ -576,7 +574,7 @@ void MovieElement::activate() {
 	if (!_videoDecoder->loadStream(movieDataStream))
 		_videoDecoder.reset();
 
-	if (_runtime->getHacks().removeQuickTimeEdits)
+	if (getRuntime()->getHacks().removeQuickTimeEdits)
 		qtDecoder->flattenEditLists();
 	_timeScale = qtDecoder->getTimeScale();
 
@@ -599,7 +597,7 @@ void MovieElement::activate() {
 		}
 
 		if (subSetIDPtr)
-			_subtitles.reset(new SubtitlePlayer(_runtime, *subSetIDPtr, subtitleTables));
+			_subtitles.reset(new SubtitlePlayer(getRuntime(), *subSetIDPtr, subtitleTables));
 	}
 }
 
@@ -889,7 +887,7 @@ MiniscriptInstructionOutcome MovieElement::scriptSetTimestamp(MiniscriptThread *
 
 	if (asInteger != (int32)_currentTimestamp) {
 		SeekToTimeTaskData *taskData = thread->getRuntime()->getVThread().pushTask("MovieElement::seekToTimeTask", this, &MovieElement::seekToTimeTask);
-		taskData->runtime = _runtime;
+		taskData->runtime = getRuntime();
 		taskData->timestamp = asInteger;
 
 		return kMiniscriptInstructionOutcomeYieldToVThreadNoRetry;
@@ -963,7 +961,7 @@ MiniscriptInstructionOutcome MovieElement::scriptSetRangeTyped(MiniscriptThread 
 
 	if (targetTS != _currentTimestamp) {
 		SeekToTimeTaskData *taskData = thread->getRuntime()->getVThread().pushTask("MovieElement::seekToTimeTask", this, &MovieElement::seekToTimeTask);
-		taskData->runtime = _runtime;
+		taskData->runtime = getRuntime();
 		taskData->timestamp = targetTS;
 
 		return kMiniscriptInstructionOutcomeYieldToVThreadNoRetry;
@@ -1016,7 +1014,7 @@ VThreadState MovieElement::seekToTimeTask(const SeekToTimeTaskData &taskData) {
 	return kVThreadReturn;
 }
 
-ImageElement::ImageElement() : _cacheBitmap(false), _assetID(0), _runtime(nullptr) {
+ImageElement::ImageElement() : _cacheBitmap(false), _assetID(0) {
 }
 
 ImageElement::~ImageElement() {
@@ -1027,7 +1025,6 @@ bool ImageElement::load(ElementLoaderContext &context, const Data::ImageElement 
 		return false;
 
 	_cacheBitmap = ((data.elementFlags & Data::ElementFlags::kCacheBitmap) != 0);
-	_runtime = context.runtime;
 	_assetID = data.imageAssetID;
 
 	return true;
@@ -1057,7 +1054,7 @@ MiniscriptInstructionOutcome ImageElement::writeRefAttribute(MiniscriptThread *t
 }
 
 void ImageElement::activate() {
-	Project *project = _runtime->getProject();
+	Project *project = getRuntime()->getProject();
 	Common::SharedPtr<Asset> asset = project->getAssetByID(_assetID).lock();
 
 	if (!asset) {
@@ -1070,7 +1067,7 @@ void ImageElement::activate() {
 		return;
 	}
 
-	_cachedImage = static_cast<ImageAsset *>(asset.get())->loadAndCacheImage(_runtime);
+	_cachedImage = static_cast<ImageAsset *>(asset.get())->loadAndCacheImage(getRuntime());
 
 	if (_name.empty())
 		_name = project->getAssetNameByID(_assetID);
@@ -1087,23 +1084,22 @@ void ImageElement::render(Window *window) {
 		if (inkMode == VisualElementRenderProperties::kInkModeInvisible)
 			return;
 
-		Common::SharedPtr<Graphics::ManagedSurface> optimized = _cachedImage->optimize(_runtime);
+		Common::SharedPtr<Graphics::ManagedSurface> optimized = _cachedImage->optimize(getRuntime());
 		Common::Rect srcRect(optimized->w, optimized->h);
 		Common::Rect destRect(_cachedAbsoluteOrigin.x, _cachedAbsoluteOrigin.y, _cachedAbsoluteOrigin.x + _rect.width(), _cachedAbsoluteOrigin.y + _rect.height());
 
 		if (optimized->format.bytesPerPixel == 1) {
 			// FIXME: Pass palette to blit functions instead
 			if (_cachedImage->getOriginalColorDepth() == kColorDepthMode1Bit) {
-				const Graphics::PixelFormat &fmt = window->getPixelFormat();
-				uint32 blackColor = fmt.RGBToColor(0, 0, 0);
-				uint32 whiteColor = fmt.RGBToColor(255, 255, 255);
-
-				const uint32 bwPalette[2] = {whiteColor, blackColor};
+				const uint8 bwPalette[2 * 3] = {
+					255, 255, 255,
+					0, 0, 0
+				};
 				optimized->setPalette(bwPalette, 0, 2);
 			} else {
 				const Palette *palette = getPalette().get();
 				if (!palette)
-					palette = &_runtime->getGlobalPalette();
+					palette = &getRuntime()->getGlobalPalette();
 
 				optimized->setPalette(palette->getPalette(), 0, 256);
 			}
@@ -1113,7 +1109,8 @@ void ImageElement::render(Window *window) {
 
 		if (inkMode == VisualElementRenderProperties::kInkModeBackgroundMatte || inkMode == VisualElementRenderProperties::kInkModeBackgroundTransparent) {
 			const ColorRGB8 transColorRGB8 = _renderProps.getBackColor();
-			uint32 transColor = optimized->format.ARGBToColor(255, transColorRGB8.r, transColorRGB8.g, transColorRGB8.b);
+			uint32 transColor = optimized->format.ARGBToColor(0, transColorRGB8.r, transColorRGB8.g, transColorRGB8.b);
+
 			window->getSurface()->transBlitFrom(*optimized, srcRect, destRect, transColor, false, 0, alpha);
 		} else if (inkMode == VisualElementRenderProperties::kInkModeDefault || inkMode == VisualElementRenderProperties::kInkModeCopy) {
 			if (alpha != 255) {
@@ -1144,7 +1141,7 @@ MiniscriptInstructionOutcome ImageElement::scriptSetFlushPriority(MiniscriptThre
 
 MToonElement::MToonElement()
 	: _cacheBitmap(false), _maintainRate(false), _assetID(0), _rateTimes100000(0), _flushPriority(0), _celStartTimeMSec(0),
-	  _isPlaying(false), _runtime(nullptr), _renderedFrame(0), _playRange(IntRange(1, 1)), _cel(1) {
+	  _isPlaying(false), _renderedFrame(0), _playRange(IntRange(1, 1)), _cel(1) {
 }
 
 MToonElement::~MToonElement() {
@@ -1161,7 +1158,6 @@ bool MToonElement::load(ElementLoaderContext &context, const Data::MToonElement 
 	_loop = ((data.animationFlags & Data::AnimationFlags::kLoop) != 0);
 	_maintainRate = ((data.elementFlags & Data::AnimationFlags::kPlayEveryFrame) == 0);	// NOTE: Inverted intentionally
 	_assetID = data.assetID;
-	_runtime = context.runtime;
 	_rateTimes100000 = data.rateTimes100000;
 
 	return true;
@@ -1240,7 +1236,7 @@ VThreadState MToonElement::consumeCommand(Runtime *runtime, const Common::Shared
 }
 
 void MToonElement::activate() {
-	Project *project = _runtime->getProject();
+	Project *project = getRuntime()->getProject();
 	Common::SharedPtr<Asset> asset = project->getAssetByID(_assetID).lock();
 
 	if (!asset) {
@@ -1253,7 +1249,7 @@ void MToonElement::activate() {
 		return;
 	}
 
-	_cachedMToon = static_cast<MToonAsset *>(asset.get())->loadAndCacheMToon(_runtime);
+	_cachedMToon = static_cast<MToonAsset *>(asset.get())->loadAndCacheMToon(getRuntime());
 	_metadata = _cachedMToon->getMetadata();
 
 	_playMediaSignaller = project->notifyOnPlayMedia(this);
@@ -1278,7 +1274,7 @@ bool MToonElement::canAutoPlay() const {
 
 void MToonElement::render(Window *window) {
 	if (_cachedMToon) {
-		_cachedMToon->optimize(_runtime);
+		_cachedMToon->optimize(getRuntime());
 
 		uint32 frame = _cel - 1;
 		assert(frame < _metadata->frames.size());
@@ -1288,7 +1284,7 @@ void MToonElement::render(Window *window) {
 		if (_renderSurface->format.bytesPerPixel == 1) {
 			const Palette *palette = getPalette().get();
 			if (!palette)
-				palette = &_runtime->getGlobalPalette();
+				palette = &getRuntime()->getGlobalPalette();
 
 			// FIXME: Should support passing the palette to the blit function instead
 			_renderSurface->setPalette(palette->getPalette(), 0, 256);
@@ -1553,12 +1549,35 @@ MiniscriptInstructionOutcome MToonElement::scriptSetCel(MiniscriptThread *thread
 }
 
 MiniscriptInstructionOutcome MToonElement::scriptSetRange(MiniscriptThread *thread, const DynamicValue &value) {
-	if (value.getType() != DynamicValueTypes::kIntegerRange) {
-		thread->error("Invalid type for mToon range");
+	if (value.getType() == DynamicValueTypes::kIntegerRange)
+		return scriptSetRangeTyped(thread, value.getIntRange());
+	if (value.getType() == DynamicValueTypes::kPoint)
+		return scriptSetRangeTyped(thread, value.getPoint());
+	if (value.getType() == DynamicValueTypes::kLabel) {
+		const Common::String *nameStrPtr = thread->getRuntime()->getProject()->findNameOfLabel(value.getLabel());
+		if (!nameStrPtr) {
+			thread->error("mToon range label wasn't found");
+			return kMiniscriptInstructionOutcomeFailed;
+		}
+
+		if (!_metadata) {
+			thread->error("mToon range couldn't be resolved because the metadata wasn't loaded yet");
+			return kMiniscriptInstructionOutcomeFailed;
+		}
+
+		for (const MToonMetadata::FrameRangeDef &frameRange : _metadata->frameRanges) {
+			if (caseInsensitiveEqual(frameRange.name, *nameStrPtr)) {
+				// Frame ranges in the metadata are 0-based, but setting the range is 1-based, so add 1
+				return scriptSetRangeTyped(thread, IntRange(frameRange.startFrame + 1, frameRange.endFrame + 1));
+			}
+		}
+
+		thread->error("mToon range was assigned to a label but the label doesn't exist in the mToon data");
 		return kMiniscriptInstructionOutcomeFailed;
 	}
 
-	return scriptSetRangeTyped(thread, value.getIntRange());
+	thread->error("Invalid type for mToon range");
+	return kMiniscriptInstructionOutcomeFailed;
 }
 
 MiniscriptInstructionOutcome MToonElement::scriptSetRangeStart(MiniscriptThread *thread, const DynamicValue &value) {
@@ -1636,8 +1655,13 @@ MiniscriptInstructionOutcome MToonElement::scriptSetRangeTyped(MiniscriptThread 
 	return kMiniscriptInstructionOutcomeContinue;
 }
 
+MiniscriptInstructionOutcome MToonElement::scriptSetRangeTyped(MiniscriptThread *thread, const Common::Point &pointRef) {
+	IntRange intRange(pointRef.x, pointRef.y);
+	return scriptSetRangeTyped(thread, intRange);
+}
+
 void MToonElement::onPauseStateChanged() {
-	_celStartTimeMSec = _runtime->getPlayTime();
+	_celStartTimeMSec = getRuntime()->getPlayTime();
 }
 
 MiniscriptInstructionOutcome MToonElement::scriptSetRate(MiniscriptThread *thread, const DynamicValue &value) {
@@ -1660,7 +1684,7 @@ MiniscriptInstructionOutcome MToonElement::scriptSetRate(MiniscriptThread *threa
 
 TextLabelElement::TextLabelElement()
 	: _cacheBitmap(false), _needsRender(false), /*_isBitmap(false), */_assetID(0),
-	  _macFontID(0), _size(12), _alignment(kTextAlignmentLeft), _runtime(nullptr) {
+	  _macFontID(0), _size(12), _alignment(kTextAlignmentLeft) {
 }
 
 TextLabelElement::~TextLabelElement() {
@@ -1676,7 +1700,6 @@ bool TextLabelElement::load(ElementLoaderContext &context, const Data::TextLabel
 
 	_cacheBitmap = ((data.elementFlags & Data::ElementFlags::kCacheBitmap) != 0);
 	_assetID = data.assetID;
-	_runtime = context.runtime;
 
 	return true;
 }
@@ -1739,7 +1762,7 @@ MiniscriptInstructionOutcome TextLabelElement::writeRefAttributeIndexed(Miniscri
 }
 
 void TextLabelElement::activate() {
-	Project *project = _runtime->getProject();
+	Project *project = getRuntime()->getProject();
 	Common::SharedPtr<Asset> asset = project->getAssetByID(_assetID).lock();
 
 	if (!asset) {
@@ -1817,7 +1840,7 @@ void TextLabelElement::render(Window *window) {
 			Graphics::MacFont macFont(_macFontID, _size, slant);
 			macFont.setFallback(fallback);
 
-			font = _runtime->getMacFontManager()->getFont(macFont);
+			font = getRuntime()->getMacFontManager()->getFont(macFont);
 		}
 
 		// Some weird cases (like the Immediate Action entryway in Obsidian) have no font info at all
@@ -1915,8 +1938,10 @@ void TextLabelElement::render(Window *window) {
 
 	// TODO: Need to handle more modes
 	const ColorRGB8 &color = _renderProps.getForeColor();
-	const uint32 opaqueColor = target->format.RGBToColor(color.r, color.g, color.b);
-	const uint32 drawPalette[2] = {0, opaqueColor};
+	const uint8 drawPalette[2 * 3] = {
+		0, 0, 0,
+		color.r, color.g, color.b
+	};
 
 	if (_renderedText) {
 		_renderedText->setPalette(drawPalette, 0, 2);
@@ -2054,7 +2079,7 @@ MiniscriptInstructionOutcome TextLabelElement::TextLabelLineWriteInterface::refA
 
 SoundElement::SoundElement()
 	: _leftVolume(0), _rightVolume(0), _balance(0), _assetID(0), _startTime(0), _finishTime(0), _cueCheckTime(0),
-	  _startTimestamp(0), _shouldPlayIfNotPaused(true), _needsReset(true), _runtime(nullptr) {
+	  _startTimestamp(0), _shouldPlayIfNotPaused(true), _needsReset(true) {
 }
 
 SoundElement::~SoundElement() {
@@ -2072,7 +2097,6 @@ bool SoundElement::load(ElementLoaderContext &context, const Data::SoundElement 
 	_rightVolume = data.rightVolume;
 	_balance = data.balance;
 	_assetID = data.assetID;
-	_runtime = context.runtime;
 
 	return true;
 }
@@ -2099,6 +2123,9 @@ MiniscriptInstructionOutcome SoundElement::writeRefAttribute(MiniscriptThread *t
 	} else if (attrib == "balance") {
 		DynamicValueWriteFuncHelper<SoundElement, &SoundElement::scriptSetBalance, true>::create(this, writeProxy);
 		return kMiniscriptInstructionOutcomeContinue;
+	} else if (attrib == "asset") {
+		DynamicValueWriteFuncHelper<SoundElement, &SoundElement::scriptSetAsset, true>::create(this, writeProxy);
+		return kMiniscriptInstructionOutcomeContinue;
 	}
 
 	return NonVisualElement::writeRefAttribute(thread, writeProxy, attrib);
@@ -2122,7 +2149,7 @@ VThreadState SoundElement::consumeCommand(Runtime *runtime, const Common::Shared
 }
 
 void SoundElement::activate() {
-	Project *project = _runtime->getProject();
+	Project *project = getRuntime()->getProject();
 	Common::SharedPtr<Asset> asset = project->getAssetByID(_assetID).lock();
 
 	if (!asset) {
@@ -2135,7 +2162,7 @@ void SoundElement::activate() {
 		return;
 	}
 
-	_cachedAudio = static_cast<AudioAsset *>(asset.get())->loadAndCacheAudio(_runtime);
+	_cachedAudio = static_cast<AudioAsset *>(asset.get())->loadAndCacheAudio(getRuntime());
 	_metadata = static_cast<AudioAsset *>(asset.get())->getMetadata();
 
 	_playMediaSignaller = project->notifyOnPlayMedia(this);
@@ -2153,7 +2180,7 @@ void SoundElement::activate() {
 		}
 
 		if (subtitleSetIDPtr)
-			_subtitlePlayer.reset(new SubtitlePlayer(_runtime, *subtitleSetIDPtr, subTables));
+			_subtitlePlayer.reset(new SubtitlePlayer(getRuntime(), *subtitleSetIDPtr, subTables));
 	}
 }
 
@@ -2188,21 +2215,21 @@ void SoundElement::playMedia(Runtime *runtime, Project *project) {
 			}
 
 			if (!_player) {
-				_finishTime = _runtime->getPlayTime() + _metadata->durationMSec;
+				_finishTime = getRuntime()->getPlayTime() + _metadata->durationMSec;
 
 				int normalizedVolume = (_leftVolume + _rightVolume) * 255 / 200;
 				int normalizedBalance = _balance * 127 / 100;
 
 				// TODO: Support ranges
 				size_t numSamples = _cachedAudio->getNumSamples(*_metadata);
-				_player.reset(new AudioPlayer(_runtime->getAudioMixer(), normalizedVolume, normalizedBalance, _metadata, _cachedAudio, _loop, 0, 0, numSamples));
+				_player.reset(new AudioPlayer(getRuntime()->getAudioMixer(), normalizedVolume, normalizedBalance, _metadata, _cachedAudio, _loop, 0, 0, numSamples));
 
 				_startTime = runtime->getPlayTime();
 				_cueCheckTime = _startTime;
 				_startTimestamp = 0;
 			}
 
-			uint64 newTime = _runtime->getPlayTime();
+			uint64 newTime = getRuntime()->getPlayTime();
 			if (newTime > _cueCheckTime) {
 				uint64 oldTimeRelative = _cueCheckTime - _startTime + _startTimestamp;
 				uint64 newTimeRelative = newTime - _startTime + _startTimestamp;
@@ -2308,6 +2335,53 @@ MiniscriptInstructionOutcome SoundElement::scriptSetBalance(MiniscriptThread *th
 
 	setBalance(asInteger);
 	return kMiniscriptInstructionOutcomeContinue;
+}
+
+MiniscriptInstructionOutcome SoundElement::scriptSetAsset(MiniscriptThread *thread, const DynamicValue &value) {
+	DynamicValue derefValue = value.dereference();
+
+	if (derefValue.getType() != DynamicValueTypes::kString) {
+		thread->error("Tried to set a sound element's asset to something that wasn't a string");
+		return kMiniscriptInstructionOutcomeFailed;
+	}
+
+	stopPlayer();
+
+	Project *project = thread->getRuntime()->getProject();
+
+	uint32 assetID = 0;
+	if (!project->getAssetIDByName(derefValue.getString(), assetID)) {
+		warning("Sound element references asset '%s' but the asset ID couldn't be resolved", derefValue.getString().c_str());
+		return kMiniscriptInstructionOutcomeFailed;
+	}
+
+	Common::Array<Common::SharedPtr<Asset> > forceLoadedAssets;
+
+	Common::SharedPtr<Asset> asset = project->getAssetByID(assetID).lock();
+
+	if (!asset) {
+		if (thread->getRuntime()->getHacks().allowAssetsFromOtherScenes) {
+			project->forceLoadAsset(assetID, forceLoadedAssets);
+			asset = project->getAssetByID(assetID).lock();
+		}
+	}
+
+	if (!asset) {
+		warning("Sound element references asset '%s' but the asset isn't loaded!", derefValue.getString().c_str());
+		return kMiniscriptInstructionOutcomeFailed;
+	}
+
+	if (asset->getAssetType() != kAssetTypeAudio) {
+		warning("Sound element assigned an asset that isn't audio");
+		return kMiniscriptInstructionOutcomeFailed;
+	}
+
+	_cachedAudio = static_cast<AudioAsset *>(asset.get())->loadAndCacheAudio(getRuntime());
+	_metadata = static_cast<AudioAsset *>(asset.get())->getMetadata();
+	_assetID = asset->getAssetID();
+
+	return kMiniscriptInstructionOutcomeContinue;
+
 }
 
 void SoundElement::setLoop(bool loop) {

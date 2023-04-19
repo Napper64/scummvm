@@ -25,10 +25,10 @@
 #include "backends/keymapper/keymap.h"
 #include "backends/keymapper/standard-actions.h"
 
-#include "common/achievements.h"
 #include "common/savefile.h"
 #include "common/translation.h"
 
+#include "engines/achievements.h"
 #include "engines/advancedDetector.h"
 
 #include "graphics/scaler.h"
@@ -146,6 +146,7 @@ Common::KeymapArray AsylumMetaEngine::initKeymaps(const char *target) const {
 	act->setCustomEngineActionEvent(kAsylumActionShowMenu);
 	act->addDefaultInputMapping("ESCAPE");
 	act->addDefaultInputMapping("JOY_Y");
+	act->allowKbdRepeats();
 	engineKeyMap->addAction(act);
 
 	act = new Action("INVENTORY", _("Open character inventory"));

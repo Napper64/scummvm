@@ -53,19 +53,18 @@ SndRes::SndRes(SagaEngine *vm) : _vm(vm), _sfxContext(nullptr), _voiceContext(nu
 	_sfxContext = _vm->_resource->getContext(GAME_SOUNDFILE);
 	if (_sfxContext == nullptr) {
 		warning("SndRes::SndRes resource context not found");
-		return;
 	}
 
 	setVoiceBank(0);
 
-	if (_vm->getGameId() == GID_ITE) {
+	if (_vm->getGameId() == GID_ITE && _sfxContext) {
 		_fxTable.resize(ITE_SFXCOUNT);
 		for (uint i = 0; i < _fxTable.size(); i++) {
 			_fxTable[i].res = ITE_SfxTable[i].res;
 			_fxTable[i].vol = ITE_SfxTable[i].vol;
 		}
 #ifdef ENABLE_IHNM
-	} else if (_vm->getGameId() == GID_IHNM) {
+	} else if (_vm->getGameId() == GID_IHNM && _sfxContext) {
 		ResourceContext *resourceContext;
 
 		resourceContext = _vm->_resource->getContext(GAME_SOUNDFILE);
@@ -105,9 +104,6 @@ SndRes::~SndRes() {
 }
 
 void SndRes::setVoiceBank(int serial) {
-	Common::File *file;
-	if (_sfxContext == nullptr)
-		return;
 	if (_voiceSerial == serial)
 		return;
 
@@ -128,10 +124,7 @@ void SndRes::setVoiceBank(int serial) {
 
 	// Close previous voice bank file
 	if (_voiceContext != nullptr) {
-		file = _voiceContext->getFile(nullptr);
-		if (file->isOpen()) {
-			file->close();
-		}
+		_voiceContext->closeFile();
 	}
 
 	_voiceSerial = serial;
@@ -147,6 +140,9 @@ void SndRes::playSound(uint32 resourceId, int volume, bool loop) {
 	if (_sfxContext == nullptr)
 		return;
 
+	if (!_sfxContext->validResourceId(resourceId))
+		return;
+
 	if (!load(_sfxContext, resourceId, buffer, false)) {
 		warning("Failed to load sound");
 		return;
@@ -157,9 +153,6 @@ void SndRes::playSound(uint32 resourceId, int volume, bool loop) {
 
 void SndRes::playVoice(uint32 resourceId) {
 	SoundBuffer buffer;
-
-	if (_sfxContext == nullptr)
-		return;
 
 	if (!(_vm->_voiceFilesExist))
 		return;
@@ -202,9 +195,9 @@ bool SndRes::load(ResourceContext *context, uint32 resourceId, SoundBuffer &buff
 	bool result = false;
 	GameSoundType resourceType = kSoundPCM;
 	int rate = 0, size = 0;
-	Common::File *file;
+	Common::SeekableReadStream *file;
 
-	if (_sfxContext == nullptr)
+	if (context == nullptr)
 		return false;
 
 	if (resourceId == (uint32)-1) {
@@ -227,10 +220,11 @@ bool SndRes::load(ResourceContext *context, uint32 resourceId, SoundBuffer &buff
 			Common::sprintf_s(soundFileName, "SFX/SFX%d/SFX%03x", dirIndex, resourceId);
 		}
 
-		file = new Common::File();
+		Common::File *actualFile = new Common::File();
 
-		file->open(soundFileName);
-		soundResourceLength = file->size();
+		actualFile->open(soundFileName);
+		soundResourceLength = actualFile->size();
+		file = actualFile;
 	} else
 #endif
 	{
@@ -312,7 +306,8 @@ bool SndRes::load(ResourceContext *context, uint32 resourceId, SoundBuffer &buff
 		if ((soundResourceLength & 1) && (rawFlags & Audio::FLAG_16BITS))
 			soundResourceLength &= ~1;
 
-		Audio::SeekableAudioStream *audStream = Audio::makeRawStream(READ_STREAM(soundResourceLength), 22050, rawFlags);
+		Audio::SeekableAudioStream *audStream = Audio::makeRawStream(READ_STREAM(soundResourceLength),
+									     _vm->getPlatform() == Common::Platform::kPlatformAmiga ? 11025 : 22050, rawFlags);
 		buffer.stream = audStream;
 		buffer.streamLength = audStream->getLength();
 		result = true;
@@ -466,9 +461,6 @@ bool SndRes::load(ResourceContext *context, uint32 resourceId, SoundBuffer &buff
 
 int SndRes::getVoiceLength(uint32 resourceId) {
 	SoundBuffer buffer;
-
-	if (_sfxContext == nullptr)
-		return -1;
 
 	if (!(_vm->_voiceFilesExist))
 		return -1;

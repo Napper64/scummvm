@@ -41,12 +41,14 @@ namespace Director {
 
 struct ChunkReference;
 struct MenuReference;
+struct PictureReference;
 struct TheEntity;
 struct TheEntityField;
 struct LingoArchive;
 struct LingoV4Bytecode;
 struct LingoV4TheEntity;
 struct Node;
+struct Picture;
 class AbstractObject;
 class Cast;
 class ScriptContext;
@@ -143,6 +145,7 @@ struct Datum {	/* interpreter stack type */
 		ChunkReference *cref; /* CHUNKREF */
 		CastMemberID *cast;	/* CASTREF, FIELDREF */
 		MenuReference *menu; /* MENUREF	*/
+		PictureReference *picture; /* PICTUREREF */
 	} u;
 
 	int *refCount;
@@ -168,14 +171,14 @@ struct Datum {	/* interpreter stack type */
 	double asFloat() const;
 	int asInt() const;
 	Common::String asString(bool printonly = false) const;
-	CastMemberID asMemberID() const;
+	CastMemberID asMemberID(CastType castType = kCastTypeAny) const;
 	Common::Point asPoint() const;
 
 	bool isRef() const;
 	bool isVarRef() const;
 	bool isCastRef() const;
 
-	const char *type2str(bool isk = false) const;
+	const char *type2str(bool ilk = false) const;
 
 	int equalTo(Datum &d, bool ignoreCase = false) const;
 	CompareResult compareTo(Datum &d) const;
@@ -208,6 +211,11 @@ struct MenuReference {
 	MenuReference();
 };
 
+struct PictureReference {
+	Picture *_picture = nullptr;
+	~PictureReference();
+};
+
 struct PCell {
 	Datum p;
 	Datum v;
@@ -224,6 +232,7 @@ struct Builtin {
 };
 
 typedef Common::HashMap<int32, ScriptContext *> ScriptContextHash;
+typedef Common::HashMap<int32, Common::HashMap<Common::String, ScriptContext *> *> FactoryContextHash;
 typedef Common::Array<Datum> StackData;
 typedef Common::HashMap<Common::String, Symbol, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> SymbolHash;
 typedef Common::HashMap<Common::String, Datum, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> DatumHash;
@@ -241,12 +250,12 @@ struct CFrame {	/* proc/func call stack frame */
 	int				retPC;				/* where to resume after return */
 	ScriptData		*retScript;			/* which script to resume after return */
 	ScriptContext	*retContext;		/* which script context to use after return */
-	bool			retFreezeContext;	/* whether the context should be frozen after return */
 	DatumHash		*retLocalVars;
 	Datum			retMe;				/* which me obj to use after return */
 	uint			stackSizeBefore;
 	bool			allowRetVal;		/* whether to allow a return value */
 	Datum			defaultRetVal;		/* default return value */
+	int				paramCount;			/* original number of arguments submitted */
 };
 
 struct LingoEvent {
@@ -275,6 +284,7 @@ struct LingoArchive {
 	Cast *cast;
 	ScriptContextHash lctxContexts;
 	ScriptContextHash scriptContexts[kMaxScriptType + 1];
+	FactoryContextHash factoryContexts;
 	Common::Array<Common::String> names;
 	Common::HashMap<uint32, Common::String> primaryEventHandlers;
 	SymbolHash functionHandlers;
@@ -284,11 +294,27 @@ struct LingoArchive {
 	Common::String getName(uint16 id);
 	Common::String formatFunctionList(const char *prefix);
 
-	void addCode(const Common::U32String &code, ScriptType type, uint16 id, const char *scriptName = nullptr);
+	void addCode(const Common::U32String &code, ScriptType type, uint16 id, const char *scriptName = nullptr, uint32 preprocFlags = kLPPNone);
 	void removeCode(ScriptType type, uint16 id);
 	void replaceCode(const Common::U32String &code, ScriptType type, uint16 id, const char *scriptName = nullptr);
 	void addCodeV4(Common::SeekableReadStreamEndian &stream, uint16 lctxIndex, const Common::String &archName, uint16 version);
 	void addNamesV4(Common::SeekableReadStreamEndian &stream);
+};
+
+struct LingoState {
+	// Execution state for a Lingo process, created every time
+	// a top-level handler is called (e.g. on mouseDown).
+	// Can be swapped out when another script gets called with priority.
+	// Call frames are pushed and popped from the callstack with
+	// pushContext and popContext.
+	Common::Array<CFrame *> callstack;		// call stack
+	uint pc = 0;							// current program counter
+	ScriptData *script = nullptr;			// current Lingo script
+	ScriptContext *context = nullptr;		// current Lingo script context
+	DatumHash *localVars = nullptr;			// current local variables
+	Datum me;								// current me object
+
+	~LingoState();
 };
 
 class Lingo {
@@ -298,6 +324,9 @@ public:
 	~Lingo();
 
 	void resetLingo();
+	void cleanupLingo();
+	void resetLingoGo();
+
 	int getMenuNum();
 	int getMenuItemsNum(Datum &d);
 
@@ -348,17 +377,16 @@ public:
 
 public:
 	void execute();
-	void loadStateFromWindow();
-	void saveStateToWindow();
-	void pushContext(const Symbol funcSym, bool allowRetVal, Datum defaultRetVal);
+	void switchStateFromWindow();
+	void freezeState();
+	void pushContext(const Symbol funcSym, bool allowRetVal, Datum defaultRetVal, int paramCount);
 	void popContext(bool aborting = false);
-	bool hasFrozenContext();
 	void cleanLocalVars();
 	void varAssign(const Datum &var, const Datum &value);
 	Datum varFetch(const Datum &var, bool silent = false);
 	Common::U32String evalChunkRef(const Datum &var);
 	Datum findVarV4(int varType, const Datum &id);
-	CastMemberID resolveCastMember(const Datum &memberID, const Datum &castLib);
+	CastMemberID resolveCastMember(const Datum &memberID, const Datum &castLib, CastType type);
 	void exposeXObject(const char *name, Datum obj);
 
 	int getAlignedType(const Datum &d1, const Datum &d2, bool numsOnly);
@@ -366,15 +394,16 @@ public:
 	Common::String formatAllVars();
 	void printAllVars();
 
-	inst readInst() { return getInst(_pc++); }
-	inst getInst(uint pc) { return (*_currentScript)[pc]; }
-	int readInt() { return getInt(_pc++); }
+	inst readInst() { return getInst(_state->pc++); }
+	inst getInst(uint pc) { return (*_state->script)[pc]; }
+	int readInt() { return getInt(_state->pc++); }
 	int getInt(uint pc);
-	double readFloat() { double d = getFloat(_pc); _pc += calcCodeAlignment(sizeof(double)); return d; }
-	double getFloat(uint pc) { return *(double *)(&((*_currentScript)[pc])); }
-	char *readString() { char *s = getString(_pc); _pc += calcStringAlignment(s); return s; }
-	char *getString(uint pc) { return (char *)(&((*_currentScript)[pc])); }
+	double readFloat() { double d = getFloat(_state->pc); _state->pc += calcCodeAlignment(sizeof(double)); return d; }
+	double getFloat(uint pc) { return *(double *)(&((*_state->script)[_state->pc])); }
+	char *readString() { char *s = getString(_state->pc); _state->pc += calcStringAlignment(s); return s; }
+	char *getString(uint pc) { return (char *)(&((*_state->script)[_state->pc])); }
 
+	Datum getVoid();
 	void pushVoid();
 
 	void printSTUBWithArglist(const char *funcname, int nargs, const char *prefix = "STUB:");
@@ -387,7 +416,7 @@ public:
 	void func_mci(const Common::String &name);
 	void func_mciwait(const Common::String &name);
 	void func_beep(int repeats);
-	void func_goto(Datum &frame, Datum &movie);
+	void func_goto(Datum &frame, Datum &movie, bool commandgo = false );
 	void func_gotoloop();
 	void func_gotonext();
 	void func_gotoprevious();
@@ -436,13 +465,11 @@ private:
 
 public:
 	LingoCompiler *_compiler;
+	LingoState *_state;
 
 	int _currentChannelId;
-	ScriptContext *_currentScriptContext;
-	ScriptData *_currentScript;
-	Datum _currentMe;
 
-	bool _freezeContext;
+	bool _freezeState;
 	bool _abort;
 	bool _expectError;
 	bool _caughtError;
@@ -474,7 +501,6 @@ public:
 	Common::HashMap<Common::String, Audio::AudioStream *> _audioAliases;
 
 	DatumHash _globalvars;
-	DatumHash *_localvars;
 
 	FuncHash _functions;
 
@@ -482,7 +508,6 @@ public:
 	Common::HashMap<int, LingoV4TheEntity *> _lingoV4TheEntity;
 
 	uint _globalCounter;
-	uint _pc;
 
 	StackData _stack;
 

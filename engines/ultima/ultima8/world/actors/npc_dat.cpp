@@ -19,7 +19,7 @@
  *
  */
 
-#include "ultima/ultima8/misc/pent_include.h"
+#include "ultima/ultima8/misc/debugger.h"
 #include "ultima/ultima8/world/actors/npc_dat.h"
 
 #include "ultima/ultima8/kernel/kernel.h"
@@ -90,7 +90,8 @@ uint16 NPCDat::randomlyGetStrongerWeaponTypes(uint shapeno) {
 	// and other differences as noted.
 	// Some shapes are only valid in each game, but that's ok.
 
-	int rnd = getRandom();
+	Common::RandomSource &rs = Ultima8Engine::get_instance()->getRandomSource();
+	uint rnd = rs.getRandomNumber(UINT_MAX);
 
 	switch (shapeno) {
 	case 899:	/* shape 899 - android */

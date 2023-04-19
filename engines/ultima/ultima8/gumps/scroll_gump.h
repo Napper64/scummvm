@@ -22,6 +22,7 @@
 #ifndef ULTIMA8_GUMPS_SCROLLGUMP_H
 #define ULTIMA8_GUMPS_SCROLLGUMP_H
 
+#include "ultima/shared/std/string.h"
 #include "ultima/ultima8/gumps/modal_gump.h"
 #include "ultima/ultima8/usecode/intrinsics.h"
 #include "ultima/ultima8/misc/classtype.h"
@@ -47,6 +48,8 @@ public:
 
 	// Close on double click
 	void onMouseDouble(int button, int32 mx, int32 my) override;
+
+	bool OnKeyDown(int key, int mod) override;
 
 	// Init the gump, call after construction
 	void InitGump(Gump *newparent, bool take_focus = true) override;

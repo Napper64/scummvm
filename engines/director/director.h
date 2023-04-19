@@ -128,20 +128,17 @@ struct MacShape {
 	int lineSize;
 	uint pattern;
 
-	Image::ImageDecoder *tile;
+	Picture *tile;
 	const Common::Rect *tileRect;
 
 	Graphics::MacPlotData *pd;
 };
 
 struct PatternTile {
-	Image::ImageDecoder *img = 0;
+	Picture *img = nullptr;
 	Common::Rect rect;
 
-	~PatternTile() {
-		if (img)
-			delete img;
-	}
+	~PatternTile();
 };
 
 const int SCALE_THRESHOLD = 0x100;
@@ -191,13 +188,15 @@ public:
 	void loadDefaultPalettes();
 
 	const Common::HashMap<int, PaletteV4> &getLoadedPalettes() { return _loadedPalettes; }
+	const Common::HashMap<int, PaletteV4> &getLoaded16Palettes() { return _loaded16Palettes; }
+	const PaletteV4 &getLoaded4Palette() { return _loaded4Palette; }
 
 	const Common::FSNode *getGameDataDir() const { return &_gameDataDir; }
 	const byte *getPalette() const { return _currentPalette; }
 	uint16 getPaletteColorCount() const { return _currentPaletteLength; }
 
 	void loadPatterns();
-	Image::ImageDecoder *getTile(int num);
+	Picture *getTile(int num);
 	const Common::Rect &getTileRect(int num);
 	uint32 transformColor(uint32 color);
 	Graphics::MacPatterns &getPatterns();
@@ -207,6 +206,7 @@ public:
 	Graphics::MacDrawPixPtr getInkDrawPixel();
 
 	void loadKeyCodes();
+	void setMachineType(int machineType);
 	Common::CodePage getPlatformEncoding();
 
 	Archive *createArchive();
@@ -221,10 +221,14 @@ public:
 	// game-quirks.cpp
 	void gameQuirks(const char *target, Common::Platform platform);
 
+	void delayMillis(uint32 delay);
+
 public:
 	RandomState _rnd;
 	Graphics::MacWindowManager *_wm;
 	Graphics::PixelFormat _pixelformat;
+
+	uint32 _debugDraw = 0;
 
 public:
 	int _colorDepth;
@@ -255,6 +259,7 @@ public:
 	uint32 _wmMode;
 	uint16 _wmWidth;
 	uint16 _wmHeight;
+	byte _fpsLimit;
 
 private:
 	byte _currentPalette[768];
@@ -272,6 +277,8 @@ private:
 	PatternTile _builtinTiles[kNumBuiltinTiles];
 
 	Common::HashMap<int, PaletteV4> _loadedPalettes;
+	Common::HashMap<int, PaletteV4> _loaded16Palettes;
+	PaletteV4 _loaded4Palette;
 
 	Graphics::ManagedSurface *_surface;
 
@@ -280,6 +287,8 @@ private:
 public:
 	int _tickBaseline;
 	Common::String _traceLogFile;
+
+	uint16 _framesRan = 0; // used by kDebugFewFramesOnly
 };
 
 // An extension of MacPlotData for interfacing with inks and patterns without

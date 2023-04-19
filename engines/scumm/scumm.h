@@ -63,6 +63,7 @@ using GUI::Dialog;
 namespace Common {
 class SeekableReadStream;
 class WriteStream;
+class SeekableWriteStream;
 }
 namespace Graphics {
 class FontSJIS;
@@ -111,7 +112,7 @@ enum {
 };
 
 /* SCUMM Debug Channels */
-void debugC(int level, const char *s, ...) GCC_PRINTF(2, 3);
+void debugC(int level, MSVC_PRINTF const char *s, ...) GCC_PRINTF(2, 3);
 
 enum {
 	DEBUG_GENERAL	=	1 << 0,		// General debug
@@ -124,7 +125,8 @@ enum {
 	DEBUG_ACTORS	=	1 << 8,		// General Actor Debug
 	DEBUG_INSANE	=	1 << 9,		// Track INSANE
 	DEBUG_SMUSH	=	1 << 10,		// Track SMUSH
-	DEBUG_MOONBASE_AI = 1 << 11		// Moonbase AI
+	DEBUG_MOONBASE_AI = 1 << 11,		// Moonbase AI
+	DEBUG_NETWORK = 1 << 12		// Track Networking
 };
 
 struct VerbSlot;
@@ -364,9 +366,12 @@ class ResourceManager;
  * GUI defines and enums.
  */
 
-#define GUI_PAGE_MAIN 0
-#define GUI_PAGE_SAVE 1
-#define GUI_PAGE_LOAD 2
+#define GUI_PAGE_MAIN         0
+#define GUI_PAGE_SAVE         1
+#define GUI_PAGE_LOAD         2
+#define GUI_PAGE_RESTART      3 // Sega CD
+#define GUI_PAGE_CODE_CONFIRM 4 // Sega CD
+#define GUI_PAGE_INVALID_CODE 5 // Sega CD
 
 #define GUI_CTRL_FIRST_SG               1
 #define GUI_CTRL_LAST_SG                9
@@ -388,6 +393,21 @@ class ResourceManager;
 #define GUI_CTRL_OUTER_BOX              26
 #define GUI_CTRL_INNER_BOX              27
 
+// Sega CD
+#define GUI_CTRL_NUMPAD_1           1
+#define GUI_CTRL_NUMPAD_2           2
+#define GUI_CTRL_NUMPAD_3           3
+#define GUI_CTRL_NUMPAD_4           4
+#define GUI_CTRL_NUMPAD_5           5
+#define GUI_CTRL_NUMPAD_6           6
+#define GUI_CTRL_NUMPAD_7           7
+#define GUI_CTRL_NUMPAD_8           8
+#define GUI_CTRL_NUMPAD_9           9
+#define GUI_CTRL_NUMPAD_0           10
+#define GUI_CTRL_RESTART_BUTTON     13
+#define GUI_CTRL_ARROW_LEFT_BUTTON  16
+#define GUI_CTRL_ARROW_RIGHT_BUTTON 17
+#define GUI_CTRL_NUMPAD_BACK        23
 
 enum GUIString {
 	gsPause = 0,
@@ -429,7 +449,29 @@ enum GUIString {
 	gsTextSpeed = 37,
 	gsDisplayText = 38,
 	gsSpooledMusic = 39,
-	gsInsertSaveDisk = 40
+	gsInsertSaveDisk = 40,
+	gsSnapOn = 41,
+	gsSnapOff = 42,
+	gsRecalJoystick = 43,
+	gsMouseMode = 44,
+	gsMouseOn = 45,
+	gsMouseOff = 46,
+	gsJoystickOn = 47,
+	gsJoystickOff = 48,
+	gsSoundsOn = 49,
+	gsSoundsOff = 50,
+	gsVGAMode = 51,
+	gsEGAMode = 52,
+	gsCGAMode = 53,
+	gsHerculesMode = 54,
+	gsTandyMode = 55,
+	gsCurrentPasscode = 56,
+	gsEnterPasscode = 57,
+	gsConfirmPasscode = 58,
+	gsInvalidPasscode = 59,
+	gsSlowFast = 60,
+	gsRestartGame = 61,
+	gsHeapExt = 62,
 };
 
 struct InternalGUIControl {
@@ -449,6 +491,25 @@ struct InternalGUIControl {
 	Common::String label;
 	bool doubleLinesFlag;
 };
+
+enum ScummAction {
+	kScummActionNone,
+	kScummActionInsaneDownLeft,
+	kScummActionInsaneDown,
+	kScummActionInsaneDownRight,
+	kScummActionInsaneLeft,
+	kScummActionInsaneRight,
+	kScummActionInsaneUpLeft,
+	kScummActionInsaneUp,
+	kScummActionInsaneUpRight,
+	kScummActionInsaneAttack,
+	kScummActionInsaneSwitch,
+	kScummActionInsaneCheat,
+
+	kScummActionCount
+};
+
+extern const char *const insaneKeymapId;
 
 /**
  * Base class for all SCUMM engines.
@@ -488,6 +549,9 @@ public:
 	bool _enableEnhancements = false;
 	bool _useOriginalGUI = true;
 	bool _enableAudioOverride = false;
+	bool _enableCOMISong = false;
+
+	Common::Keymap *_insaneKeymap;
 
 protected:
 	VirtualMachineState vm;
@@ -604,6 +668,8 @@ protected:
 	int32 _bannerColors[50]; // Colors for the original GUI
 	byte *_bannerMem = nullptr;
 	uint32 _bannerMemSize = 0;
+	int _bannerSaveYStart = 0;
+
 	bool _messageBannerActive = false;
 	bool _comiQuitMenuIsOpen = false;
 	bool _closeBannerAndQueryQuitFlag = false;
@@ -620,6 +686,8 @@ protected:
 	const char _checkedBox[2] = {'x', '\0'};
 	const char _arrowUp[2] = {'\x18', '\0'};
 	const char _arrowDown[2] = {'\x19', '\0'};
+	const char _arrowLeft[2] = {'\x3c', '\0'};
+	const char _arrowRight[2] = {'\x3d', '\0'};
 
 	Common::StringArray _savegameNames;
 	int _menuPage = 0;
@@ -632,11 +700,18 @@ protected:
 	char _mainMenuSpeechSlider[17];
 	char _mainMenuSfxSlider[17];
 	char _mainMenuTextSpeedSlider[17];
+	char _mainMenuSegaCDPasscode[5];
 	int _spooledMusicIsToBeEnabled = 1;
 	int _saveScriptParam = 0;
 	int _guiCursorAnimCounter = 0;
 	int _v5VoiceMode = 0;
+
+	// Fake flags just for sub v5 GUIs
 	int _internalSpeakerSoundsAreOn = 1;
+	int _guiMouseFlag = 1;
+	int _guiJoystickFlag = 1;
+
+	bool _mixerMutedByGUI = false;
 
 	Graphics::Surface _savegameThumbnail;
 	byte *_tempTextSurface = nullptr;
@@ -653,9 +728,13 @@ protected:
 	int _curCursorHotspotX = 0;
 	int _curCursorHotspotY = 0;
 
+	virtual void setSnailCursor() {}
+
 	void initBanners();
 	Common::KeyState showBannerAndPause(int bannerId, int32 waitTime, const char *msg, ...);
 	Common::KeyState showOldStyleBannerAndPause(const char *msg, int color, int32 waitTime);
+	Common::KeyState printMessageAndPause(const char *msg, int color, int32 waitTime, bool drawOnSentenceLine);
+
 	void clearBanner();
 	void setBannerColors(int bannerId, byte r, byte g, byte b);
 	virtual int getBannerColor(int bannerId);
@@ -671,7 +750,7 @@ protected:
 	virtual void queryQuit(bool returnToLauncher);
 	virtual void queryRestart();
 	virtual const char *getGUIString(int stringId);
-	void waitForBannerInput(int32 waitTime, Common::KeyState &ks, bool &leftBtnClicked, bool &rightBtnClicked, bool handeleMouseWheel = false);
+	void waitForBannerInput(int32 waitTime, Common::KeyState &ks, bool &leftBtnClicked, bool &rightBtnClicked, bool handleMouseWheel = false);
 	virtual int getGUIStringHeight(const char *str);
 	virtual int getGUIStringWidth(const char *str);
 	virtual void drawGUIText(const char *buttonString, Common::Rect *clipRect, int textXPos, int textYPos, int textColor, bool centerFlag);
@@ -688,10 +767,14 @@ protected:
 
 	void showMainMenu();
 	virtual void setUpMainMenuControls();
+	void setUpMainMenuControlsSegaCD();
 	void drawMainMenuControls();
+	void drawMainMenuControlsSegaCD();
 	void updateMainMenuControls();
+	void updateMainMenuControlsSegaCD();
 	void drawMainMenuTitle(const char *title);
 	bool executeMainMenuOperation(int op, int mouseX, int mouseY, bool &hasLoadedState);
+	bool executeMainMenuOperationSegaCD(int op, int mouseX, int mouseY, bool &hasLoadedState);
 	bool shouldHighlightLabelAndWait(int clickedControl);
 	void fillSavegameLabels();
 	bool canWriteGame(int slotId);
@@ -702,7 +785,8 @@ protected:
 	void restoreSurfacesPostGUI();
 
 public:
-	char displayMessage(const char *altButton, const char *message, ...) GCC_PRINTF(3, 4);
+	char displayMessage(const char *altButton, MSVC_PRINTF const char *message, ...) GCC_PRINTF(3, 4);
+	bool displayMessageYesNo(MSVC_PRINTF const char *message, ...) GCC_PRINTF(2, 3);
 
 protected:
 	byte _fastMode = 0;
@@ -786,6 +870,7 @@ public:
 protected:
 	Common::KeyState _keyPressed;
 	bool _keyDownMap[512]; // FIXME - 512 is a guess. it's max(kbd.ascii)
+	bool _actionMap[kScummActionCount];
 
 	Common::Point _mouse;
 	Common::Point _virtualMouse;
@@ -829,14 +914,16 @@ protected:
 	void loadResourceOLD(Common::Serializer &ser, ResType type, ResId idx);	// "Obsolete"
 
 	void copyHeapSaveGameToFile(int slot, const char *saveName);
+	bool changeSavegameName(int slot, char *newName);
 	virtual Common::SeekableReadStream *openSaveFileForReading(int slot, bool compat, Common::String &fileName);
-	virtual Common::WriteStream *openSaveFileForWriting(int slot, bool compat, Common::String &fileName);
+	virtual Common::SeekableWriteStream *openSaveFileForWriting(int slot, bool compat, Common::String &fileName);
 
 	Common::String makeSavegameName(int slot, bool temporary) const {
 		return makeSavegameName(_targetName, slot, temporary);
 	}
 
 	int getKeyState(int key);
+	int getActionState(ScummAction action);
 
 public:
 	static Common::String makeSavegameName(const Common::String &target, int slot, bool temporary);
@@ -1201,6 +1288,8 @@ protected:
 	bool _doEffect = false;
 
 	bool _snapScroll = false;
+
+	virtual void setBuiltinCursor(int index) {}
 public:
 	bool isLightOn() const;
 
@@ -1290,12 +1379,16 @@ protected:
 	virtual void drawDirtyScreenParts();
 	void updateDirtyScreen(VirtScreenNumber slot);
 	void drawStripToScreen(VirtScreen *vs, int x, int width, int top, int bottom);
+
+	void mac_markScreenAsDirty(int x, int y, int w, int h);
 	void mac_drawStripToScreen(VirtScreen *vs, int top, int x, int y, int width, int height);
 	void mac_drawLoomPracticeMode();
 	void mac_createIndy3TextBox(Actor *a);
 	void mac_drawIndy3TextBox();
 	void mac_undrawIndy3TextBox();
 	void mac_undrawIndy3CreditsText();
+	void mac_drawBorder(int x, int y, int w, int h, byte color);
+	Common::KeyState mac_showOldStyleBannerAndPause(const char *msg, int32 waitTime);
 
 	const byte *postProcessDOSGraphics(VirtScreen *vs, int &pitch, int &x, int &y, int &width, int &height) const;
 	const byte *ditherVGAtoEGA(int &pitch, int &x, int &y, int &width, int &height) const;
@@ -1478,6 +1571,7 @@ protected:
 	virtual void printString(int m, const byte *msg);
 
 	virtual bool handleNextCharsetCode(Actor *a, int *c);
+	virtual void drawSentence() {}
 	virtual void CHARSET_1();
 	bool newLine();
 	void drawString(int a, const byte *msg);
@@ -1506,6 +1600,7 @@ public:
 	bool _useMultiFont = false;
 	int _numLoadedFont = 0;
 	int _2byteShadow = 0;
+	bool _segaForce2ByteCharHeight = false;
 
 	int _2byteHeight = 0;
 	int _2byteWidth = 0;

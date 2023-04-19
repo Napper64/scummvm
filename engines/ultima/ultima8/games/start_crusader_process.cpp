@@ -40,6 +40,7 @@ DEFINE_RUNTIME_CLASSTYPE_CODE(StartCrusaderProcess)
 
 StartCrusaderProcess::StartCrusaderProcess(int saveSlot) : Process(),
 _initStage(PlayFirstMovie), _saveSlot(saveSlot) {
+	_flags |= PROC_PREVENT_SAVE;
 }
 
 
@@ -64,8 +65,16 @@ void StartCrusaderProcess::run() {
 		return;
 	}
 
-	// Try to load the save game, if succeeded this pointer will no longer be valid
-	if (_saveSlot >= 0 && Ultima8Engine::get_instance()->loadGameState(_saveSlot).getCode() == Common::kNoError) {
+	// Try to load the save game, if succeeded this process will terminate
+	if (_saveSlot >= 0) {
+		Common::Error loadError = Ultima8Engine::get_instance()->loadGameState(_saveSlot);
+		if (loadError.getCode() != Common::kNoError) {
+			Ultima8Engine::get_instance()->setError(loadError);
+			fail();
+			return;
+		}
+
+		terminate();
 		return;
 	}
 
@@ -137,7 +146,7 @@ void StartCrusaderProcess::run() {
 }
 
 void StartCrusaderProcess::saveData(Common::WriteStream *ws) {
-	CANT_HAPPEN();
+	warning("Attempted save of process with prevent save flag");
 
 	Process::saveData(ws);
 }

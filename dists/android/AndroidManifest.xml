@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-	package="org.scummvm.scummvm"
+	xmlns:tools="http://schemas.android.com/tools"
 	android:installLocation="auto"
 	android:launchMode="singleTask"
-	android:sharedUserId="org.scummvm.scummvm">
+	android:sharedUserId="org.scummvm.scummvm"
+	android:sharedUserMaxSdkVersion="32"
+	tools:targetApi="tiramisu">
 
-	<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+	<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+		tools:ignore="ScopedStorage" />
 	<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
 	<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 	<uses-permission android:name="android.permission.INTERNET" />
@@ -28,6 +31,7 @@
 		android:required="true" />
 
 	<supports-screens
+		android:resizeable="true"
 		android:largeScreens="true"
 		android:normalScreens="true"
 		android:smallScreens="true"
@@ -37,12 +41,13 @@
 		android:allowBackup="true"
 		android:description="@string/app_desc"
 		android:icon="@mipmap/scummvm"
-		android:isGame="true"
+		android:appCategory="game"
 		android:label="@string/app_name"
 		android:resizeableActivity="false"
 		android:requestLegacyExternalStorage="true">
 		<activity
 			android:name=".SplashActivity"
+			android:exported="true"
 			android:banner="@drawable/leanback_icon"
 			android:configChanges="orientation|keyboard|keyboardHidden|screenSize"
 			android:screenOrientation="landscape"
@@ -58,14 +63,13 @@
 		</activity>
 		<activity
 			android:name=".ScummVMActivity"
+			android:exported="false"
 			android:banner="@drawable/leanback_icon"
 			android:configChanges="orientation|keyboard|keyboardHidden|screenSize"
+			android:launchMode="singleInstance"
 			android:screenOrientation="landscape"
 			android:theme="@style/AppTheme"
 			android:windowSoftInputMode="adjustResize">
-			<intent-filter>
-				<category android:name="tv.ouya.intent.category.GAME" />
-			</intent-filter>
 		</activity>
 	</application>
 

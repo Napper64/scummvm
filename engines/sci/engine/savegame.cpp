@@ -568,7 +568,7 @@ void Script::saveLoadWithSerializer(Common::Serializer &s) {
 
 	s.skip(4, VER(14), VER(19));		// OBSOLETE: Used to be _numExports
 	s.skip(4, VER(14), VER(19));		// OBSOLETE: Used to be _numSynonyms
-	s.syncAsSint32LE(_lockers);
+	s.syncAsUint32LE(_lockers);
 
 	// Sync _objects. This is a hashmap, and we use the following on disk format:
 	// First we store the number of items in the hashmap, then we store each
@@ -1476,6 +1476,7 @@ void gamestate_restore(EngineState *s, Common::SeekableReadStream *fh) {
 
 		if (meta.gameObjectOffset > 0 && meta.script0Size > 0) {
 			Resource *script0 = g_sci->getResMan()->findResource(ResourceId(kResourceTypeScript, 0), false);
+			assert(script0);
 			if (script0->size() != meta.script0Size || g_sci->getGameObject().getOffset() != meta.gameObjectOffset) {
 				showScummVMDialog(_("This saved game was created with a different version of the game, unable to load it"));
 

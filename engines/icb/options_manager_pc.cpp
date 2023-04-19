@@ -548,7 +548,7 @@ void OptionsManager::MakeAllSurfii() {
 		// Create movie thumbnail surfii
 		for (i = 0; i < 24; i++) {
 			m_movieSurfaceIDs[i] = surface_manager->Create_new_surface(pxVString("MovieLib thumb %d", i), 100, 56, SYSTEM);
-			m_grayMovieSurfaceIDs[i] = surface_manager->Create_new_surface(pxVString("Gray MovieLib thumb", i), 100, 56, SYSTEM);
+			m_grayMovieSurfaceIDs[i] = surface_manager->Create_new_surface(pxVString("Gray MovieLib thumb %d", i), 100, 56, SYSTEM);
 		}
 	} else
 		Fatal_error("OptionsManager::MakeAllSurfii() function called when surface_manager is NULL");
@@ -6182,8 +6182,6 @@ void OptionsManager::DrawSlideShow() {
 
 		// This slide is bink compressed
 		Video::BinkDecoder *binkDecoder = new Video::BinkDecoder();
-		binkDecoder->setDefaultHighColorFormat(Graphics::PixelFormat(4, 8, 8, 8, 0, 16, 8, 0, 24));
-
 		Common::MemoryReadStream *stream = new Common::MemoryReadStream((byte *)slideptr, slideLen);
 		if (!stream) {
 			Fatal_error("Failed open bink file");
@@ -6191,6 +6189,8 @@ void OptionsManager::DrawSlideShow() {
 		if (!binkDecoder->loadStream(stream)) {
 			Fatal_error("Failed open bink file");
 		}
+
+		binkDecoder->setOutputPixelFormat(Graphics::PixelFormat(4, 8, 8, 8, 0, 16, 8, 0, 24));
 
 		// Verify image dimensions
 		if (binkDecoder->getWidth() > SCREEN_WIDTH || binkDecoder->getHeight() > SCREEN_DEPTH)

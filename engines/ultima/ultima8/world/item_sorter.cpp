@@ -19,7 +19,8 @@
  *
  */
 
-#include "ultima/ultima8/misc/pent_include.h"
+#include "ultima/ultima.h"
+#include "ultima/ultima8/misc/common_types.h"
 #include "ultima/ultima8/world/item_sorter.h"
 #include "ultima/ultima8/world/item.h"
 #include "ultima/ultima8/graphics/shape.h"
@@ -42,9 +43,14 @@ namespace Ultima8 {
 
 ItemSorter::ItemSorter(int capacity) :
 	_shapes(nullptr), _clipWindow(0, 0, 0, 0), _items(nullptr), _itemsTail(nullptr),
-	_itemsUnused(nullptr), _painted(nullptr), _sortLimit(0), _camSx(0), _camSy(0) {
+	_itemsUnused(nullptr), _painted(nullptr), _camSx(0), _camSy(0),
+	_sortLimit(0), _sortLimitChanged(false) {
 	int i = capacity;
-	while (i--) _itemsUnused = new SortItem(_itemsUnused);
+	while (i--) {
+		SortItem *next = _itemsUnused;
+		_itemsUnused = new SortItem();
+		_itemsUnused->_next = next;
+	}
 }
 
 ItemSorter::~ItemSorter() {
@@ -57,9 +63,9 @@ ItemSorter::~ItemSorter() {
 	_itemsTail = nullptr;
 
 	while (_itemsUnused) {
-		SortItem *_next = _itemsUnused->_next;
+		SortItem *next = _itemsUnused->_next;
 		delete _itemsUnused;
-		_itemsUnused = _next;
+		_itemsUnused = next;
 	}
 
 	delete [] _items;
@@ -82,16 +88,24 @@ void ItemSorter::BeginDisplayList(const Rect &clipWindow, int32 camx, int32 camy
 	_painted = nullptr;
 
 	// Screenspace bounding box bottom x coord (RNB x coord)
-	_camSx = (camx - camy) / 4;
+	int32 camSx = (camx - camy) / 4;
 	// Screenspace bounding box bottom extent  (RNB y coord)
-	_camSy = (camx + camy) / 8 - camz;
+	int32 camSy = (camx + camy) / 8 - camz;
+
+	if (camSx != _camSx || camSy != _camSy) {
+		_camSx = camSx;
+		_camSy = camSy;
+
+		// Reset sort limit debugging on camera move
+		_sortLimit = 0;
+	}
 }
 
 void ItemSorter::AddItem(int32 x, int32 y, int32 z, uint32 shapeNum, uint32 frame_num, uint32 flags, uint32 ext_flags, uint16 itemNum) {
 
 	// First thing, get a SortItem to use (first of unused)
 	if (!_itemsUnused)
-		_itemsUnused = new SortItem(nullptr);
+		_itemsUnused = new SortItem();
 	SortItem *si = _itemsUnused;
 
 	si->_itemNum = itemNum;
@@ -120,41 +134,29 @@ void ItemSorter::AddItem(int32 x, int32 y, int32 z, uint32 shapeNum, uint32 fram
 	info->getFootpadWorld(xd, yd, zd, flags & Item::FLG_FLIPPED);
 
 	// Worldspace bounding box
-	si->_x = x;
-	si->_y = y;
-	si->_z = z;
-	si->_xLeft = si->_x - xd;
-	si->_yFar = si->_y - yd;
-	si->_zTop = si->_z + zd;
+	Box box(x, y, z, xd, yd, zd);
+	si->setBoxBounds(box, _camSx, _camSy);
 
-	// Screenspace bounding box left extent    (LNT x coord)
-	si->_sxLeft = (si->_xLeft - si->_y) / 4 - _camSx;
-	// Screenspace bounding box right extent   (RFT x coord)
-	si->_sxRight = (si->_x - si->_yFar) / 4 - _camSx;
-
-	// Screenspace bounding box top x coord    (LFT x coord)
-	si->_sxTop = (si->_xLeft - si->_yFar) / 4 - _camSx;
-	// Screenspace bounding box top extent     (LFT y coord)
-	si->_syTop = (si->_xLeft + si->_yFar) / 8 - si->_zTop - _camSy;
-
-	// Screenspace bounding box bottom x coord (RNB x coord)
-	si->_sxBot = (si->_x - si->_y) / 4 - _camSx;
-	// Screenspace bounding box bottom extent  (RNB y coord)
-	si->_syBot = (si->_x + si->_y) / 8 - si->_z - _camSy;
-
-	// Real Screenspace coords
-	si->_sx = si->_sxBot - frame->_xoff;   // Left
-	si->_sy = si->_syBot - frame->_yoff;   // Top
-	si->_sx2 = si->_sx + frame->_width;    // Right
-	si->_sy2 = si->_sy + frame->_height;   // Bottom
+	// Real Screenspace from shape frame
+	if (si->_flags & Item::FLG_FLIPPED) {
+		si->_sr.left = si->_sxBot + frame->_xoff - frame->_width;
+		si->_sr.top = si->_syBot - frame->_yoff;
+		si->_sr.right = si->_sr.left + frame->_width;
+		si->_sr.bottom = si->_sr.top + frame->_height;
+	} else {
+		si->_sr.left = si->_sxBot - frame->_xoff;
+		si->_sr.top = si->_syBot - frame->_yoff;
+		si->_sr.right = si->_sr.left + frame->_width;
+		si->_sr.bottom = si->_sr.top + frame->_height;
+	}
 
 	// Do Clipping here
-	int16 clipped = CheckClipped(Rect(si->_sx, si->_sy, si->_sx2, si->_sy2));
-	if (clipped < 0)
+	if (!_clipWindow.intersects(si->_sr)) {
 		// Clipped away entirely - don't add to the list.
 		return;
+	}
 
-	si->_clipped = (clipped != 0);
+	si->_clipped = !_clipWindow.contains(si->_sr);
 
 	// These help out with sorting. We calc them now, so it will be faster
 	si->_fbigsq = (xd == 128 && yd == 128) || (xd == 256 && yd == 256) || (xd == 512 && yd == 512);
@@ -189,7 +191,7 @@ void ItemSorter::AddItem(int32 x, int32 y, int32 z, uint32 shapeNum, uint32 fram
 	SortItem *addpoint = nullptr;
 	for (SortItem *si2 = _items; si2 != nullptr; si2 = si2->_next) {
 		// Get the insert point... which is before the first item that has higher z than us
-		if (!addpoint && si->ListLessThan(si2))
+		if (!addpoint && si->listLessThan(*si2))
 			addpoint = si2;
 
 		// Doesn't overlap
@@ -198,22 +200,22 @@ void ItemSorter::AddItem(int32 x, int32 y, int32 z, uint32 shapeNum, uint32 fram
 
 		// Attempt to find which is infront
 		if (si->below(*si2)) {
-			// si2 occludes si (us)
 			if (si2->_occl && si2->occludes(*si)) {
 				// No need to do any more checks, this isn't visible
 				si->_occluded = true;
 				break;
+			} else {
+				// si1 is behind si2, so add it to si2's dependency list
+				si2->_depends.insert_sorted(si);
 			}
-
-			// si1 is behind si2, so add it to si2's dependency list
-			si2->_depends.insert_sorted(si);
 		} else {
-			// ss occludes si2. Sadly, we can't remove it from the list.
-			if (si->_occl && si->occludes(*si2))
+			if (si->_occl && si->occludes(*si2)) {
+				// Occluded, but we can't remove it from the list
 				si2->_occluded = true;
-			// si2 is behind si1, so add it to si1's dependency list
-			else
-				si->_depends.push_back(si2);
+			} else {
+				// si2 is behind si1, so add it to si1's dependency list
+				si->_depends.insert_sorted(si2);
+			}
 		}
 	}
 
@@ -251,6 +253,11 @@ void ItemSorter::AddItem(const Item *add) {
 }
 
 void ItemSorter::PaintDisplayList(RenderSurface *surf, bool item_highlight) {
+	if (_sortLimit) {
+		// Clear the surface when debugging the sorter
+		surf->Fill32(0, _clipWindow);
+	}
+
 	SortItem *it = _items;
 	SortItem *end = nullptr;
 	_painted = nullptr;  // Reset the paint tracking
@@ -295,8 +302,8 @@ bool ItemSorter::PaintSortItem(RenderSurface *surf, SortItem *si) {
 	SortItem::DependsList::iterator end = si->_depends.end();
 	while (it != end) {
 		if ((*it)->_order == -2) {
-			//warning("cycle in paint dependency graph %d -> %d -> ... -> %d",
-			//		si->_shapeNum, (*it)->_shapeNum, si->_shapeNum);
+			debugC(kDebugObject, "Cycle in paint dependency graph %d -> %d -> ... -> %d",
+					si->_shapeNum, (*it)->_shapeNum, si->_shapeNum);
 			break;
 		}
 		else if ((*it)->_order == -1) {
@@ -305,9 +312,6 @@ bool ItemSorter::PaintSortItem(RenderSurface *surf, SortItem *si) {
 		}
 		++it;
 	}
-
-	// Set our painting _order based on previously painted item
-	si->_order = _painted ? _painted->_order + 1 : 0;
 
 	// Now paint us!
 	if (surf) {
@@ -346,18 +350,21 @@ bool ItemSorter::PaintSortItem(RenderSurface *surf, SortItem *si) {
 		}
 	}
 
-	if (_sortLimit) {
-		if (si->_order == _sortLimit) {
-			if (!_painted || _painted->_itemNum != si->_itemNum) {
-				pout << "SortItem: " << *si << Std::endl;
-				if (_painted && si->overlap(_painted)) {
-					pout << "Overlaps: " << *_painted << Std::endl;
-				}
-			}
+	// Set our painting _order based on previously painted item
+	si->_order = _painted ? _painted->_order + 1 : 0;
 
-			_painted = si;
-			return true;
+	if (_sortLimit && si->_order == _sortLimit) {
+		if (_sortLimitChanged) {
+			_sortLimitChanged = false;
+
+			debugC(kDebugObject, "SortItem: %s", si->dumpInfo().c_str());
+			if (_painted && si->overlap(*_painted)) {
+				debugC(kDebugObject, "Overlaps: %s", _painted->dumpInfo().c_str());
+			}
 		}
+
+		_painted = si;
+		return true;
 	}
 
 	_painted = si;
@@ -386,11 +393,12 @@ uint16 ItemSorter::Trace(int32 x, int32 y, HitFace *face, bool item_highlight) {
 
 		for (it = _itemsTail; it != nullptr; it = it->_prev) {
 			if (!(it->_flags & (Item::FLG_DISPOSABLE | Item::FLG_FAST_ONLY)) && !it->_fixed) {
+				if (!it->_itemNum || !it->contains(x, y))
+					continue;
 
-				if (!it->_itemNum) continue;
-
-				// Doesn't Overlap
-				if (x < it->_sx || x >= it->_sx2 || y < it->_sy || y >= it->_sy2) continue;
+				// Skip transparent non-solids
+				if (!it->_solid && it->_trans)
+					continue;
 
 				// Now check the _frame itself
 				const ShapeFrame *_frame = it->_shape->getFrame(it->_frame);
@@ -414,11 +422,14 @@ uint16 ItemSorter::Trace(int32 x, int32 y, HitFace *face, bool item_highlight) {
 	// We then check to see if the item has a point where the trace goes.
 	// Finally we then set the selected SortItem if it's '_order' is highest
 
-	if (!selected) for (it = _items; it != nullptr; it = it->_next) {
-			if (!it->_itemNum) continue;
+	if (!selected) {
+		for (it = _items; it != nullptr; it = it->_next) {
+			if (!it->_itemNum || !it->contains(x, y))
+				continue;
 
-			// Doesn't Overlap
-			if (x < it->_sx || x >= it->_sx2 || y < it->_sy || y >= it->_sy2) continue;
+			// Skip transparent non-solids
+			if (!it->_solid && it->_trans)
+				continue;
 
 			// Now check the _frame itself
 			const ShapeFrame *_frame = it->_shape->getFrame(it->_frame);
@@ -434,6 +445,7 @@ uint16 ItemSorter::Trace(int32 x, int32 y, HitFace *face, bool item_highlight) {
 			// Ok now check against selected
 			if (!selected || (it->_order > selected->_order)) selected = it;
 		}
+	}
 
 	if (selected) {
 
@@ -480,27 +492,9 @@ uint16 ItemSorter::Trace(int32 x, int32 y, HitFace *face, bool item_highlight) {
 
 void ItemSorter::IncSortLimit(int count) {
 	_sortLimit += count;
+	_sortLimitChanged = true;
 	if (_sortLimit < 0)
 		_sortLimit = 0;
-}
-
-//
-// int16 ItemSorter::CheckClipped(Rect &r)
-//
-// Desc: Check for a clipped rectangle
-// Returns: -1 if off screen,
-//           0 if not clipped,
-//           1 if clipped
-//
-int16 ItemSorter::CheckClipped(const Rect &c) const {
-	Rect r = c;
-	r.clip(_clipWindow);
-
-	// Clipped away to the void
-	if (r.isEmpty())
-		return -1;
-	else if (r == c) return 0;
-	else return 1;
 }
 
 } // End of namespace Ultima8

@@ -24,7 +24,7 @@
 
 #include "backends/networking/curl/curlrequest.h"
 #include "common/memstream.h"
-#include "common/json.h"
+#include "common/formats/json.h"
 
 namespace Networking {
 
@@ -39,9 +39,6 @@ protected:
 	JsonCallback _jsonCallback;
 	Common::MemoryWriteStreamDynamic _contentsStream;
 	byte *_buffer;
-
-	/** Prepares raw bytes from _contentsStream to be parsed with Common::JSON::parse(). */
-	char *getPreparedContents();
 
 	/** Sets FINISHED state and passes the JSONValue * into user's callback in JsonResponse. */
 	virtual void finishJson(Common::JSONValue *json);

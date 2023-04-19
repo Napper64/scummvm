@@ -167,6 +167,19 @@ public:
 	static bool exists(const Path &fileName);
 
 	/**
+	 * Attempt to read the Mac Finder info metadata for a file path.
+	 * @param fileName The base file name of the file
+	 * @param archive The archive to search in
+	 * @param outFinderInfo The loaded and parsed Finder info
+	 * @param outFinderExtendedInfo The loaded and parsed Finder extended info
+	 * @return True if finder info was available for a path, false if not
+	 */
+	static bool getFileFinderInfo(const Path &fileName, Archive &archive, MacFinderInfo &outFinderInfo);
+	static bool getFileFinderInfo(const Path &fileName, Archive &archive, MacFinderInfo &outFinderInfo, MacFinderExtendedInfo &outFinderExtendedInfo);
+	static bool getFileFinderInfo(const Path &fileName, MacFinderInfo &outFinderInfo);
+	static bool getFileFinderInfo(const Path &fileName, MacFinderInfo &outFinderInfo, MacFinderExtendedInfo &outFinderExtendedInfo);
+
+	/**
 	 * List all filenames matching pattern for opening with open().
 	 *
 	 * @param files Array containing all matching filenames discovered. Only
@@ -180,12 +193,6 @@ public:
 	 * Close the Mac data/resource fork pair.
 	 */
 	void close();
-
-	/**
-	 * Query whether or not we have a data fork present.
-	 * @return True if the data fork is present
-	 */
-	bool hasDataFork() const;
 
 	/**
 	 * Query whether or not we have a data fork present.
@@ -216,12 +223,6 @@ public:
 	 * @return Pointer to a SeekableReadStream with loaded resource
 	 */
 	SeekableReadStream *getResource(uint32 typeID, const String &filename);
-
-	/**
-	 * Retrieve the data fork
-	 * @return The stream if present, 0 otherwise
-	 */
-	SeekableReadStream *getDataFork();
 
 	static int getDataForkOffset() { return MBI_INFOHDR; }
 
@@ -302,8 +303,22 @@ private:
 	bool loadFromRawFork(SeekableReadStream *stream);
 	bool loadFromAppleDouble(SeekableReadStream *stream);
 
+	/**
+	 * Get Finder info from a file in MacBinary format
+	 */
+	static bool getFinderInfoFromMacBinary(SeekableReadStream *stream, MacFinderInfo &outFinderInfo, MacFinderExtendedInfo &outFinderExtendedInfo);
+
+	/**
+	 * Get Finder info from a file in AppleDouble format
+	 */
+	static bool getFinderInfoFromAppleDouble(SeekableReadStream *stream, MacFinderInfo &outFinderInfo, MacFinderExtendedInfo &outFinderExtendedInfo);
+
+	static bool readAndValidateMacBinaryHeader(SeekableReadStream &stream, byte (&outMacBinaryHeader)[MBI_INFOHDR]);
+
 	static Path constructAppleDoubleName(Path name);
 	static Path disassembleAppleDoubleName(Path name, bool *isAppleDouble);
+
+	static SeekableReadStream *openAppleDoubleWithAppleOrOSXNaming(Archive& archive, const Path &fileName);
 
 	/**
 	 * Do a sanity check whether the given stream is a raw resource fork.

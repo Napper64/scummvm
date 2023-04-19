@@ -22,6 +22,8 @@
 #ifndef SCI_DETECTION_OPTIONS_H
 #define SCI_DETECTION_OPTIONS_H
 
+#include "common/translation.h"
+
 namespace Sci {
 
 const ADExtraGuiOptionsMap optionsList[] = {
@@ -250,6 +252,14 @@ const PopUpOptionsMap popUpOptionsList[] = {
 			{
 				_s("Yamaha FB-01"),
 				kMidiModeFB01
+			},
+			{
+				_s("Casio MT-540"),
+				kMidiModeMT540
+			},
+			{
+				_s("Casio CT-460 / CSM-1"),
+				kMidiModeCT460
 			},
 			POPUP_OPTIONS_ITEMS_TERMINATOR
 		}

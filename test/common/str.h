@@ -570,6 +570,80 @@ class StringTestSuite : public CxxTest::TestSuite
 		TS_ASSERT_EQUALS(s4, "TestTestTestTestTestTestTestTestTestTestTest");
 	}
 
+	void test_ustring_replace() {
+		// These tests are inspired from the above string tests
+		
+		// --------------------------
+		// Tests without displacement
+		// --------------------------
+		Common::U32String testString = Common::U32String("This is the original string.");
+
+		// Positions and sizes as parameters, U32String as replacement
+		testString.replace(12, 8, Common::U32String("newnewne"));
+		TS_ASSERT_EQUALS(testString, Common::U32String("This is the newnewne string."));
+
+		// Using iterators (also a terribly useless program as a test).
+		testString.replace(testString.begin(), testString.end(), Common::U32String("That is the supernew string."));
+		TS_ASSERT_EQUALS(testString, Common::U32String("That is the supernew string."));
+
+		// With substrings.
+		testString.replace(12, 2, Common::U32String("That hy is new."), 5, 2);
+		TS_ASSERT_EQUALS(testString, Common::U32String("That is the hypernew string."));
+
+		// --------------------------
+		// Tests with displacement
+		// --------------------------
+		testString = Common::U32String("Hello World");
+
+		// Positions and sizes as parameters, string as replacement
+		testString.replace(6, 5, Common::U32String("friends"));
+		TS_ASSERT_EQUALS(testString, Common::U32String("Hello friends"));
+
+		// Using iterators (also a terribly useless program as a test)
+		testString.replace(testString.begin() + 5, testString.begin() + 6, Common::U32String(" good "));
+		TS_ASSERT_EQUALS(testString, Common::U32String("Hello good friends"));
+
+		// With substrings
+		testString.replace(6, 0, Common::U32String("Displaced my string"), 10, 3);
+		TS_ASSERT_EQUALS(testString, Common::U32String("Hello my good friends"));
+
+		// -----------------------
+		// Deep copy compliance
+		// -----------------------
+
+		// Makes a deep copy without changing the length of the original
+		Common::U32String s1 = Common::U32String("TestTestTestTestTestTestTestTestTestTestTest");
+		Common::U32String s2(s1);
+		TS_ASSERT_EQUALS(s1, "TestTestTestTestTestTestTestTestTestTestTest");
+		TS_ASSERT_EQUALS(s2, "TestTestTestTestTestTestTestTestTestTestTest");
+		s1.replace(0, 4, Common::U32String("TEST"));
+		TS_ASSERT_EQUALS(s1, "TESTTestTestTestTestTestTestTestTestTestTest");
+		TS_ASSERT_EQUALS(s2, "TestTestTestTestTestTestTestTestTestTestTest");
+
+		// Makes a deep copy when we shorten the string
+		Common::String s3 = "TestTestTestTestTestTestTestTestTestTestTest";
+		Common::String s4(s3);
+		s3.replace(0, 32, Common::U32String(""));
+		TS_ASSERT_EQUALS(s3, "TestTestTest");
+		TS_ASSERT_EQUALS(s4, "TestTestTestTestTestTestTestTestTestTestTest");
+	}
+
+	void test_find() {
+		Common::String a("0123012"), b;
+
+		TS_ASSERT_EQUALS(a.find('1'), 1u);
+		TS_ASSERT_EQUALS(a.find('3'), 3u);
+		TS_ASSERT_EQUALS(a.find('1', 3), 5u);
+		TS_ASSERT_EQUALS(b.find('*'), Common::String::npos);
+		TS_ASSERT_EQUALS(b.find('*', 1), Common::String::npos);
+
+		TS_ASSERT_EQUALS(a.rfind('1'), 5u);
+		TS_ASSERT_EQUALS(a.rfind('3'), 3u);
+		TS_ASSERT_EQUALS(a.rfind('1', 3), 1u);
+		TS_ASSERT_EQUALS(b.rfind('*'), Common::String::npos);
+		TS_ASSERT_EQUALS(b.rfind('*', 1), Common::String::npos);
+	}
+
 	void test_setChar() {
 		Common::String testString("123456");
 		testString.setChar('2', 0);

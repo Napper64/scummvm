@@ -82,6 +82,7 @@ static const GLchar *readFile(const Common::String &filename) {
 	Common::File file;
 	Common::String shaderDir;
 
+#ifndef RELEASE_BUILD
 	// Allow load shaders from source code directory without install them.
 	// It's used for development purpose.
 	// Additionally allow load shaders outside distribution data path,
@@ -91,6 +92,10 @@ static const GLchar *readFile(const Common::String &filename) {
 	SearchMan.addDirectory("STARK_SHADERS", "engines/stark", 0, 2);
 	SearchMan.addDirectory("WINTERMUTE_SHADERS", "engines/wintermute/base/gfx/opengl", 0, 2);
 	SearchMan.addDirectory("PLAYGROUND3D_SHADERS", "engines/playground3d", 0, 2);
+	SearchMan.addDirectory("FREESCAPE_SHADERS", "engines/freescape", 0, 2);
+	SearchMan.addDirectory("HPL1_SHADERS", "engines/hpl1/engine/impl", 0, 2);
+#endif
+
 	if (ConfMan.hasKey("extrapath")) {
 		SearchMan.addDirectory("EXTRA_PATH", Common::FSNode(ConfMan.get("extrapath")), 0, 2);
 	}
@@ -100,11 +105,17 @@ static const GLchar *readFile(const Common::String &filename) {
 	file.open(shaderDir + filename);
 	if (!file.isOpen())
 		error("Could not open shader %s!", filename.c_str());
+
+#ifndef RELEASE_BUILD
 	SearchMan.remove("GRIM_SHADERS");
 	SearchMan.remove("MYST3_SHADERS");
 	SearchMan.remove("STARK_SHADERS");
 	SearchMan.remove("WINTERMUTE_SHADERS");
 	SearchMan.remove("PLAYGROUND3D_SHADERS");
+	SearchMan.remove("FREESCAPE_SHADERS");
+	SearchMan.remove("HPL1_SHADERS");
+#endif
+
 	SearchMan.remove("EXTRA_PATH");
 
 	const int32 size = file.size();
@@ -132,6 +143,8 @@ GLuint Shader::createDirectShader(size_t shaderSourcesCount, const char *const *
 
 		_error = Common::String::format("Could not compile shader %s: %s", name.c_str(), log);
 		warning("Shader::createDirectShader(): %s", _error.c_str());
+
+		delete[] log;
 		return 0;
 	}
 

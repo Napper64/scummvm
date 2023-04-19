@@ -176,6 +176,7 @@ public:
 	int  GetCompatibleBitmapFormat(int color_depth) override;
 	IDriverDependantBitmap *CreateDDB(int width, int height, int color_depth, bool opaque) override;
 	IDriverDependantBitmap *CreateDDBFromBitmap(Bitmap *bitmap, bool hasAlpha, bool opaque) override;
+	IDriverDependantBitmap *CreateRenderTargetDDB(int width, int height, int color_depth, bool opaque) override;
 	void UpdateDDBFromBitmap(IDriverDependantBitmap *ddb, Bitmap *bitmap, bool hasAlpha) override;
 	void DestroyDDB(IDriverDependantBitmap *ddb) override;
 
@@ -195,6 +196,7 @@ public:
 	void DrawSprite(int x, int y, IDriverDependantBitmap *ddb) override;
 	void SetScreenFade(int red, int green, int blue) override;
 	void SetScreenTint(int red, int green, int blue) override;
+	void SetStageScreen(const Size &sz, int x = 0, int y = 0) override;
 
 	void RenderToBackBuffer() override;
 	void Render() override;
@@ -221,6 +223,7 @@ public:
 	Bitmap *GetMemoryBackBuffer() override;
 	void SetMemoryBackBuffer(Bitmap *backBuffer) override;
 	Bitmap *GetStageBackBuffer(bool mark_dirty) override;
+	void SetStageBackBuffer(Bitmap *backBuffer) override;
 	bool GetStageMatrixes(RenderMatrixes & /*rm*/) override {
 		return false; /* not supported */
 	}
@@ -228,6 +231,11 @@ public:
 	typedef std::shared_ptr<ScummVMRendererGfxFilter> PSDLRenderFilter;
 
 	void SetGraphicsFilter(PSDLRenderFilter filter);
+
+protected:
+	size_t GetLastDrawEntryIndex() override {
+		return _spriteList.size();
+	}
 
 private:
 	Graphics::Screen *_screen = nullptr;
@@ -240,7 +248,6 @@ private:
 	uint16 _defaultGammaBlue[256] {};
 #endif
 
-	RendererFlip _renderFlip = FLIP_NONE;
 	/*  SDL_Renderer *_renderer = nullptr;
 	    SDL_Texture *_screenTex = nullptr; */
 	// BITMAP struct for wrapping screen texture locked pixels, so that we may use blit()
@@ -276,15 +283,14 @@ private:
 	// Renders single sprite batch on the precreated surface
 	size_t RenderSpriteBatch(const ALSpriteBatch &batch, size_t from, Shared::Bitmap *surface, int surf_offx, int surf_offy);
 
-	void highcolor_fade_in(Bitmap *vs, void(*draw_callback)(), int offx, int offy, int speed, int targetColourRed, int targetColourGreen, int targetColourBlue);
-	void highcolor_fade_out(Bitmap *vs, void(*draw_callback)(), int offx, int offy, int speed, int targetColourRed, int targetColourGreen, int targetColourBlue);
+	void highcolor_fade_in(Bitmap *vs, void(*draw_callback)(), int speed, int targetColourRed, int targetColourGreen, int targetColourBlue);
+	void highcolor_fade_out(Bitmap *vs, void(*draw_callback)(), int speed, int targetColourRed, int targetColourGreen, int targetColourBlue);
 	void __fade_from_range(PALETTE source, PALETTE dest, int speed, int from, int to);
 	void __fade_out_range(int speed, int from, int to, int targetColourRed, int targetColourGreen, int targetColourBlue);
 	// Copy raw screen bitmap pixels to the screen
-	void BlitToScreen();
 	void copySurface(const Graphics::Surface &src, bool mode);
 	// Render bitmap on screen
-	void Present() { BlitToScreen(); }
+	void Present(int xoff = 0, int yoff = 0, Shared::GraphicFlip flip = Shared::kFlip_None);
 };
 
 

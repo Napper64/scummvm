@@ -129,6 +129,8 @@ protected:
 
 	void slideUpAndClose();
 
+	Common::String _prompt;
+
 public:
 	ConsoleDialog(float widthPercent, float heightPercent);
 	virtual ~ConsoleDialog();
@@ -143,7 +145,7 @@ public:
 	void handleKeyDown(Common::KeyState state) override;
 	void handleCommand(CommandSender *sender, uint32 cmd, uint32 data) override;
 
-	int printFormat(int dummy, const char *format, ...) GCC_PRINTF(3, 4);
+	int printFormat(int dummy, MSVC_PRINTF const char *format, ...) GCC_PRINTF(3, 4);
 	int vprintFormat(int dummy, const char *format, va_list argptr);
 
 	void printChar(int c);
@@ -160,6 +162,9 @@ public:
 	int getCharsPerLine() {
 		return _pageWidth;
 	}
+
+	void setPrompt(Common::String prompt);
+	void resetPrompt();
 
 protected:
 	inline char &buffer(int idx) {

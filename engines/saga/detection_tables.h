@@ -63,6 +63,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE_DEMO,
 		PATCHLIST_NONE,
 		INTROLIST_ITE_DOS_DEMO,
+		{},
 	},
 
 	// Inherit the earth - MAC Demo version
@@ -87,6 +88,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE_WIN_DEMO,
 		PATCHLIST_ITE_MAC,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 
@@ -113,6 +115,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE_WIN_DEMO,
 		PATCHLIST_ITE_MAC,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 
@@ -139,6 +142,63 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE_WIN_DEMO,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_DEFAULT,
+		{},
+	},
+
+	// Inherit the earth - Win32 Demo version 2, compressed
+	{
+		{
+			"ite",
+			"Win Demo 2",
+			{
+				{"itedemo.exe",		0,	"d2ea5ccf8554fef4576718c06f34e5e5", 17472512},
+				AD_LISTEND
+			},
+			Common::EN_ANY,
+			Common::kPlatformWindows,
+			ADGF_DEMO,
+			GUIO0()
+		},
+		GID_ITE,
+		GF_INSTALLER,
+		ITE_DEFAULT_SCENE,
+		RESOURCELIST_ITE,
+		FONTLIST_ITE_WIN_DEMO,
+		PATCHLIST_ITE,
+		INTROLIST_ITE_DEFAULT,
+		{
+			{"ited.rsc",		GAME_RESOURCEFILE,	"3a450852cbf3c80773984d565647e6ac", 1951395},
+			{"scriptsd.rsc",	GAME_SCRIPTFILE,	"3f12b67fa93e56e1a6be39d2921d80bb", 70051},
+			AD_LISTEND
+		},
+	},
+
+	// Inherit the earth - Win32 Demo version 3, compressed
+	{
+		{
+			"ite",
+			"Win Demo 3",
+			{
+				{"itedemo.exe",		0,	"0a12e3ff2d511c2723acc4abc4480ee1", 31675904},
+				AD_LISTEND
+			},
+			Common::EN_ANY,
+			Common::kPlatformWindows,
+			ADGF_DEMO,
+			GUIO0()
+		},
+		GID_ITE,
+		GF_INSTALLER,
+		ITE_DEFAULT_SCENE,
+		RESOURCELIST_ITE,
+		FONTLIST_ITE_WIN_DEMO,
+		PATCHLIST_ITE_MAC, // Skip midi patches.
+		INTROLIST_ITE_DEFAULT,
+		{
+			{"ited.rsc",		GAME_RESOURCEFILE,	"3a450852cbf3c80773984d565647e6ac", 1951395},
+			{"scriptsd.rsc",	GAME_SCRIPTFILE,	"3f12b67fa93e56e1a6be39d2921d80bb", 70051},
+			AD_LISTEND
+		},
 	},
 
 
@@ -165,10 +225,133 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE_WIN_DEMO,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_DEFAULT,
+		{},
+	},
+
+	// Inherit the earth - Win32 Demo version 1
+	// Non-interactive demo, compressed
+	{
+		{
+			"ite",
+			"Demo 1",
+			{
+				{"itedemo.exe",		0,	"e49c52d06add732f3736f64d3e79a223", 7823872},
+				AD_LISTEND
+			},
+			Common::EN_ANY,
+			Common::kPlatformWindows,
+			ADGF_DEMO,
+			GUIO0()
+		},
+		GID_ITE,
+		GF_8BIT_UNSIGNED_PCM | GF_INSTALLER,
+		ITE_DEFAULT_SCENE,
+		RESOURCELIST_ITE,
+		FONTLIST_ITE_WIN_DEMO,
+		PATCHLIST_ITE,
+		INTROLIST_ITE_DEFAULT,
+		{
+			{"ited.rsc",		GAME_RESOURCEFILE,	"3a450852cbf3c80773984d565647e6ac", 1327323},
+			{"scriptsd.rsc",	GAME_SCRIPTFILE,	"3f12b67fa93e56e1a6be39d2921d80bb", 38613},
+			AD_LISTEND
+		},
 	},
 
 
-	// TODO: Add Amiga demos here (not supported yet)
+	{
+		{
+			"ite",
+			"AGA Demo CD",
+			{
+				{"ite.rtn",		GAME_RESOURCEFILE,	"634d36f78ac151b14dbeed274e169def", 18564},
+				{"ite.000",                             0,      "75a2c63fd67d3c87512a37af91537fba", 900096},
+				AD_LISTEND
+			},
+			Common::DE_DEU,
+			Common::kPlatformAmiga,
+			ADGF_CD,
+			GUIO0()
+		},
+		GID_ITE,
+		GF_EXTRA_ITE_CREDITS | GF_AGA_GRAPHICS | GF_EMBED_FONT | GF_POWERPACK_GFX,
+		ITE_DEFAULT_SCENE,
+		RESOURCELIST_ITE_GERMAN_AGA,
+		FONTLIST_NONE,
+		PATCHLIST_ITE,
+		INTROLIST_ITE_AMIGA_GERMAN_AGA,
+		{},
+	},
+	{
+		{
+			"ite",
+			"AGA Demo Floppy",
+			{
+				{"ite.rtn",		GAME_RESOURCEFILE,	"634d36f78ac151b14dbeed274e169def", 18564},
+				{"ite01.adf", 0, "82877f62357c39cb3a9f892dfce713e2", 901120},
+				{"ite02.adf", 0, "ed7bff9c17aacce17a9b5743d39149e7", 901120},
+				AD_LISTEND
+			},
+			Common::DE_DEU,
+			Common::kPlatformAmiga,
+			ADGF_CD,
+			GUIO0()
+		},
+		GID_ITE,
+		GF_ITE_FLOPPY|GF_EXTRA_ITE_CREDITS | GF_AGA_GRAPHICS | GF_EMBED_FONT | GF_POWERPACK_GFX,
+		ITE_DEFAULT_SCENE,
+		RESOURCELIST_ITE_GERMAN_AGA,
+		FONTLIST_NONE,
+		PATCHLIST_ITE,
+		INTROLIST_ITE_AMIGA_GERMAN_AGA,
+		{},
+	},
+	{
+		{
+			"ite",
+			"ECS Demo CD",
+			{
+				{"ite.rtn",		GAME_RESOURCEFILE,	"1e77154f045358ef3f09fbdb00ea92a4", 18624},
+				{"ite.000",                             0,      "7907e74ed9ce17bb9d6c10e21273d53e", 788221},
+				AD_LISTEND
+			},
+			Common::DE_DEU,
+			Common::kPlatformAmiga,
+			ADGF_CD,
+			GUIO0()
+		},
+		GID_ITE,
+		GF_EXTRA_ITE_CREDITS | GF_ECS_GRAPHICS | GF_EMBED_FONT | GF_POWERPACK_GFX,
+		ITE_DEFAULT_SCENE,
+		RESOURCELIST_ITE_GERMAN_ECS,
+		FONTLIST_NONE,
+		PATCHLIST_ITE,
+		INTROLIST_ITE_AMIGA_GERMAN_ECS,
+		{},
+	},
+	{
+		{
+			"ite",
+			"ECS Demo Floppy",
+			{
+				{"ite.rtn",		GAME_RESOURCEFILE,	"1e77154f045358ef3f09fbdb00ea92a4", 18624},
+				{"ite01.adf",                           0,      "fc6ba8bae7d86038efa2fba30ebf5e77", 901120},
+				{"ite02.adf",                           0,      "8f8cc806fc19066480b868c43e12343a", 901120},
+				AD_LISTEND
+			},
+			Common::DE_DEU,
+			Common::kPlatformAmiga,
+			ADGF_NO_FLAGS,
+			GUIO0()
+		},
+		GID_ITE,
+		GF_ITE_FLOPPY | GF_EXTRA_ITE_CREDITS | GF_ECS_GRAPHICS | GF_EMBED_FONT | GF_POWERPACK_GFX,
+		ITE_DEFAULT_SCENE,
+		RESOURCELIST_ITE_GERMAN_ECS,
+		FONTLIST_NONE,
+		PATCHLIST_ITE,
+		INTROLIST_ITE_AMIGA_GERMAN_ECS,
+		{},
+	},
 
 
 	// ITE Mac versions ///////////////////////////////////////////////////////////////////////////////////////
@@ -179,11 +362,11 @@ static const SAGAGameDescription gameDescriptions[] = {
 			"ite",
 			"CD",
 			{
-				{"ite resources.bin",	GAME_RESOURCEFILE | GAME_MACBINARY,	"0bd506aa887bfc7965f695c6bd28237d", -1},
-				{"ite scripts.bin",		GAME_SCRIPTFILE | GAME_MACBINARY,	"af0d7a2588e09ad3ecbc5b474ea238bf", -1},
-				{"ite sounds.bin",		GAME_SOUNDFILE | GAME_MACBINARY,	"441426c6bb2a517f65c7e49b57f7a345", -1},
-				{"ite music.bin",		GAME_MUSICFILE_GM | GAME_MACBINARY,	"c1d20324b7cdf1650e67061b8a93251c", -1},
-				//{"ite voices.bin",		GAME_VOICEFILE | GAME_MACBINARY,	"dba92ae7d57e942250fe135609708369", -1},
+				{"ite resources",	GAME_RESOURCEFILE | GAME_MACBINARY,	"d:4f7fa11c5175980ed593392838523060", 8862102},
+				{"ite scripts",		GAME_SCRIPTFILE | GAME_MACBINARY,	"d:adf1f46c1d0589083996a7060c798ad0", 336006},
+				{"ite sounds",		GAME_SOUNDFILE | GAME_MACBINARY,	"d:8ee4d9ee27688785608d09faaa4a974c", 3680672},
+				{"ite music",		GAME_MUSICFILE_GM | GAME_MACBINARY,	"r:b0d66d7ae48f35c5c9a3444343b86f85", 3135053},
+				// {"ite voices",		GAME_VOICEFILE | GAME_MACBINARY,	"ee65f8e713127cf7f2d56371d2b8e63d", 2264},
 				AD_LISTEND
 			},
 			Common::EN_ANY,
@@ -198,6 +381,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE_WIN_DEMO,
 		PATCHLIST_NONE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - MAC CD First edition
@@ -225,6 +409,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE_WIN_DEMO,
 		PATCHLIST_NONE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - MAC CD Wyrmkeep version
@@ -249,13 +434,14 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE_WIN_DEMO,
 		PATCHLIST_ITE_MAC,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - MAC CD GOG version 1.1
 	{
 		{
 			"ite",
-			"GOG CD Mac v1.1",
+			"GOG.com CD Mac v1.1",
 			{
 				{"ite_i.rsc",					GAME_RESOURCEFILE,	"a6433e34b97b15e64fe8214651012db9", 8927165},
 				{"scripts_i.rsc",				GAME_SCRIPTFILE,	"a891405405edefc69c9d6c420c868b84", 335927},
@@ -273,6 +459,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_NONE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 
@@ -305,6 +492,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_NONE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - German Wyrmkeep combined Windows/Mac/Linux CD
@@ -332,6 +520,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_NONE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - Italian Wyrmkeep combined Windows/Mac/Linux CD (fan translation)
@@ -363,6 +552,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_NONE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - Wyrmkeep Windows CD version
@@ -389,6 +579,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - Wyrmkeep Linux CD version
@@ -415,6 +606,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - DOS CD version - 17-06-1994
@@ -440,6 +632,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - Wyrmkeep Italian Windows CD version (fan translation)
@@ -465,6 +658,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - Wyrmkeep Italian Linux CD version (fan translation)
@@ -490,6 +684,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - Italian DOS CD version (fan translation)
@@ -514,6 +709,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - Wyrmkeep French Windows CD version (fan translation)
@@ -539,6 +735,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - Wyrmkeep French Linux CD version (fan translation)
@@ -564,6 +761,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - French DOS CD version (fan translation)
@@ -588,6 +786,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - DOS CD version - 30-06-1994
@@ -612,6 +811,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - Hebrew fan translation
@@ -636,6 +836,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_NONE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - DOS CD German version
@@ -661,6 +862,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_NONE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - Windows Trial
@@ -688,6 +890,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_NONE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - macOS Trial
@@ -714,6 +917,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_NONE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - Pocket PC Trial
@@ -740,6 +944,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the Earth - Japanese PC-98 CD version
@@ -764,6 +969,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_NONE,
 		INTROLIST_ITE_DEFAULT,
+		{},
  	},
 
 	// Inherit the earth - Russian CD version (fan translation)
@@ -788,6 +994,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// ITE floppy versions ////////////////////////////////////////////////////////////////////////////////////
@@ -814,6 +1021,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_NONE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - Disk version
@@ -838,7 +1046,42 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
+
+	// Same as above but installer
+	{
+		{
+			"ite",
+			"Floppy Packed",
+			{
+				{"inherit.arj", 0, "a7910371d6b43c00a318bc9c6f0062b4", 1413298},
+				{"inherit.a01", 0, "e5034686e3bc531ba1bbcb6c6efe90c1", 1456420},
+				{"inherit.a02", 0, "a8d3bf36dd7ece019fd2f819a0dfed70", 1456328},
+				{"inherit.a03", 0, "456a4ee942cdf653754fbec4e942db46", 1456284},
+				{"inherit.a04", 0, "748865cda20e1404b19f17b5aaab255d", 1456289},
+				{"inherit.105", 0, "c03f250b95dedf7f10bf188c49047140", 1117200},
+				AD_LISTEND
+			},
+			Common::EN_ANY,
+			Common::kPlatformDOS,
+			ADGF_NO_FLAGS,
+			GUIO1(GUIO_NOSPEECH)
+		},
+		GID_ITE,
+		GF_ITE_FLOPPY | GF_INSTALLER,
+		ITE_DEFAULT_SCENE,
+		RESOURCELIST_ITE,
+		FONTLIST_ITE,
+		PATCHLIST_ITE,
+		INTROLIST_ITE_DEFAULT,
+		{
+			{"ite.rsc",		GAME_RESOURCEFILE,					"8f4315a9bb10ec839253108a032c8b54", 8903828},
+			{"scripts.rsc",	GAME_SCRIPTFILE,					"516f7330f8410057b834424ea719d1ef", -1},
+			AD_LISTEND
+		},
+	},
+
 
 	// Inherit the earth - Italian Disk version (fan translation)
 	{
@@ -862,6 +1105,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - Chinese Disk version
@@ -886,6 +1130,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// Inherit the earth - Russian Disk version (fan translation)
@@ -910,6 +1155,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 
 	// ITE Amiga versions /////////////////////////////////////////////////////////////////////////////////////
@@ -921,6 +1167,9 @@ static const SAGAGameDescription gameDescriptions[] = {
 			"AGA CD",
 			{
 				{"ite.rtn",		GAME_RESOURCEFILE,	"9d97f645eb877d1c9eb9d906930c3257", 18564},
+				{"aga.exe",                             0,      "f18ff495b8346983400a8eb6175590e5", 203224},
+				{"ite.sounds",             GAME_SOUNDFILE,      "f09b29e3204192de7e8cc6b073cb34f5", 640284},
+				{"ite.voices",             GAME_VOICEFILE,      "f2efcf1c175c572f91cc4ec66dbb226f", 221124347},
 				AD_LISTEND
 			},
 			Common::DE_DEU,
@@ -931,10 +1180,12 @@ static const SAGAGameDescription gameDescriptions[] = {
 		GID_ITE,
 		GF_EXTRA_ITE_CREDITS | GF_AGA_GRAPHICS,
 		ITE_DEFAULT_SCENE,
-		RESOURCELIST_ITE_GERMAN_AGA_CD,
+		RESOURCELIST_ITE_GERMAN_AGA,
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_AMIGA_GERMAN_AGA,
+		{},
+
 	},
 	// This is on the same disk as previous but it's for ECS systems
 	{
@@ -943,6 +1194,9 @@ static const SAGAGameDescription gameDescriptions[] = {
 			"ECS CD",
 			{
 				{"ecs.rtn",		GAME_RESOURCEFILE,	"62d738d3201c1624f0e4bfcc8fb587dd", 18624},
+				{"ecs.exe",                             0,      "b6a5ae7b07c620a8101e87bb0d2af136", 205064},
+				{"ite.sounds",             GAME_SOUNDFILE,      "f09b29e3204192de7e8cc6b073cb34f5", 640284},
+				{"ite.voices",             GAME_VOICEFILE,      "f2efcf1c175c572f91cc4ec66dbb226f", 221124347},
 				AD_LISTEND
 			},
 			Common::DE_DEU,
@@ -953,10 +1207,11 @@ static const SAGAGameDescription gameDescriptions[] = {
 		GID_ITE,
 		GF_EXTRA_ITE_CREDITS | GF_ECS_GRAPHICS,
 		ITE_DEFAULT_SCENE,
-		RESOURCELIST_ITE_GERMAN_ECS_CD,
+		RESOURCELIST_ITE_GERMAN_ECS,
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
 		INTROLIST_ITE_AMIGA_GERMAN_ECS,
+		{},
 	},
 	// Amiga Future coverdisk/Wyrmkeep English edition
 	{
@@ -965,6 +1220,9 @@ static const SAGAGameDescription gameDescriptions[] = {
 			"AGA CD",
 			{
 				{"ite.rtn",		GAME_RESOURCEFILE,	"749885c0f7eaab4e977dc26a41d99ad8", 18524},
+				{"aga.exe",                             0,      "e6d93bbf0f89786eb930fbc81e02810d", 202328},
+				{"ite.sounds",             GAME_SOUNDFILE,      "f09b29e3204192de7e8cc6b073cb34f5", 640284},
+				{"ite.voices",             GAME_VOICEFILE,      "daf62750f5322da03fab395e548b0b8f", 217376825},
 				AD_LISTEND
 			},
 			Common::EN_ANY,
@@ -978,7 +1236,8 @@ static const SAGAGameDescription gameDescriptions[] = {
 		RESOURCELIST_ITE,
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
-		INTROLIST_ITE_AMIGA_ENGLISH_AGA_CD,
+		INTROLIST_ITE_DEFAULT,
+		{},
 	},
 	// This is on the same disk as previous but it's for ECS systems
 	{
@@ -987,6 +1246,9 @@ static const SAGAGameDescription gameDescriptions[] = {
 			"ECS CD",
 			{
 				{"ecs.rtn",		GAME_RESOURCEFILE,	"c9d09514839d771efdc82ad761413349", 18584},
+				{"ecs.exe",                             0,      "29665b96c2758aec3906ebc891079234", 204228},
+				{"ite.sounds",             GAME_SOUNDFILE,      "f09b29e3204192de7e8cc6b073cb34f5", 640284},
+				{"ite.voices",             GAME_VOICEFILE,      "daf62750f5322da03fab395e548b0b8f", 217376825},
 				AD_LISTEND
 			},
 			Common::EN_ANY,
@@ -997,13 +1259,86 @@ static const SAGAGameDescription gameDescriptions[] = {
 		GID_ITE,
 		GF_EXTRA_ITE_CREDITS | GF_ECS_GRAPHICS,
 		ITE_DEFAULT_SCENE,
-		RESOURCELIST_ITE_ENGLISH_ECS_CD,
+		RESOURCELIST_ITE_ENGLISH_ECS,
 		FONTLIST_ITE,
 		PATCHLIST_ITE,
-		INTROLIST_ITE_AMIGA_ENGLISH_ECS_CD,
+		INTROLIST_ITE_AMIGA_ENGLISH_ECS,
+		{},
 	},
 
-	// TODO: Add Amiga floppy versions
+	// Inherit the earth - German Floppy version
+	{
+		{
+			"ite",
+			"AGA Floppy",
+			{
+				{"ite.rtn",		GAME_RESOURCEFILE,	"38f6a3aca708ef3ab6059d94a268da29", 18564},
+				{"ite01.adf",		0,					"4f7913f82d7f8318d24f31b6226731eb", 901120},
+				{"ite02.adf",	0,					"9c959343c3e2e4a067426bf4cf28eba0", 901120},
+				AD_LISTEND
+			},
+			Common::DE_DEU,
+			Common::kPlatformAmiga,
+			ADGF_NO_FLAGS,
+			GUIO1(GUIO_NOSPEECH)
+		},
+		GID_ITE,
+		GF_ITE_FLOPPY | GF_AGA_GRAPHICS | GF_EMBED_FONT | GF_POWERPACK_GFX,
+		ITE_DEFAULT_SCENE,
+		RESOURCELIST_ITE_GERMAN_AGA,
+		FONTLIST_NONE,
+		PATCHLIST_NONE,
+		INTROLIST_ITE_AMIGA_GERMAN_AGA,
+		{},
+	},
+	{
+		{
+			"ite",
+			"ECS Floppy",
+			{
+				{"ite.rtn",		GAME_RESOURCEFILE,	"733a15d1816b76ed10fbb02668ae1f93", 18624},
+				{"ite01.adf",		0,					"49352821102fc03d1653e0fda13fb15f", 901120},
+				{"ite02.adf",	0,					"160189cce6ecec4bfb4e045bf9be3218", 901120},
+				AD_LISTEND
+			},
+			Common::DE_DEU,
+			Common::kPlatformAmiga,
+			ADGF_NO_FLAGS,
+			GUIO1(GUIO_NOSPEECH)
+		},
+		GID_ITE,
+		GF_ITE_FLOPPY | GF_ECS_GRAPHICS | GF_EMBED_FONT | GF_POWERPACK_GFX,
+		ITE_DEFAULT_SCENE,
+		RESOURCELIST_ITE_GERMAN_ECS,
+		FONTLIST_NONE,
+		PATCHLIST_NONE,
+		INTROLIST_ITE_AMIGA_GERMAN_ECS,
+		{},
+	},
+	{
+		{
+			"ite",
+			"ECS Floppy",
+			{
+				{"ite.rtn",		GAME_RESOURCEFILE,	"9d0c6b31ac86b4bd9237e304e4bfb73a", 18624},
+				{"ite01.adf",		0,					"532973f8422f46f73db5b8a161681d40", 901120},
+				{"ite02.adf",	0,					"794f525b9b81f765a5df18bfae8364ec", 901120},
+				AD_LISTEND
+			},
+			Common::EN_ANY,
+			Common::kPlatformAmiga,
+			ADGF_NO_FLAGS,
+			GUIO1(GUIO_NOSPEECH)
+		},
+		GID_ITE,
+		GF_ITE_FLOPPY | GF_ECS_GRAPHICS | GF_EMBED_FONT | GF_POWERPACK_GFX,
+		ITE_DEFAULT_SCENE,
+		RESOURCELIST_ITE_GERMAN_ECS, // Uses German resource list for some reason
+		FONTLIST_NONE,
+		PATCHLIST_NONE,
+		INTROLIST_ITE_AMIGA_GERMAN_ECS, // Uses German intro list for some reason
+		{},
+	},
 
 	// IHNM Section ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1031,6 +1366,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_IHNM_DEMO,
 		PATCHLIST_NONE,
 		INTROLIST_NONE,
+		{},
 	},
 
 	// I Have No Mouth And I Must Scream - English CD version
@@ -1063,6 +1399,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_IHNM_CD,
 		PATCHLIST_NONE,
 		INTROLIST_NONE,
+		{},
 	},
 
 	// I Have No Mouth And I Must Scream - De CD version
@@ -1093,6 +1430,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_IHNM_CD,
 		PATCHLIST_NONE,
 		INTROLIST_NONE,
+		{},
 	},
 
 	// I Have No Mouth And I Must Scream - German fan CD translation
@@ -1123,6 +1461,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_IHNM_CD,
 		PATCHLIST_NONE,
 		INTROLIST_NONE,
+		{},
 	},
 
 	// I Have No Mouth And I Must Scream - Hungarian fan CD translation
@@ -1153,6 +1492,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_IHNM_CD,
 		PATCHLIST_NONE,
 		INTROLIST_NONE,
+		{},
 	},
 
 	// I Have No Mouth And I Must Scream - Sp CD version
@@ -1181,6 +1521,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_IHNM_CD,
 		PATCHLIST_NONE,
 		INTROLIST_NONE,
+		{},
 	},
 
 	// I Have No Mouth And I Must Scream - Korean CD version
@@ -1210,6 +1551,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_IHNM_CD,
 		PATCHLIST_NONE,
 		INTROLIST_NONE,
+		{},
 	},
 
 	// I Have No Mouth And I Must Scream - Fr CD version
@@ -1239,6 +1581,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_IHNM_CD,
 		PATCHLIST_NONE,
 		INTROLIST_NONE,
+		{},
 	},
 
 	// I Have No Mouth And I Must Scream - Chinese CD
@@ -1262,12 +1605,13 @@ static const SAGAGameDescription gameDescriptions[] = {
 			GUIO1(GUIO_NOASPECT)
 		},
 		GID_IHNM,
-		0,
+		GF_IHNM_COLOR_FIX,
 		IHNM_DEFAULT_SCENE,
 		RESOURCELIST_IHNM,
 		FONTLIST_IHNM_ZH,
 		PATCHLIST_NONE,
 		INTROLIST_NONE,
+		{},
 	},
 
 	// I Have No Mouth And I Must Scream - Italian fan CD translation
@@ -1296,6 +1640,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_IHNM_CD,
 		PATCHLIST_NONE,
 		INTROLIST_NONE,
+		{},
 	},
 
 	// I Have No Mouth And I Must Scream - Russian fan translaction v1.0 (by jack7277 et al)
@@ -1328,6 +1673,7 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_IHNM_CD,
 		PATCHLIST_NONE,
 		INTROLIST_NONE,
+		{},
 	},
 
 	// I Have No Mouth And I Must Scream - Mac English CD
@@ -1354,9 +1700,10 @@ static const SAGAGameDescription gameDescriptions[] = {
 		FONTLIST_IHNM_CD,
 		PATCHLIST_NONE,
 		INTROLIST_NONE,
+		{},
 	},
 
-	{ AD_TABLE_END_MARKER, 0, 0, 0, RESOURCELIST_NONE, FONTLIST_MAX, PATCHLIST_MAX, INTROLIST_NONE }
+	{ AD_TABLE_END_MARKER, 0, 0, 0, RESOURCELIST_NONE, FONTLIST_MAX, PATCHLIST_MAX, INTROLIST_NONE, {} }
 };
 
 } // End of namespace Saga

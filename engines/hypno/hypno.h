@@ -23,7 +23,7 @@
 #define HYPNO_H
 
 #include "common/array.h"
-#include "common/installshieldv3_archive.h"
+#include "common/compression/installshieldv3_archive.h"
 #include "common/random.h"
 #include "common/serializer.h"
 #include "common/str-array.h"
@@ -500,7 +500,7 @@ public:
 	}
 
 	bool hasFeature(EngineFeature f) const override {
-		return (f == kSupportsSavingDuringRuntime || f == kSupportsLoadingDuringRuntime);
+		return (f == kSupportsSavingDuringRuntime || f == kSupportsLoadingDuringRuntime || f == kSupportsReturnToLauncher);
 	}
 
 private:
@@ -651,4 +651,3 @@ public:
 } // End of namespace Hypno
 
 #endif
-

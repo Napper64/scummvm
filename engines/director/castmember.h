@@ -57,6 +57,7 @@ namespace Director {
 class AudioDecoder;
 struct CastMemberInfo;
 class Channel;
+struct Picture;
 struct Resource;
 class Sprite;
 class Stxt;
@@ -125,6 +126,7 @@ public:
 	~BitmapCastMember();
 	Graphics::MacWidget *createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) override;
 
+	bool isModified() override;
 	void createMatte(Common::Rect &bbox);
 	Graphics::Surface *getMatte(Common::Rect &bbox);
 	void copyStretchImg(Graphics::Surface *surface, const Common::Rect &bbox, const byte *pal = 0);
@@ -135,7 +137,11 @@ public:
 
 	Common::String formatInfo() override;
 
-	Image::ImageDecoder *_img;
+	PictureReference *getPicture() const;
+	void setPicture(PictureReference &picture);
+	void setPicture(Image::ImageDecoder &image, bool adjustSize);
+
+	Picture *_picture = nullptr;
 	Graphics::Surface *_ditheredImg;
 	Graphics::FloodFill *_matte;
 
@@ -145,11 +151,13 @@ public:
 	uint16 _flags2;
 	uint16 _bytes;
 	int _clut;
+	int _ditheredTargetClut;
 
 	uint16 _bitsPerPixel;
 
 	uint32 _tag;
 	bool _noMatte;
+	bool _external;
 };
 
 class DigitalVideoCastMember : public CastMember {
@@ -284,7 +292,6 @@ public:
 	TextCastMember(Cast *cast, uint16 castId, Common::SeekableReadStreamEndian &stream, uint16 version, uint8 flags1 = 0, bool asButton = false);
 	void setColors(uint32 *fgcolor, uint32 *bgcolor) override;
 
-	void setText(const Common::U32String &text);
 	Graphics::MacWidget *createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) override;
 
 	bool isEditable() override { return _editable; }
@@ -334,10 +341,13 @@ public:
 
 	Common::U32String _ftext;
 	Common::U32String _ptext;
+	Common::String _rtext;
 	void importStxt(const Stxt *stxt);
 	void importRTE(byte *text);
 
 	Common::U32String getText();
+	Common::String getRawText();
+	void setRawText(const Common::String &text);
 
 private:
 	uint32 _bgcolor;
@@ -395,6 +405,8 @@ public:
 	PaletteCastMember(Cast *cast, uint16 castId, Common::SeekableReadStreamEndian &stream, uint16 version);
 	int getPaletteId() { return _palette ? _palette->id : 0; }
 	void activatePalette() { if (_palette) g_director->setPalette(_palette->id); }
+
+	Common::String formatInfo() override;
 
 	PaletteV4 *_palette;
 };

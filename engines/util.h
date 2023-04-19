@@ -58,11 +58,12 @@ void initGraphicsModes(const Graphics::ModeList &modes);
  * Shows various warnings on certain backend graphics
  * transaction failures (aspect switch, fullscreen switch, etc.).
  *
- * Errors are returned when the backend is not able to switch to the specified
- * mode.
+ * An error dialog will be generated when the backend is not able to switch
+ * to the specified mode.
  *
- * Defaults to 256 color palette mode if no graphics format is provided.
- * Uses the preferred format of the backend if graphics format pointer is NULL.
+ * Defaults to CLUT8 (256 color palette) if only width and height provided.
+ * If graphics format is explicitly set to nullptr, uses the preferred format of
+ * the backend.
  * Finds the best compatible format if a list of graphics formats is provided.
  */
 void initGraphics(int width, int height);
@@ -78,5 +79,11 @@ void initGraphics(int width, int height, const Common::List<Graphics::PixelForma
  * @overload
  */
 void initGraphics3d(int width, int height);
+
+/**
+ * Inits any of the modes in "modes". "modes" is in the order of preference.
+ * Return value is index in modes of resulting mode.
+ */
+int initGraphicsAny(const Graphics::ModeWithFormatList &modes);
 /** @} */
 #endif

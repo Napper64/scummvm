@@ -379,7 +379,7 @@ void Inter_v2::o2_initMult() {
 	_vm->_draw->_spriteBottom = _vm->_mult->_animHeight;
 	_vm->_draw->_destSpriteX = 0;
 	_vm->_draw->_destSpriteY = 0;
-	_vm->_draw->spriteOperation(0);
+	_vm->_draw->spriteOperation(DRAW_BLITSURF);
 
 	debugC(4, kDebugGraphics, "o2_initMult: x = %d, y = %d, w = %d, h = %d",
 		  _vm->_mult->_animLeft, _vm->_mult->_animTop,
@@ -578,6 +578,13 @@ void Inter_v2::o2_totSub() {
 
 	uint8 flags = _vm->_game->_script->readByte();
 
+	// Skipping the copy protection screen in Adibou 1
+	if (!_vm->_copyProtection && (_vm->getGameType() == kGameTypeAdibou1) && totFile == "p_eleph") {
+		debugC(2, kDebugGameFlow, "Skipping copy protection screen");
+		_varStack.pushInt(1);
+		return;
+	}
+
 	_vm->_game->totSub(flags, totFile);
 }
 
@@ -608,7 +615,7 @@ void Inter_v2::o2_pushVars() {
 			if (_vm->_game->_script->evalExpr(&value) != 20)
 				value = 0;
 
-			_varStack.pushInt((uint16)value);
+			_varStack.pushInt((uint32)value);
 		}
 	}
 }
@@ -616,7 +623,7 @@ void Inter_v2::o2_pushVars() {
 void Inter_v2::o2_popVars() {
 	uint8 count = _vm->_game->_script->readByte();
 	for (int i = 0; i < count; i++) {
-		int16 varOff = _vm->_game->_script->readVarIndex();
+		uint16 varOff = _vm->_game->_script->readVarIndex();
 
 		_varStack.pop(*_variables, varOff);
 	}
@@ -977,11 +984,11 @@ void Inter_v2::o2_playImd() {
 void Inter_v2::o2_getImdInfo() {
 	Common::String imd = _vm->_game->_script->evalString();
 
-	int16 varX      = _vm->_game->_script->readVarIndex();
-	int16 varY      = _vm->_game->_script->readVarIndex();
-	int16 varFrames = _vm->_game->_script->readVarIndex();
-	int16 varWidth  = _vm->_game->_script->readVarIndex();
-	int16 varHeight = _vm->_game->_script->readVarIndex();
+	uint16 varX      = _vm->_game->_script->readVarIndex();
+	uint16 varY      = _vm->_game->_script->readVarIndex();
+	uint16 varFrames = _vm->_game->_script->readVarIndex();
+	uint16 varWidth  = _vm->_game->_script->readVarIndex();
+	uint16 varHeight = _vm->_game->_script->readVarIndex();
 
 	// WORKAROUND: The nut rolling animation in the administration center
 	// in Woodruff is called "noixroul", but the scripts think it's "noixroule".
@@ -1455,7 +1462,13 @@ void Inter_v2::o2_checkData(OpFuncParams &params) {
 	debugC(2, kDebugFileIO, "Requested size of file \"%s\": %d", file.c_str(), size);
 
 	WRITE_VAR_OFFSET(varOff, (size == -1) ? -1 : 50);
-	WRITE_VAR(16, (uint32) size);
+	// WORKAROUND: the "current hotspot" variable (also VAR(16)) is sometimes corrupted here before being read.
+	// We skip writing the file size into VAR(16) here as a workaround (the value is not used anyway).
+	// In some versions of Adibou 1, this sometimes triggers the "quit" action instead of starting
+	// a chosen Read/Count application.
+	// Note: a similar issue has been found in Adibou 2, see o7_checkData().
+	if (_vm->getGameType() != kGameTypeAdibou1  || !_vm->isCurrentTot("KID.TOT"))
+		WRITE_VAR(16, (uint32) size);
 }
 
 void Inter_v2::o2_readData(OpFuncParams &params) {

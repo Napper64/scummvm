@@ -25,7 +25,7 @@
 #include "backends/platform/iphone/osys_main.h"
 #include "backends/platform/iphone/iphone_video.h"
 
-#include "graphics/conversion.h"
+#include "graphics/blit.h"
 
 void OSystem_IPHONE::engineInit() {
 	EventsBaseBackend::engineInit();
@@ -400,7 +400,7 @@ void OSystem_IPHONE::dirtyFullOverlayScreen() {
 	}
 }
 
-void OSystem_IPHONE::setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format) {
+void OSystem_IPHONE::setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format, const byte *mask) {
 	//printf("setMouseCursor(%p, %u, %u, %i, %i, %u, %d, %p)\n", (const void *)buf, w, h, hotspotX, hotspotY, keycolor, dontScale, (const void *)format);
 
 	const Graphics::PixelFormat pixelFormat = format ? *format : Graphics::PixelFormat::createFormatCLUT8();

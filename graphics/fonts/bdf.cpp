@@ -27,6 +27,8 @@
 
 #include "graphics/surface.h"
 
+#define DRAWDEBUG 0
+
 namespace Graphics {
 
 BdfFont::BdfFont(const BdfFontData &data, DisposeAfterUse::Flag dispose)
@@ -397,16 +399,16 @@ BdfFont *BdfFont::loadFont(Common::SeekableReadStream &stream) {
 			byte *bitmap = loadCharacter(stream, encoding, advance, box);
 
 			// Ignore all characters above 255.
-			if (encoding < -1 || encoding >= font.numCharacters) {
+			if (encoding < 0 || encoding >= font.numCharacters) {
 				delete[] bitmap;
-				encoding = -1;
+				continue;
 			}
 
 			// Calculate the max advance
-			if (encoding != -1 && advance > font.maxAdvance)
+			if (advance > font.maxAdvance)
 				font.maxAdvance = advance;
 
-			if (!bitmap && encoding != -1) {
+			if (!bitmap) {
 				warning("BdfFont::loadFont: Character %d invalid", encoding);
 				freeBitmaps(bitmaps, font.numCharacters);
 				delete[] bitmaps;
@@ -417,11 +419,9 @@ BdfFont *BdfFont::loadFont(Common::SeekableReadStream &stream) {
 				return 0;
 			}
 
-			if (encoding != -1) {
-				bitmaps[encoding] = bitmap;
-				advances[encoding] = advance;
-				boxes[encoding] = box;
-			}
+			bitmaps[encoding] = bitmap;
+			advances[encoding] = advance;
+			boxes[encoding] = box;
 		} else if (line.hasPrefix("FAMILY_NAME \"")) {
 			if (familyName != nullptr) {
 				warning("BdfFont::loadFont: Duplicated FAMILY_NAME");
@@ -726,7 +726,7 @@ BdfFont *BdfFont::loadFromCache(Common::SeekableReadStream &stream) {
 	return new BdfFont(data, DisposeAfterUse::YES);
 }
 
-BdfFont *BdfFont::scaleFont(BdfFont *src, int newSize) {
+BdfFont *BdfFont::scaleFont(const BdfFont *src, int newSize) {
 	if (!src) {
 		warning("BdfFont::scaleFont(): Empty font reference in scale font");
 		return nullptr;
@@ -742,18 +742,23 @@ BdfFont *BdfFont::scaleFont(BdfFont *src, int newSize) {
 		return nullptr;
 	}
 
+	Graphics::Surface srcSurf;
+	srcSurf.create(MAX(src->getFontSize() * 2, newSize * 2), MAX(src->getFontSize() * 2, newSize * 2), PixelFormat::createFormatCLUT8());
+	int dstGraySize = newSize * 20 * newSize;
+	int *dstGray = (int *)malloc(dstGraySize * sizeof(int));
+
 	float scale = (float)newSize / (float)src->getFontSize();
 
 	BdfFontData data;
 
-	data.maxAdvance = (int)((float)src->_data.maxAdvance * scale);
-	data.height = (int)((float)src->_data.height * scale);
-	data.size = (int)((float)src->_data.size * scale);
-	data.defaultBox.width = (int)((float)src->_data.defaultBox.width * scale);
-	data.defaultBox.height = (int)((float)src->_data.defaultBox.height * scale);
-	data.defaultBox.xOffset = (int)((float)src->_data.defaultBox.xOffset * scale);
-	data.defaultBox.yOffset = (int)((float)src->_data.defaultBox.yOffset * scale);
-	data.ascent = (int)((float)src->_data.ascent * scale);
+	data.maxAdvance = (int)(roundf((float)src->_data.maxAdvance * scale));
+	data.height = (int)(roundf((float)src->_data.height * scale));
+	data.size = (int)(roundf((float)src->_data.size * scale));
+	data.defaultBox.width = (int)(roundf((float)src->_data.defaultBox.width * scale));
+	data.defaultBox.height = (int)(roundf((float)src->_data.defaultBox.height * scale));
+	data.defaultBox.xOffset = (int)(roundf((float)src->_data.defaultBox.xOffset * scale));
+	data.defaultBox.yOffset = (int)(roundf((float)src->_data.defaultBox.yOffset * scale));
+	data.ascent = (int)(roundf((float)src->_data.ascent * scale));
 	data.firstCharacter = src->_data.firstCharacter;
 	data.defaultCharacter = src->_data.defaultCharacter;
 	data.numCharacters = src->_data.numCharacters;
@@ -768,67 +773,87 @@ BdfFont *BdfFont::scaleFont(BdfFont *src, int newSize) {
 
 	BdfBoundingBox *boxes = new BdfBoundingBox[data.numCharacters];
 	for (int i = 0; i < data.numCharacters; ++i) {
-		boxes[i].width = (int)((float)src->_data.boxes[i].width * scale);
-		boxes[i].height = (int)((float)src->_data.boxes[i].height * scale);
-		boxes[i].xOffset = (int)((float)src->_data.boxes[i].xOffset * scale);
-		boxes[i].yOffset = (int)((float)src->_data.boxes[i].yOffset * scale);
+		boxes[i].width = (int)(((float)src->_data.boxes[i].width * scale));
+		boxes[i].height = (int)(((float)src->_data.height * scale));
+		boxes[i].xOffset = (int)(((float)src->_data.boxes[i].xOffset * scale));
+		boxes[i].yOffset = (int)(((float)src->_data.boxes[i].yOffset * scale));
 	}
 	data.boxes = boxes;
 
 	byte *advances = new byte[data.numCharacters];
 	for (int i = 0; i < data.numCharacters; ++i) {
-		advances[i] = (int)((float)src->_data.advances[i] * scale);
+		advances[i] = (int)(roundf((float)src->_data.advances[i] * scale));
 	}
 	data.advances = advances;
 
 	byte **bitmaps = new byte *[data.numCharacters];
-
 	for (int i = 0; i < data.numCharacters; i++) {
 		const BdfBoundingBox &box = data.boxes ? data.boxes[i] : data.defaultBox;
 		const BdfBoundingBox &srcBox = data.boxes ? src->_data.boxes[i] : src->_data.defaultBox;
 
+#if DRAWDEBUG
+		int ccc = 'd';
+#endif
 		if (src->_data.bitmaps[i]) {
-			const int bytes = ((box.width + 7) / 8) * box.height; // Dimensions have been already corrected
+			int grayLevel = box.height * box.width / 3;
+			int dstPitch = (box.width + 7) / 8 ;
+			const int bytes = dstPitch * box.height;
 			bitmaps[i] = new byte[bytes];
 
-			int srcPitch = (srcBox.width + 7) / 8;
-			int dstPitch = (box.width + 7) / 8;
+			src->scaleSingleGlyph(&srcSurf, dstGray, dstGraySize, box.width, box.height, box.xOffset, box.yOffset, grayLevel, i + src->_data.firstCharacter,
+								src->_data.height, srcBox.width, scale);
 
 			byte *ptr = bitmaps[i];
-
 			for (int y = 0; y < box.height; y++) {
-				const byte *srcd = (const byte *)&src->_data.bitmaps[i][((int)((float)y / scale)) * srcPitch];
+				byte *srcd = (byte *)srcSurf.getBasePtr(0, y);
 				byte *dst = ptr;
 				byte b = 0;
-
-				for (int x = 0; x < box.width; x++) {
+				for (int x = 0; x < box.width; x++, srcd++) {
 					b <<= 1;
-
-					int sx = (int)((float)x / scale);
-
-					if (srcd[sx / 8] & (0x80 >> (sx % 8)))
+					if (*srcd == 1) {
 						b |= 1;
-
+					}
 					if (x % 8 == 7) {
 						*dst++ = b;
 						b = 0;
 					}
 				}
-
 				if (((box.width - 1) % 8)) {
 					b <<= 7 - ((box.width - 1) % 8);
 					*dst = b;
 				}
-
 				ptr += dstPitch;
+#if DRAWDEBUG
+				if (i == ccc) {
+					int *grayPtr = dstGray;
+					debugN("--> %d ", grayLevel);
+					grayPtr = &dstGray[y * box.width];
+					for (int x = 0; x < ; box.widthx++, grayPtr++)
+						debugN("%c", *grayPtr > grayLevel ? '@' : '_');
+					debugN("\n");
+					debugN("***");
+				}
+#endif
 			}
-
+#if DRAWDEBUG
+			if (i == ccc) {
+				for (int y = 0; y < box.height; y++) {
+					const byte *srcRow = (const byte *)&bitmaps[i][y * dstPitch];
+					for (int x = 0; x < box.width; x++) {
+						int sx = x;
+						debugN("%c", (srcRow[sx / 8] & (0x80 >> (sx % 8))) ? '#' : '_');
+					}
+					debugN("\n");
+				}
+			}
+#endif
 		} else {
 			bitmaps[i] = 0;
 		}
 	}
-
 	data.bitmaps = bitmaps;
+	free(dstGray);
+	srcSurf.free();
 
 	return new BdfFont(data, DisposeAfterUse::YES);
 }

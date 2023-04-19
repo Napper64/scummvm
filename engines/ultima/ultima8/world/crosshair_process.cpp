@@ -19,7 +19,7 @@
  *
  */
 
-#include "ultima/ultima8/misc/pent_include.h"
+#include "ultima/ultima8/misc/debugger.h"
 
 #include "ultima/ultima8/kernel/kernel.h"
 #include "ultima/ultima8/world/actors/main_actor.h"
@@ -65,7 +65,7 @@ void CrosshairProcess::run() {
 
 		const CruAvatarMoverProcess *mover = dynamic_cast<CruAvatarMoverProcess *>(Ultima8Engine::get_instance()->getAvatarMoverProcess());
 		if (!mover) {
-			warning("lost CruAvatarMoverProcess!");
+			warning("lost CruAvatarMoverProcess");
 			return;
 		}
 		double angle = mover->getAvatarAngleDegrees() + 90.0;

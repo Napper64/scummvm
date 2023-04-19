@@ -137,13 +137,14 @@
 	</bitmaps>
 
 	<fonts>
-		<font	resolution = 'y>399'
+		<font	resolution = 'y>=H'
 				id = 'text_default'
 				file = 'helvb12.bdf'>
 				<language id = 'ja'  scalable_file = 'NotoSansJP-Bold.otf'/>
 				<language id = 'ko'  scalable_file = 'NotoSansKR-Bold.otf'/>
 				<language id = 'zh*' scalable_file = 'NotoSansTC-Bold.otf'/>
 				<language id = 'hi'  scalable_file = 'NotoSans-Bold.ttf'/>
+				<language id = 'ar'  scalable_file = 'NotoNaskhArabic-Bold.ttf'/>
 				<language id = '*'   scalable_file = 'FreeSansBold.ttf'/>
 		</font>
 		<font	id = 'text_default'
@@ -153,15 +154,17 @@
 				<language id = 'ko'  scalable_file = 'NotoSansKR-Regular.otf'/>
 				<language id = 'zh*' scalable_file = 'NotoSansTC-Regular.otf'/>
 				<language id = 'hi'  scalable_file = 'NotoSans-Regular.ttf'/>
+				<language id = 'ar'  scalable_file = 'NotoNaskhArabic-Regular.ttf'/>
 				<language id = '*'   scalable_file = 'FreeSans.ttf'/>
 		</font>
-		<font	resolution = 'y>399'
+		<font	resolution = 'y>=H'
 				id = 'text_button'
 				file = 'helvb12.bdf'>
 				<language id = 'ja'  scalable_file = 'NotoSansJP-Bold.otf'/>
 				<language id = 'ko'  scalable_file = 'NotoSansKR-Bold.otf'/>
 				<language id = 'zh*' scalable_file = 'NotoSansTC-Bold.otf'/>
 				<language id = 'hi'  scalable_file = 'NotoSans-Bold.ttf'/>
+				<language id = 'ar'  scalable_file = 'NotoNaskhArabic-Bold.ttf'/>
 				<language id = '*'   scalable_file = 'FreeSansBold.ttf'/>
 		</font>
 		<font	id = 'text_button'
@@ -171,15 +174,17 @@
 				<language id = 'ko'  scalable_file = 'NotoSansKR-Regular.otf'/>
 				<language id = 'zh*' scalable_file = 'NotoSansTC-Regular.otf'/>
 				<language id = 'hi'  scalable_file = 'NotoSans-Regular.ttf'/>
+				<language id = 'ar'  scalable_file = 'NotoNaskhArabic-Regular.ttf'/>
 				<language id = '*'   scalable_file = 'FreeSans.ttf'/>
 		</font>
-		<font	resolution = 'y>399'
+		<font	resolution = 'y>=H'
 				id = 'text_normal'
 				file = 'helvb12.bdf'>
 				<language id = 'ja'  scalable_file = 'NotoSansJP-Regular.otf'/>
 				<language id = 'ko'  scalable_file = 'NotoSansKR-Regular.otf'/>
 				<language id = 'zh*' scalable_file = 'NotoSansTC-Regular.otf'/>
 				<language id = 'hi'  scalable_file = 'NotoSans-Regular.ttf'/>
+				<language id = 'ar'  scalable_file = 'NotoNaskhArabic-Regular.ttf'/>
 				<language id = '*'   scalable_file = 'FreeSans.ttf'/>
 		</font>
 		<font	id = 'text_normal'
@@ -189,6 +194,7 @@
 				<language id = 'ko'  scalable_file = 'NotoSansKR-Regular.otf'/>
 				<language id = 'zh*' scalable_file = 'NotoSansTC-Regular.otf'/>
 				<language id = 'hi'  scalable_file = 'NotoSans-Regular.ttf'/>
+				<language id = 'ar'  scalable_file = 'NotoNaskhArabic-Regular.ttf'/>
 				<language id = '*'   scalable_file = 'FreeSans.ttf'/>
 		</font>
 		<font	id = 'tooltip_normal'
@@ -198,6 +204,7 @@
 				<language id = 'ko'  scalable_file = 'NotoSansKR-Regular.otf'/>
 				<language id = 'zh*' scalable_file = 'NotoSansTC-Regular.otf'/>
 				<language id = 'hi'  scalable_file = 'NotoSans-Regular.ttf'/>
+				<language id = 'ar'  scalable_file = 'NotoNaskhArabic-Regular.ttf'/>
 				<language id = '*'   scalable_file = 'FreeMonoBold.ttf'/>
 		</font>
 		<font	resolution = 'y>799'
@@ -206,7 +213,7 @@
 				point_size = '12'>
 				<language id = '*'   scalable_file = 'SourceCodeVariable-Roman.ttf'/>
 		</font>
-		<font	resolution = 'y>399'
+		<font	resolution = 'y>=H'
 				id = 'console'
 				file = 'builtinConsole'
 				point_size = '10'>
@@ -282,7 +289,7 @@
 	<!-- <defaults fill = 'gradient' fg_color = 'white'/> -->
 
 	<cursor file = 'cursor.bmp' hotspot = '0, 0'/>
-	<cursor resolution = 'y<400' file = 'cursor_small.bmp' hotspot = '0, 0'/>
+	<cursor resolution = 'y<H' file = 'cursor_small.bmp' hotspot = '0, 0'/>
 
 	<!-- Selection (text or list items) -->
 	<drawdata id = 'text_selection' cache = 'false'>
@@ -366,7 +373,7 @@
 	</drawdata>
 
 	<!-- Buttons at the top and bottom of the scrollbar -->
-	<drawdata id = 'scrollbar_button_idle' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'scrollbar_button_idle' cache = 'false' resolution = 'y>=H'>
 		<drawstep	func = 'roundedsq'
 					radius = '10'
 					fill = 'none'
@@ -385,7 +392,7 @@
 		/>
 	</drawdata>
 
-	<drawdata id = 'scrollbar_button_idle' cache = 'false' resolution = 'y<400'>
+	<drawdata id = 'scrollbar_button_idle' cache = 'false' resolution = 'y<H'>
 		<drawstep	func = 'roundedsq'
 					radius = '10'
 					fill = 'none'
@@ -404,7 +411,7 @@
 		/>
 	</drawdata>
 
-	<drawdata id = 'scrollbar_button_hover' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'scrollbar_button_hover' cache = 'false' resolution = 'y>=H'>
 		<drawstep	func = 'roundedsq'
 					radius = '10'
 					fill = 'gradient'
@@ -427,7 +434,7 @@
 		/>
 	</drawdata>
 
-	<drawdata id = 'scrollbar_button_hover' cache = 'false' resolution = 'y<400'>
+	<drawdata id = 'scrollbar_button_hover' cache = 'false' resolution = 'y<H'>
 		<drawstep	func = 'roundedsq'
 					radius = '10'
 					fill = 'gradient'
@@ -543,7 +550,7 @@
 	</drawdata>
 
 	<!-- Idle popup -->
-	<drawdata id = 'popup_idle' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'popup_idle' cache = 'false' resolution = 'y>=H'>
 		<drawstep	func = 'roundedsq'
 					radius = '5'
 					stroke = '1'
@@ -581,7 +588,7 @@
 				horizontal_align = 'start'
 		/>
 	</drawdata>
-	<drawdata id = 'popup_idle_rtl' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'popup_idle_rtl' cache = 'false' resolution = 'y>=H'>
 		<drawstep	func = 'roundedsq'
 					radius = '5'
 					stroke = '1'
@@ -620,7 +627,7 @@
 		/>
 	</drawdata>
 
-	<drawdata id = 'popup_idle' cache = 'false' resolution ='y<400'>
+	<drawdata id = 'popup_idle' cache = 'false' resolution ='y<H'>
 		<drawstep	func = 'roundedsq'
 					radius = '5'
 					stroke = '1'
@@ -658,7 +665,7 @@
 				horizontal_align = 'start'
 		/>
 	</drawdata>
-	<drawdata id = 'popup_idle_rtl' cache = 'false' resolution ='y<400'>
+	<drawdata id = 'popup_idle_rtl' cache = 'false' resolution ='y<H'>
 		<drawstep	func = 'roundedsq'
 					radius = '5'
 					stroke = '1'
@@ -698,7 +705,7 @@
 	</drawdata>
 
 	<!-- Disabled popup -->
-	<drawdata id = 'popup_disabled' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'popup_disabled' cache = 'false' resolution = 'y>=H'>
 		<drawstep	func = 'roundedsq'
 					stroke = '1'
 					fg_color = 'lightgray'
@@ -736,7 +743,7 @@
 				horizontal_align = 'start'
 		/>
 	</drawdata>
-	<drawdata id = 'popup_disabled_rtl' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'popup_disabled_rtl' cache = 'false' resolution = 'y>=H'>
 		<drawstep	func = 'roundedsq'
 					stroke = '1'
 					fg_color = 'lightgray'
@@ -775,7 +782,7 @@
 		/>
 	</drawdata>
 
-	<drawdata id = 'popup_disabled' cache = 'false' resolution = 'y<400'>
+	<drawdata id = 'popup_disabled' cache = 'false' resolution = 'y<H'>
 		<drawstep	func = 'roundedsq'
 					radius = '5'
 					stroke = '1'
@@ -813,7 +820,7 @@
 				horizontal_align = 'start'
 		/>
 	</drawdata>
-	<drawdata id = 'popup_disabled_rtl' cache = 'false' resolution = 'y<400'>
+	<drawdata id = 'popup_disabled_rtl' cache = 'false' resolution = 'y<H'>
 		<drawstep	func = 'roundedsq'
 					radius = '5'
 					stroke = '1'
@@ -853,7 +860,7 @@
 	</drawdata>
 
 	<!-- Hovered popup -->
-	<drawdata id = 'popup_hover' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'popup_hover' cache = 'false' resolution = 'y>=H'>
 		<drawstep	func = 'roundedsq'
 					stroke = '1'
 					fg_color = 'lightgray'
@@ -891,7 +898,7 @@
 				horizontal_align = 'start'
 		/>
 	</drawdata>
-	<drawdata id = 'popup_hover_rtl' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'popup_hover_rtl' cache = 'false' resolution = 'y>=H'>
 		<drawstep	func = 'roundedsq'
 					stroke = '1'
 					fg_color = 'lightgray'
@@ -930,7 +937,7 @@
 		/>
 	</drawdata>
 
-	<drawdata id = 'popup_hover' cache = 'false' resolution = 'y<400'>
+	<drawdata id = 'popup_hover' cache = 'false' resolution = 'y<H'>
 		<drawstep	func = 'roundedsq'
 					radius = '5'
 					stroke = '1'
@@ -968,7 +975,7 @@
 				horizontal_align = 'start'
 		/>
 	</drawdata>
-	<drawdata id = 'popup_hover_rtl' cache = 'false' resolution = 'y<400'>
+	<drawdata id = 'popup_hover_rtl' cache = 'false' resolution = 'y<H'>
 		<drawstep	func = 'roundedsq'
 					radius = '5'
 					stroke = '1'
@@ -1171,7 +1178,7 @@
 	</drawdata>
 
 	<!-- Dropdown button widget -->
-	<drawdata id = 'dropdown_button_idle' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'dropdown_button_idle' cache = 'false' resolution = 'y>=H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'
@@ -1199,7 +1206,7 @@
 					orientation = 'bottom'
 		/>
 	</drawdata>
-	<drawdata id = 'dropdown_button_idle_rtl' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'dropdown_button_idle_rtl' cache = 'false' resolution = 'y>=H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'
@@ -1227,7 +1234,7 @@
 					orientation = 'bottom'
 		/>
 	</drawdata>
-	<drawdata id = 'dropdown_button_idle' cache = 'false' resolution = 'y<400'>
+	<drawdata id = 'dropdown_button_idle' cache = 'false' resolution = 'y<H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'
@@ -1255,7 +1262,7 @@
 					orientation = 'bottom'
 		/>
 	</drawdata>
-	<drawdata id = 'dropdown_button_idle_rtl' cache = 'false' resolution = 'y<400'>
+	<drawdata id = 'dropdown_button_idle_rtl' cache = 'false' resolution = 'y<H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'
@@ -1284,7 +1291,7 @@
 		/>
 	</drawdata>
 
-	<drawdata id = 'dropdown_button_hover_left' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'dropdown_button_hover_left' cache = 'false' resolution = 'y>=H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'
@@ -1313,7 +1320,7 @@
 					orientation = 'bottom'
 		/>
 	</drawdata>
-	<drawdata id = 'dropdown_button_hover_left_rtl' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'dropdown_button_hover_left_rtl' cache = 'false' resolution = 'y>=H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'
@@ -1342,7 +1349,7 @@
 					orientation = 'bottom'
 		/>
 	</drawdata>
-	<drawdata id = 'dropdown_button_hover_left' cache = 'false' resolution = 'y<400'>
+	<drawdata id = 'dropdown_button_hover_left' cache = 'false' resolution = 'y<H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'
@@ -1371,7 +1378,7 @@
 					orientation = 'bottom'
 		/>
 	</drawdata>
-	<drawdata id = 'dropdown_button_hover_left_rtl' cache = 'false' resolution = 'y<400'>
+	<drawdata id = 'dropdown_button_hover_left_rtl' cache = 'false' resolution = 'y<H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'
@@ -1401,7 +1408,7 @@
 		/>
 	</drawdata>
 
-	<drawdata id = 'dropdown_button_hover_right' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'dropdown_button_hover_right' cache = 'false' resolution = 'y>=H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'
@@ -1430,7 +1437,7 @@
 					orientation = 'bottom'
 		/>
 	</drawdata>
-	<drawdata id = 'dropdown_button_hover_right_rtl' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'dropdown_button_hover_right_rtl' cache = 'false' resolution = 'y>=H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'
@@ -1459,7 +1466,7 @@
 					orientation = 'bottom'
 		/>
 	</drawdata>
-	<drawdata id = 'dropdown_button_hover_right' cache = 'false' resolution = 'y<400'>
+	<drawdata id = 'dropdown_button_hover_right' cache = 'false' resolution = 'y<H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'
@@ -1488,7 +1495,7 @@
 					orientation = 'bottom'
 		/>
 	</drawdata>
-	<drawdata id = 'dropdown_button_hover_right_rtl' cache = 'false' resolution = 'y<400'>
+	<drawdata id = 'dropdown_button_hover_right_rtl' cache = 'false' resolution = 'y<H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'
@@ -1518,7 +1525,7 @@
 		/>
 	</drawdata>
 
-	<drawdata id = 'dropdown_button_disabled' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'dropdown_button_disabled' cache = 'false' resolution = 'y>=H'>
 		<text	font = 'text_button'
 				text_color = 'color_button_disabled'
 				vertical_align = 'center'
@@ -1546,7 +1553,7 @@
 					orientation = 'bottom'
 		/>
 	</drawdata>
-	<drawdata id = 'dropdown_button_disabled_rtl' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'dropdown_button_disabled_rtl' cache = 'false' resolution = 'y>=H'>
 		<text	font = 'text_button'
 				text_color = 'color_button_disabled'
 				vertical_align = 'center'
@@ -1574,7 +1581,7 @@
 					orientation = 'bottom'
 		/>
 	</drawdata>
-	<drawdata id = 'dropdown_button_disabled' cache = 'false' resolution = 'y<400'>
+	<drawdata id = 'dropdown_button_disabled' cache = 'false' resolution = 'y<H'>
 		<text	font = 'text_button'
 				text_color = 'color_button_disabled'
 				vertical_align = 'center'
@@ -1602,7 +1609,7 @@
 					orientation = 'bottom'
 		/>
 	</drawdata>
-	<drawdata id = 'dropdown_button_disabled_rtl' cache = 'false' resolution = 'y<400'>
+	<drawdata id = 'dropdown_button_disabled_rtl' cache = 'false' resolution = 'y<H'>
 		<text	font = 'text_button'
 				text_color = 'color_button_disabled'
 				vertical_align = 'center'
@@ -1631,7 +1638,7 @@
 		/>
 	</drawdata>
 
-	<drawdata id = 'dropdown_button_pressed_left' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'dropdown_button_pressed_left' cache = 'false' resolution = 'y>=H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'
@@ -1661,7 +1668,7 @@
 					orientation = 'bottom'
 		/>
 	</drawdata>
-	<drawdata id = 'dropdown_button_pressed_left_rtl' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'dropdown_button_pressed_left_rtl' cache = 'false' resolution = 'y>=H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'
@@ -1691,7 +1698,7 @@
 					orientation = 'bottom'
 		/>
 	</drawdata>
-	<drawdata id = 'dropdown_button_pressed_left' cache = 'false' resolution = 'y<400'>
+	<drawdata id = 'dropdown_button_pressed_left' cache = 'false' resolution = 'y<H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'
@@ -1721,7 +1728,7 @@
 					orientation = 'bottom'
 		/>
 	</drawdata>
-	<drawdata id = 'dropdown_button_pressed_left_rtl' cache = 'false' resolution = 'y<400'>
+	<drawdata id = 'dropdown_button_pressed_left_rtl' cache = 'false' resolution = 'y<H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'
@@ -1752,7 +1759,7 @@
 		/>
 	</drawdata>
 
-	<drawdata id = 'dropdown_button_pressed_right' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'dropdown_button_pressed_right' cache = 'false' resolution = 'y>=H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'
@@ -1782,7 +1789,7 @@
 					orientation = 'bottom'
 		/>
 	</drawdata>
-	<drawdata id = 'dropdown_button_pressed_right_rtl' cache = 'false' resolution = 'y>399'>
+	<drawdata id = 'dropdown_button_pressed_right_rtl' cache = 'false' resolution = 'y>=H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'
@@ -1812,7 +1819,7 @@
 					orientation = 'bottom'
 		/>
 	</drawdata>
-	<drawdata id = 'dropdown_button_pressed_right' cache = 'false' resolution = 'y<400'>
+	<drawdata id = 'dropdown_button_pressed_right' cache = 'false' resolution = 'y<H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'
@@ -1842,7 +1849,7 @@
 					orientation = 'bottom'
 		/>
 	</drawdata>
-	<drawdata id = 'dropdown_button_pressed_right_rtl' cache = 'false' resolution = 'y<400'>
+	<drawdata id = 'dropdown_button_pressed_right_rtl' cache = 'false' resolution = 'y<H'>
 		<text	font = 'text_button'
 				text_color = 'color_button'
 				vertical_align = 'center'

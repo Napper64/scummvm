@@ -23,7 +23,7 @@
 #define ULTIMA8_KERNEL_OBJECT_H
 
 #include "ultima/ultima8/misc/classtype.h"
-#include "ultima/ultima8/misc/pent_include.h"
+#include "ultima/ultima8/misc/debugger.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -49,8 +49,8 @@ public:
 	//! Clear objID of self and contents (if any)
 	virtual void clearObjId();
 
-	//! dump some info about this object to pout
-	virtual void dumpInfo() const;
+	//! dump some info about this object to a string
+	virtual Common::String dumpInfo() const;
 
 	//! Spawn a usecode function on this object
 	//! \param classid The usecode class to run

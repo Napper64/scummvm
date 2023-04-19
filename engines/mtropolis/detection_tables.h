@@ -45,7 +45,7 @@ static const MTropolisGameDescription gameDescriptions[] = {
 			},
 			Common::EN_ANY,
 			Common::kPlatformMacintosh,
-			ADGF_TESTING,
+			ADGF_NO_FLAGS,
 			GUIO3(GAMEOPTION_WIDESCREEN_MOD, GAMEOPTION_AUTO_SAVE_AT_CHECKPOINTS, GAMEOPTION_SOUND_EFFECT_SUBTITLES)
 		},
 		GID_OBSIDIAN,
@@ -67,12 +67,34 @@ static const MTropolisGameDescription gameDescriptions[] = {
 			},
 			Common::EN_ANY,
 			Common::kPlatformMacintosh,
-			ADGF_TESTING,
+			ADGF_NO_FLAGS,
 			GUIO3(GAMEOPTION_WIDESCREEN_MOD, GAMEOPTION_AUTO_SAVE_AT_CHECKPOINTS, GAMEOPTION_SOUND_EFFECT_SUBTITLES)
 		},
 		GID_OBSIDIAN,
 		0,
 		MTBOOT_OBSIDIAN_RETAIL_MAC_EN,
+	},
+	{ // Obsidian Japanese Macintosh, dumped
+		{
+			"obsidian",
+			"V1.0, 1/13/97, CD",
+			{
+				{"Obsidian Data 2", 0, "d3b4746dd05adba87e15f83a1599c6fe", 570855424},
+				//{"Obsidian Data 3", 0, "96bb5f6ab893aca9e8e3ce19d19974fc", 616954880},
+				//{"Obsidian Data 4", 0, "54cf1745ea19e0cc33d76905d0b9fc41", 593788928},
+				//{"Obsidian Data 5", 0, "adc938b08ba2d2f0a08c934e6105b0f9", 583581824},
+				//{"Obsidian Data 6", 0, "09de40ab9001eda30291421d2736fa76", 551191680},
+				//{"xn--u9j9ecg0a2fsa1io6k6jkdc2k", 0, "af62516a9a9bd16bc5c01e755a9f7329", 9186432},
+				AD_LISTEND
+			},
+			Common::JA_JPN,
+			Common::kPlatformMacintosh,
+			ADGF_NO_FLAGS,
+			GUIO1(GAMEOPTION_AUTO_SAVE_AT_CHECKPOINTS)
+		},
+		GID_OBSIDIAN,
+		0,
+		MTBOOT_OBSIDIAN_RETAIL_MAC_JP,
 	},
 
 	{ // Obsidian Windows, installed
@@ -94,7 +116,7 @@ static const MTropolisGameDescription gameDescriptions[] = {
 			},
 			Common::EN_ANY,
 			Common::kPlatformWindows,
-			ADGF_TESTING,
+			ADGF_NO_FLAGS,
 			GUIO3(GAMEOPTION_WIDESCREEN_MOD, GAMEOPTION_AUTO_SAVE_AT_CHECKPOINTS, GAMEOPTION_SOUND_EFFECT_SUBTITLES)
 		},
 		GID_OBSIDIAN,
@@ -108,7 +130,7 @@ static const MTropolisGameDescription gameDescriptions[] = {
 			"obsidian",
 			"installed, CD",
 			{
-				//{ "Obsidian.exe",		 0, "0b50a779136ae6c9cc8bcfa3148c1127", 762368 },
+				{ "Obsidian.exe",		 0, "0b50a779136ae6c9cc8bcfa3148c1127", 762368 },
 				//{ "Obsidian.c95",		 0, "fea68ff30ff319cdab30b79d2850a480", 145920 },
 				//{ "MCURSORS.C95",		 0, "dcbe480913eebf233d0cdc33809bf048", 87040 },
 				{ "Obsidian Data 1.MPL", 0, "f96fc3a3a0a645009265c74c5fcb2c6a", 18972392 },
@@ -121,12 +143,37 @@ static const MTropolisGameDescription gameDescriptions[] = {
 			},
 			Common::DE_DEU,
 			Common::kPlatformWindows,
-			ADGF_TESTING,
-			GUIO1(GAMEOPTION_WIDESCREEN_MOD)
+			ADGF_NO_FLAGS,
+			GUIO1(GAMEOPTION_AUTO_SAVE_AT_CHECKPOINTS)
 		},
 		GID_OBSIDIAN,
 		0,
-		MTBOOT_OBSIDIAN_RETAIL_WIN_DE,
+		MTBOOT_OBSIDIAN_RETAIL_WIN_DE_INSTALLED,
+	},
+	{
+		// Obsidian, German Windows, CD
+		// Released via the "ProSieben Mystery" series
+		{
+			"obsidian",
+			"CD",
+			{
+				{ "_SETUP.1",			 0, "79c3a087043eb540a6e796d89a5add47", 8586799 },
+				{ "OBSIDIAN DATA 1.MPL", 0, "f96fc3a3a0a645009265c74c5fcb2c6a", 18972392 },
+				//{ "OBSIDIAN DATA 2.MPX", 0, "b42a5a7bc36b2de2f9882e8a05435857", 559682181 },
+				//{ "OBSIDIAN DATA 3.MPX", 0, "d4cb1a43d129019f8c2172a09cbedf2a", 614519546 },
+				//{ "OBSIDIAN DATA 4.MPX", 0, "ae3095e5ac0a3a8984758ee76420e9b1", 591403514 },
+				//{ "OBSIDIAN DATA 5.MPX", 0, "e8939423008a47c77735e16d7391a947", 578314080 },
+				//{ "OBSIDIAN DATA 6.MPX", 0, "1295c1fe1a9113dbf2764b7024bf759d", 552452074 },
+				AD_LISTEND
+			},
+			Common::DE_DEU,
+			Common::kPlatformWindows,
+			ADGF_NO_FLAGS,
+			GUIO1(GAMEOPTION_AUTO_SAVE_AT_CHECKPOINTS)
+		},
+		GID_OBSIDIAN,
+		0,
+		MTBOOT_OBSIDIAN_RETAIL_WIN_DE_DISC,
 	},
 	{
 		// Obsidian, Italian Windows, installed
@@ -147,8 +194,8 @@ static const MTropolisGameDescription gameDescriptions[] = {
 			},
 			Common::IT_ITA,
 			Common::kPlatformWindows,
-			ADGF_TESTING,
-			GUIO1(GAMEOPTION_WIDESCREEN_MOD)
+			ADGF_NO_FLAGS,
+			GUIO1(GAMEOPTION_AUTO_SAVE_AT_CHECKPOINTS)
 		},
 		GID_OBSIDIAN,
 		0,
@@ -173,7 +220,7 @@ static const MTropolisGameDescription gameDescriptions[] = {
 			},
 			Common::EN_ANY,
 			Common::kPlatformMacintosh,
-			ADGF_DEMO | ADGF_TESTING,
+			ADGF_DEMO,
 			GUIO1(GAMEOPTION_WIDESCREEN_MOD)
 		},
 		GID_OBSIDIAN,
@@ -199,7 +246,7 @@ static const MTropolisGameDescription gameDescriptions[] = {
 			},
 			Common::EN_ANY,
 			Common::kPlatformWindows,
-			ADGF_DEMO | ADGF_TESTING,
+			ADGF_DEMO,
 			GUIO1(GAMEOPTION_WIDESCREEN_MOD)
 		},
 		GID_OBSIDIAN,
@@ -222,7 +269,7 @@ static const MTropolisGameDescription gameDescriptions[] = {
 			},
 			Common::EN_ANY,
 			Common::kPlatformWindows,
-			ADGF_DEMO | ADGF_TESTING,
+			ADGF_DEMO,
 			GUIO1(GAMEOPTION_WIDESCREEN_MOD)
 		},
 		GID_OBSIDIAN,
@@ -247,7 +294,7 @@ static const MTropolisGameDescription gameDescriptions[] = {
 			},
 			Common::EN_ANY,
 			Common::kPlatformWindows,
-			ADGF_DEMO | ADGF_TESTING,
+			ADGF_DEMO,
 			GUIO1(GAMEOPTION_WIDESCREEN_MOD)
 		},
 		GID_OBSIDIAN,
@@ -272,7 +319,7 @@ static const MTropolisGameDescription gameDescriptions[] = {
 			},
 			Common::EN_ANY,
 			Common::kPlatformWindows,
-			ADGF_DEMO | ADGF_TESTING,
+			ADGF_DEMO,
 			GUIO0()
 		},
 		GID_OBSIDIAN,
@@ -295,7 +342,7 @@ static const MTropolisGameDescription gameDescriptions[] = {
 			},
 			Common::EN_ANY,
 			Common::kPlatformWindows,
-			ADGF_DEMO | ADGF_TESTING,
+			ADGF_DEMO,
 			GUIO0()
 		},
 		GID_OBSIDIAN,
@@ -318,7 +365,7 @@ static const MTropolisGameDescription gameDescriptions[] = {
 			},
 			Common::EN_ANY,
 			Common::kPlatformWindows,
-			ADGF_DEMO | ADGF_TESTING,
+			ADGF_DEMO,
 			GUIO1(GAMEOPTION_WIDESCREEN_MOD)
 		},
 		GID_OBSIDIAN,
@@ -341,7 +388,7 @@ static const MTropolisGameDescription gameDescriptions[] = {
 			},
 			Common::EN_ANY,
 			Common::kPlatformWindows,
-			ADGF_DEMO | ADGF_TESTING,
+			ADGF_DEMO,
 			GUIO1(GAMEOPTION_WIDESCREEN_MOD)
 		},
 		GID_OBSIDIAN,
@@ -442,6 +489,87 @@ static const MTropolisGameDescription gameDescriptions[] = {
 		MTBOOT_MTI_DEMO_WIN,
 	},
 
+	{ // Uncle Albert's Magical Album (German, Windows)
+	  // Original title: Onkel Alberts geheimnisvolles Notizbuch
+	  // Published by Tivola, 1998
+		{
+			"albert1",
+			"",
+			{
+				{ "Albert.exe",   0, "0e513dac9d2a0d7cfcdc670cab2a9bda", 757760 },
+				{ "album411.MPL", 0, "08a742f5087d25e8ee45c2fcd57ad9a6", 17979781 },
+				{ "album412.MPX", 0, "79fabc94dafd0e0f3ab93c138c4c8c82", 298762355 },
+				// { "BASIC.X95",    0, "a1b474e90cc285bfdcfa87355f890b9e", 242688 },
+				// { "BITMAP.R95",   0, "2bf7305eca9df63dbc75f55093b84cc0", 81408 },
+				// { "CURSORS.C95",  0, "c1e2eebe7183b5ea33de7872a8ea4d2b", 87040 },
+				// { "EXTRAS.R95",   0, "c5830771609c774de9dbeaa5dff69b3e", 185344 },
+				// { "ROTATORK.R95", 0, "c271f786f028c0076635bea49a2be890", 66560 },
+				AD_LISTEND
+			},
+			Common::DE_DEU,
+			Common::kPlatformWindows,
+			ADGF_UNSTABLE,
+			GUIO0()
+		},
+		GID_ALBERT1,
+		0,
+		MTBOOT_ALBERT1_WIN_DE,
+	},
+
+	{ // Uncle Albert's Fabulous Voyage (German, Windows)
+	  // Original title: Alberts abenteuerliche Reise
+	  // Published by Tivola, 2000
+		{
+			"albert2",
+			"",
+			{
+				{ "reise.exe",    0, "0e513dac9d2a0d7cfcdc670cab2a9bda", 757760 },
+				{ "voyage1.MPL",  0, "fe202ad897cb6cf5303f2f046e8123d5", 26122297 },
+				{ "voyage2.MPX",  0, "6554893511e08bf2e0d5770b7854589f", 261888657 },
+				// { "BASIC.X95",    0, "a1b474e90cc285bfdcfa87355f890b9e", 242688 },
+				// { "BITMAP.R95",   0, "2bf7305eca9df63dbc75f55093b84cc0", 81408 },
+				// { "CURSORS.C95",  0, "c1e2eebe7183b5ea33de7872a8ea4d2b", 87040 },
+				// { "EXTRAS.R95",   0, "c5830771609c774de9dbeaa5dff69b3e", 185344 },
+				// { "ROTATORK.R95", 0, "c271f786f028c0076635bea49a2be890", 66560 },
+				AD_LISTEND
+			},
+			Common::DE_DEU,
+			Common::kPlatformWindows,
+			ADGF_UNSTABLE,
+			GUIO0()
+		},
+		GID_ALBERT2,
+		0,
+		MTBOOT_ALBERT2_WIN_DE,
+	},
+
+	{ // Uncle Albert's Mysterious Island (German, Windows)
+	  // Original title: Alberts mysteriöse Insel
+	  // Published by Tivola, 2001
+		{
+			"albert3",
+			"",
+			{
+				{ "insel.exe",      0, "0e513dac9d2a0d7cfcdc670cab2a9bda", 757760 },
+				{ "ile_myst1.MPL",  0, "44ac2e944a61303f4028408165bafeb4", 24080377 },
+				{ "ILEMYST2.MPX",   0, "ecb1d2c8b99eb5b2ac6be55893b97f50", 283748531 },
+				// { "BASIC.X95",     0, "a1b474e90cc285bfdcfa87355f890b9e", 242688 },
+				// { "BITMAP.R95",    0, "2bf7305eca9df63dbc75f55093b84cc0", 81408 },
+				// { "CURSORS.C95",   0, "c1e2eebe7183b5ea33de7872a8ea4d2b", 87040 },
+				// { "EXTRAS.R95",    0, "c5830771609c774de9dbeaa5dff69b3e", 185344 },
+				// { "ROTATORK.R95",  0, "c271f786f028c0076635bea49a2be890", 66560 },
+				AD_LISTEND
+			},
+			Common::DE_DEU,
+			Common::kPlatformWindows,
+			ADGF_UNSTABLE,
+			GUIO0()
+		},
+		GID_ALBERT3,
+		0,
+		MTBOOT_ALBERT3_WIN_DE,
+	},
+
 	{ // SPQR: The Empire's Darkest Hour Windows CD-ROM
 		{
 			"spqr",
@@ -479,6 +607,25 @@ static const MTropolisGameDescription gameDescriptions[] = {
 		GID_SPQR,
 		0,
 		MTBOOT_SPQR_RETAIL_MAC,
+	},
+
+	{ // Star Trek: The Game Show demo
+		{
+			"sttgs",
+			"Demo",
+			{
+				// { "MTPLAY95.EXE", 0, "3ce9559e8c8047243fb7393a90d8b8f5", 756736 },
+				{ "Trektriv.mpl", 0, "2dfab3665f9d7a24473f7cd17a0615ba", 43003276 },
+				AD_LISTEND
+			},
+			Common::EN_ANY,
+			Common::kPlatformWindows,
+			ADGF_DEMO | ADGF_UNSTABLE,
+			GUIO0()
+		},
+		GID_STTGS,
+		0,
+		MTBOOT_STTGS_DEMO_WIN,
 	},
 
 	{ AD_TABLE_END_MARKER, 0, 0, MTBOOT_INVALID }

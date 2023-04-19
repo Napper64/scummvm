@@ -27,6 +27,8 @@
 #include "engines/nancy/graphics.h"
 #include "engines/nancy/renderobject.h"
 #include "engines/nancy/resource.h"
+#include "engines/nancy/cursor.h"
+#include "engines/nancy/state/scene.h"
 
 namespace Nancy {
 
@@ -34,7 +36,8 @@ GraphicsManager::GraphicsManager() :
 	_objects(objectComparator),
 	_inputPixelFormat(2, 5, 5, 5, 0, 10, 5, 0, 0),
 	_screenPixelFormat(2, 5, 6, 5, 0, 11, 5, 0, 0),
-	_clut8Format(Graphics::PixelFormat::createFormatCLUT8()) {}
+	_clut8Format(Graphics::PixelFormat::createFormatCLUT8()),
+	_isSuppressed(false) {}
 
 void GraphicsManager::init() {
 	initGraphics(640, 480, &_screenPixelFormat);
@@ -42,48 +45,83 @@ void GraphicsManager::init() {
 	_screen.setTransparentColor(getTransColor());
 	_screen.clear();
 
-	Common::SeekableReadStream *ob = g_nancy->getBootChunkStream("OB0");
-	ob->seek(0);
-
-	g_nancy->_resource->loadImage(ob->readString(), _object0);
-
-	loadFonts();
+	g_nancy->_resource->loadImage(g_nancy->_imageChunks["OB0"].imageName, _object0);
 }
 
 void GraphicsManager::draw() {
+	if (_isSuppressed) {
+		_isSuppressed = false;
+		return;
+	}
+
+	g_nancy->_cursorManager->applyCursor();
+	Common::List<Common::Rect> dirtyRects;
+
+	// Update graphics for all RenderObjects and determine
+	// the areas of the screen that need to be redrawn
 	for (auto it : _objects) {
 		RenderObject &current = *it;
 
 		current.updateGraphics();
 
-		if (current._isVisible && current._needsRedraw) {
-			// object is visible and updated
-
-			if (current._redrawFrom) {
+		if (current._needsRedraw) {
+			if (current._isVisible) {
 				if (current.hasMoved() && !current.getPreviousScreenPosition().isEmpty()) {
-					// Redraw previous location if moved
-					blitToScreen(*current._redrawFrom, current.getPreviousScreenPosition());
+					// Object moved to a new location on screen, update the previous one
+					dirtyRects.push_back(current.getPreviousScreenPosition());
 				}
 
-				if (current._drawSurface.hasTransparentColor()) {
-					// Redraw below if transparent
-					blitToScreen(*current._redrawFrom, current.getScreenPosition());
-				}
+				// Redraw the current location
+				dirtyRects.push_back(current.getScreenPosition());
+			} else if (!current.getPreviousScreenPosition().isEmpty()) {
+				// Object just turned invisible, redraw the last location
+				dirtyRects.push_back(current.getPreviousScreenPosition());
 			}
-
-			// Draw the object itself
-			blitToScreen(current, current.getScreenPosition());
-		} else if (!current._isVisible && current._needsRedraw && current._redrawFrom && !current.getPreviousScreenPosition().isEmpty()) {
-			// Object just turned invisible, redraw below
-			blitToScreen(*current._redrawFrom, current.getPreviousScreenPosition());
 		}
 
 		current._needsRedraw = false;
 		current._previousScreenPosition = current._screenPosition;
 	}
 
+	// Filter out dirty rects that are completely inside others to reduce overdraw
+	for (auto outer = dirtyRects.begin(); outer != dirtyRects.end(); ++outer) {
+		for (auto inner = dirtyRects.begin(); inner != dirtyRects.end(); ++inner) {
+			if (inner != outer && (*outer).contains(*inner)) {
+				dirtyRects.erase(inner);
+				break;
+			}
+		}
+	}
+
+	// Redraw all dirty rects
+	for (auto it : _objects) {
+		RenderObject &current = *it;
+
+		if (!current._isVisible || current.getScreenPosition().isEmpty()) {
+			continue;
+		}
+
+		for (Common::Rect rect : dirtyRects) {
+			if (rect.intersects(current.getScreenPosition())) {
+				blitToScreen(current, rect.findIntersectingRect(current.getScreenPosition()));
+			}
+		}
+	}
+
 	// Draw the screen
 	_screen.update();
+}
+
+void GraphicsManager::loadFonts(Common::SeekableReadStream *chunkStream) {
+	assert(chunkStream);
+
+	chunkStream->seek(0);
+	while (chunkStream->pos() < chunkStream->size() - 1) {
+		_fonts.push_back(Font());
+		_fonts.back().read(*chunkStream);
+	}
+
+	delete chunkStream;
 }
 
 void GraphicsManager::addObject(RenderObject *object) {
@@ -119,14 +157,8 @@ void GraphicsManager::redrawAll() {
 	}
 }
 
-void GraphicsManager::loadSurfacePalette(Graphics::ManagedSurface &inSurf, const Common::String paletteFilename) {
-	Common::File f;
-	if (f.open(paletteFilename + ".bmp")) {
-		Image::BitmapDecoder dec;
-		if (dec.loadStream(f)) {
-			inSurf.setPalette(dec.getPalette(), dec.getPaletteStartIndex(), MIN<uint>(256, dec.getPaletteColorCount()));
-		}
-	}
+void GraphicsManager::suppressNextDraw() {
+	_isSuppressed = true;
 }
 
 void GraphicsManager::loadSurfacePalette(Graphics::ManagedSurface &inSurf, const Common::String paletteFilename, uint paletteStart, uint paletteSize) {
@@ -141,13 +173,17 @@ void GraphicsManager::loadSurfacePalette(Graphics::ManagedSurface &inSurf, const
 
 void GraphicsManager::copyToManaged(const Graphics::Surface &src, Graphics::ManagedSurface &dst, bool verticalFlip, bool doubleSize) {
 	if (dst.w != (doubleSize ? src.w * 2 : src.w) || dst.h != (doubleSize ? src.h * 2 : src.h)) {
-		const uint32 *palette = dst.getPalette();
+		uint8 palette[256 * 3];
+		bool hasPalette = dst.hasPalette();
 		bool hasTransColor = dst.hasTransparentColor();
+
+		if (hasPalette && g_nancy->getGameType() == kGameTypeVampire) {
+			dst.grabPalette(palette, 0, 256);
+		}
+
 		dst.create(doubleSize ? src.w * 2 : src.w, doubleSize ? src.h * 2 : src.h, src.format);
 
-		if (palette && g_nancy->getGameType() == kGameTypeVampire) {
-			// free() clears the _hasPalette flag but doesn't clear the palette itself, so
-			// we just set it to itself; hopefully this doesn't cause any issues
+		if (hasPalette && g_nancy->getGameType() == kGameTypeVampire) {
 			dst.setPalette(palette, 0, 256);
 		}
 
@@ -227,7 +263,63 @@ void GraphicsManager::copyToManaged(void *src, Graphics::ManagedSurface &dst, ui
 	copyToManaged(surf, dst, verticalFlip, doubleSize);
 }
 
-void GraphicsManager::debugDrawToScreen(const Graphics::Surface &surf) {
+// Custom rotation code since Surface::rotoscale() produces incorrect results
+// Only works on 16 bit square surfaces with the same size, and ignores transparency
+// Rotation is a value between 0 and 3, corresponding to 0, 90, 180, or 270 degrees clockwise
+void GraphicsManager::rotateBlit(const Graphics::ManagedSurface &src, Graphics::ManagedSurface &dest, byte rotation) {
+	assert(!src.empty() && !dest.empty());
+	assert(src.w == src.h && src.h == dest.w && dest.w == dest.h);
+	assert(rotation >= 0 && rotation <= 3);
+	assert(src.format.bytesPerPixel == 2 && dest.format.bytesPerPixel == 2);
+
+	uint size = src.w;
+	const uint16 *s, *e;
+
+	switch (rotation) {
+	case 0 :
+		// No rotation, just blit
+		dest.rawBlitFrom(src, src.getBounds(), Common::Point());
+		return;
+	case 2 : {
+		// 180 degrees
+		uint16 *d;
+		for (uint y = 0; y < size; ++y) {
+			s = (const uint16 *)src.getBasePtr(0, y);
+			e = (const uint16 *)src.getBasePtr(size - 1, y);
+			d = (uint16 *)dest.getBasePtr(size - 1, size - y - 1);
+			for (; s < e; ++s, --d) {
+				*d = *s;
+			}
+		}
+
+		break;
+	}
+	case 1 :
+		// 90 degrees
+		for (uint y = 0; y < size; ++y) {
+			s = (const uint16 *)src.getBasePtr(0, y);
+			e = (const uint16 *)src.getBasePtr(size - 1, y);
+			for (uint x = 0; x < size; ++x, ++s) {
+				*((uint16 *)dest.getBasePtr(size - y - 1, x)) = *s;
+			}
+		}
+
+		break;
+	case 3 :
+		// 270 degrees
+		for (uint y = 0; y < size; ++y) {
+			s = (const uint16 *)src.getBasePtr(0, y);
+			e = (const uint16 *)src.getBasePtr(size - 1, y);
+			for (uint x = 0; x < size; ++x, ++s) {
+				*((uint16 *)dest.getBasePtr(y, size - x - 1)) = *s;
+			}
+		}
+
+		break;
+	}
+}
+
+void GraphicsManager::debugDrawToScreen(const Graphics::ManagedSurface &surf) {
 	_screen.blitFrom(surf, Common::Point());
 	_screen.update();
 }
@@ -252,20 +344,21 @@ uint GraphicsManager::getTransColor() {
 	}
 }
 
-void GraphicsManager::loadFonts() {
-	Common::SeekableReadStream *chunk = g_nancy->getBootChunkStream("FONT");
+void GraphicsManager::grabViewportObjects(Common::Array<RenderObject *> &inArray) {
+	// Add the viewport
+	inArray.push_back(&(RenderObject &)NancySceneState.getViewport());
 
-	chunk->seek(0);
-	while (chunk->pos() < chunk->size() - 1) {
-		_fonts.push_back(Font());
-		_fonts.back().read(*chunk);
+	// Add all viewport-relative (non-UI) objects
+	for (RenderObject *obj : _objects) {
+		if (obj->isViewportRelative()) {
+			inArray.push_back(obj);
+		}
 	}
 }
 
 // Draw a given screen-space rectangle to the screen
 void GraphicsManager::blitToScreen(const RenderObject &src, Common::Rect screenRect) {
-	Common::Point pointDest(screenRect.left, screenRect.top);
-	_screen.blitFrom(src._drawSurface, src.convertToLocal(screenRect), pointDest);
+	_screen.blitFrom(src._drawSurface, src._drawSurface.getBounds().findIntersectingRect(src.convertToLocal(screenRect)), screenRect);
 }
 
 int GraphicsManager::objectComparator(const void *a, const void *b) {

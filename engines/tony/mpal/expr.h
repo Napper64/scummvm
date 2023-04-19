@@ -34,7 +34,7 @@ namespace Tony {
 namespace MPAL {
 
 /**
- * @defgroup Mathamatical operations
+ * @defgroup Mathematical operations
  */
 //@{
 
@@ -65,7 +65,7 @@ namespace MPAL {
 
 //@{
 /**
- * Mathamatical framework to manage operations
+ * Mathematical framework to manage operations
  */
 typedef struct {
 	byte _type;          // Object Type (see enum ExprListTypes)
@@ -106,10 +106,10 @@ enum ExprListTypes {
  * will point to the area of memory containing the parsed expression
  * @returns		Pointer to the buffer immediately after the expression, or NULL if error.
  */
-const byte *parseExpression(const byte *lpBuf, MpalHandle *h);
+const byte *parseExpression(const byte *lpBuf, const Common::UnalignedPtr<MpalHandle> &h);
 
 /**
- * Calculate the value of a mathamatical expression
+ * Calculate the value of a mathematical expression
  *
  * @param h					Handle to the expression
  * @returns		Numeric value

@@ -48,10 +48,10 @@ Window::Window(int id, bool scrollable, bool resizable, bool editable, Graphics:
 	_stageColor = _wm->_colorBlack;
 	_puppetTransition = nullptr;
 	_soundManager = new DirectorSound(this);
+	_lingoState = new LingoState;
 
 	_currentMovie = nullptr;
 	_mainArchive = nullptr;
-	_macBinary = nullptr;
 	_nextMovie.frameI = -1;
 	_newMovieStarted = true;
 
@@ -61,21 +61,14 @@ Window::Window(int id, bool scrollable, bool resizable, bool editable, Graphics:
 	_windowType = -1;
 	_titleVisible = true;
 	updateBorderType();
-
-	_retPC = 0;
-	_retScript = nullptr;
-	_retContext = nullptr;
-	_retFreezeContext = false;
-	_retLocalVars = nullptr;
 }
 
 Window::~Window() {
+	delete _lingoState;
 	delete _soundManager;
 	delete _currentMovie;
-	if (_macBinary) {
-		delete _macBinary;
-		_macBinary = nullptr;
-	}
+	for (uint i = 0; i < _frozenLingoStates.size(); i++)
+		delete _frozenLingoStates[i];
 	if (_puppetTransition)
 		delete _puppetTransition;
 }
@@ -177,6 +170,15 @@ bool Window::render(bool forceRedraw, Graphics::ManagedSurface *blitTo) {
 		}
 	}
 
+	if (g_director->_debugDraw & kDebugDrawFrame) {
+		const Graphics::Font *font = FontMan.getFontByUsage(Graphics::FontManager::kConsoleFont);
+		Common::String msg = Common::String::format("Frame: %d", g_director->getCurrentMovie()->getScore()->getCurrentFrame());
+		uint32 width = font->getStringWidth(msg);
+
+		blitTo->fillRect(Common::Rect(blitTo->w - 3 - width, 1, blitTo->w - 1, font->getFontHeight() + 1), _wm->_colorBlack);
+		font->drawString(blitTo, msg, blitTo->w - 2 - width, 2, width , _wm->_colorWhite);
+	}
+
 	_dirtyRects.clear();
 	_contentIsDirty = true;
 
@@ -226,8 +228,12 @@ void Window::inkBlitFrom(Channel *channel, Common::Rect destRect, Graphics::Mana
 			pd.inkBlitSurface(srcRect, channel->getMask());
 		}
 	} else {
-		if (debugChannelSet(kDebugImages, 2))
-			warning("Window::inkBlitFrom: No source surface: spriteType: %d, castType: %d, castId: %s", channel->_sprite->_spriteType, channel->_sprite->_cast ? channel->_sprite->_cast->_type : 0, channel->_sprite->_castId.asString().c_str());
+		if (debugChannelSet(kDebugImages, 4)) {
+			CastType castType = channel->_sprite->_cast ? channel->_sprite->_cast->_type : kCastTypeNull;
+			warning("Window::inkBlitFrom: No source surface: spriteType: %d (%s), castType: %d (%s), castId: %s",
+				channel->_sprite->_spriteType, spriteType2str(channel->_sprite->_spriteType), castType, castType2str(castType),
+				channel->_sprite->_castId.asString().c_str());
+		}
 	}
 }
 
@@ -291,6 +297,8 @@ void Window::loadNewSharedCast(Cast *previousSharedCast) {
 		// Clear those previous widget pointers
 		previousSharedCast->releaseCastMemberWidget();
 		_currentMovie->_sharedCast = previousSharedCast;
+
+		debugC(1, kDebugLoading, "Skipping loading already loaded shared cast, path: %s", previousSharedCastPath.c_str());
 		return;
 	}
 
@@ -309,7 +317,7 @@ void Window::loadNewSharedCast(Cast *previousSharedCast) {
 bool Window::loadNextMovie() {
 	_soundManager->changingMovie();
 	_newMovieStarted = true;
-	_currentPath = getPath(_nextMovie.movie, _currentPath);
+	_currentPath = Common::firstPathComponents(_nextMovie.movie, g_director->_dirSeparator);
 
 	Cast *previousSharedCast = nullptr;
 	if (_currentMovie) {
@@ -320,7 +328,7 @@ bool Window::loadNextMovie() {
 	delete _currentMovie;
 	_currentMovie = nullptr;
 
-	Archive *mov = openMainArchive(_currentPath + Common::lastPathComponent(_nextMovie.movie, g_director->_dirSeparator));
+	Archive *mov = openArchive(_currentPath + Common::lastPathComponent(_nextMovie.movie, g_director->_dirSeparator));
 
 	if (!mov)
 		return false;
@@ -351,6 +359,9 @@ bool Window::step() {
 			_nextMovie = getNextMovieFromQueue();
 		}
 	}
+
+	if (debugChannelSet(-1, kDebugFewFramesOnly) && g_director->_framesRan > kFewFamesMaxCounter)
+		return false;
 
 	// prepare next movie
 	if (!_nextMovie.movie.empty()) {
@@ -435,6 +446,27 @@ Common::String Window::getSharedCastPath() {
 	}
 
 	return Common::String();
+}
+
+void Window::freezeLingoState() {
+	_frozenLingoStates.push_back(_lingoState);
+	_lingoState = new LingoState;
+	debugC(kDebugLingoExec, 3, "Freezing Lingo state, depth %d", _frozenLingoStates.size());
+}
+
+void Window::thawLingoState() {
+	if (_frozenLingoStates.empty()) {
+		warning("Tried to thaw when there's no frozen state, ignoring");
+		return;
+	}
+	if (!_lingoState->callstack.empty()) {
+		warning("Can't thaw a Lingo state in mid-execution, ignoring");
+		return;
+	}
+	delete _lingoState;
+	debugC(kDebugLingoExec, 3, "Thawing Lingo state, depth %d", _frozenLingoStates.size());
+	_lingoState = _frozenLingoStates.back();
+	_frozenLingoStates.pop_back();
 }
 
 } // End of namespace Director

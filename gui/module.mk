@@ -21,6 +21,8 @@ MODULE_OBJS := \
 	predictivedialog.o \
 	saveload.o \
 	saveload-dialog.o \
+	shaderbrowser-dialog.o \
+	textviewer.o \
 	themebrowser.o \
 	ThemeEngine.o \
 	ThemeEval.o \
@@ -45,8 +47,9 @@ MODULE_OBJS := \
 ifdef USE_CLOUD
 ifdef USE_LIBCURL
 MODULE_OBJS += \
+	cloudconnectionwizard.o \
 	downloaddialog.o \
-	downloadiconsdialog.o \
+	downloadpacksdialog.o \
 	remotebrowser.o
 endif
 endif

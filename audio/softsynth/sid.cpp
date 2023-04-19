@@ -26,6 +26,8 @@
 
 #ifndef DISABLE_SID
 
+#include "common/translation.h"
+
 #include "audio/softsynth/sid.h"
 #include "audio/null.h"
 
@@ -430,7 +432,7 @@ public:
 	}
 };
 
-fc_point Filter::f0_points_6581[] = {
+const fc_point Filter::f0_points_6581[] = {
 	//  FC      f         FCHI FCLO
 	// ----------------------------
 	{    0,   220 },   // 0x00      - repeated end point
@@ -798,7 +800,7 @@ void EnvelopeGenerator::reset() {
 	hold_zero = true;
 }
 
-reg16 EnvelopeGenerator::rate_counter_period[] = {
+const data16 EnvelopeGenerator::rate_counter_period[] = {
 	9,  //   2ms*1.0MHz/256 =     7.81
 	32,  //   8ms*1.0MHz/256 =    31.25
 	63,  //  16ms*1.0MHz/256 =    62.50
@@ -818,7 +820,7 @@ reg16 EnvelopeGenerator::rate_counter_period[] = {
 };
 
 
-reg8 EnvelopeGenerator::sustain_level[] = {
+const data8 EnvelopeGenerator::sustain_level[] = {
 	0x00,
 	0x11,
 	0x22,

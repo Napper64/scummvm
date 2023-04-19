@@ -299,15 +299,15 @@ void IAGSEngine::DrawTextWrapped(int32 xx, int32 yy, int32 wid, int32 font, int3
 void IAGSEngine::SetVirtualScreen(BITMAP *bmp) {
 	if (!_G(gfxDriver)->UsesMemoryBackBuffer()) {
 		debug_script_warn("SetVirtualScreen: this plugin requires software graphics driver to work correctly.");
-		// we let it continue since gfxDriver is supposed to ignore this request without throwing an exception
+		return;
 	}
 
 	if (bmp) {
 		_GP(glVirtualScreenWrap).WrapAllegroBitmap(bmp, true);
-		_G(gfxDriver)->SetMemoryBackBuffer(&_GP(glVirtualScreenWrap));
+		_G(gfxDriver)->SetStageBackBuffer(&_GP(glVirtualScreenWrap));
 	} else {
 		_GP(glVirtualScreenWrap).Destroy();
-		_G(gfxDriver)->SetMemoryBackBuffer(nullptr);
+		_G(gfxDriver)->SetStageBackBuffer(nullptr);
 	}
 }
 
@@ -344,7 +344,7 @@ void IAGSEngine::BlitSpriteRotated(int32 x, int32 y, BITMAP *bmp, int32 angle) {
 
 void IAGSEngine::PollSystem() {
 	ags_domouse();
-	update_polled_stuff_if_runtime();
+	update_polled_stuff();
 	eAGSMouseButton mbut;
 	int mwheelz;
 	if (run_service_mb_controls(mbut, mwheelz) && mbut > kMouseNone && !_GP(play).IsIgnoringInput())
@@ -760,12 +760,12 @@ void IAGSEngine::GetRenderStageDesc(AGSRenderStageDesc *desc) {
 void IAGSEngine::GetGameInfo(AGSGameInfo* ginfo) {
 	if (ginfo->Version >= 26) {
 		snprintf(ginfo->GameName, sizeof(ginfo->GameName), "%s", _GP(game).gamename);
-		snprintf(ginfo->guid, sizeof(ginfo->guid), "%s", _GP(game).guid);
-		ginfo->uniqueid = _GP(game).uniqueid;
+		snprintf(ginfo->Guid, sizeof(ginfo->Guid), "%s", _GP(game).guid);
+		ginfo->UniqueId = _GP(game).uniqueid;
 	}
 }
 
-IAGSFontRenderer2* IAGSEngine::ReplaceFontRenderer2(int fontNumber, IAGSFontRenderer2 *newRenderer) {
+IAGSFontRenderer* IAGSEngine::ReplaceFontRenderer2(int fontNumber, IAGSFontRenderer2 *newRenderer) {
 	auto *old_render = font_replace_renderer(fontNumber, newRenderer);
 	GUI::MarkForFontUpdate(fontNumber);
 	return old_render;
@@ -869,9 +869,9 @@ Engine::GameInitError pl_register_plugins(const std::vector<Shared::PluginInfo> 
 
 		// Copy plugin info
 		apl->filename = name;
-		if (info.DataLen) {
+		if (info.DataLen > 0) {
 			apl->savedata = (char *)malloc(info.DataLen);
-			memcpy(apl->savedata, info.Data.get(), info.DataLen);
+			memcpy(apl->savedata, &info.Data.front(), info.DataLen);
 		}
 		apl->savedatasize = info.DataLen;
 

@@ -20,7 +20,7 @@
  */
 
 #include "common/memstream.h"
-#include "common/iff_container.h"
+#include "common/formats/iff_container.h"
 
 #include "engines/nancy/nancy.h"
 #include "engines/nancy/iff.h"
@@ -74,11 +74,14 @@ bool IFF::load() {
 
 	// Scan the file for DATA chunks, completely ignoring IFF structure
 	// Presumably the string "DATA" is not allowed inside of chunks...
+	// The Vampire Diaries uses the standard FORM
+	uint32 dataString = g_nancy->getGameType() == kGameTypeVampire ? ID_FORM : ID_DATA;
+
 	uint offset = 0;
 
 	while (offset < size - 3) {
 		uint32 id = READ_BE_UINT32(data + offset);
-		if (id == ID_DATA || id == ID_FORM) {
+		if (id == dataString) {
 			// Replace 'DATA' with standard 'FORM' for the parser
 			WRITE_BE_UINT32(data + offset, ID_FORM);
 			Common::MemoryReadStream stream(data + offset, size - offset);
@@ -143,9 +146,12 @@ uint32 IFF::stringToId(const Common::String &s) {
 }
 
 void IFF::list(Common::Array<Common::String> &nameList) const {
+	Common::String chunkName;
 	nameList.reserve(_chunks.size());
 	for (uint i = 0; i < _chunks.size(); ++i) {
-		nameList.push_back(idToString(_chunks[i].id));
+		chunkName = idToString(_chunks[i].id);
+		chunkName.trim();
+		nameList.push_back(chunkName);
 	}
 }
 

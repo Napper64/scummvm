@@ -27,7 +27,6 @@
 #include "engines/advancedDetector.h"
 #include "engines/obsolete.h"
 
-#include "sword1/detection.h"
 #include "sword1/obsolete.h" // Obsolete ID table.
 
 static const PlainGameDescriptor swordGames[] = {
@@ -38,20 +37,16 @@ static const PlainGameDescriptor swordGames[] = {
 #include "sword1/detection_tables.h"
 
 static const char *const directoryGlobs[] = {
-	"clusters",
-	"music",
 	"smackshi",
-	"english",
-	"italian",
-	"speech",
+	"video",
 	nullptr
 };
 
 class SwordMetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
-	SwordMetaEngineDetection() : AdvancedMetaEngineDetection(Sword1::gameDescriptions, sizeof(Sword1::SwordGameDescription), swordGames) {
+	SwordMetaEngineDetection() : AdvancedMetaEngineDetection(Sword1::gameDescriptions, sizeof(ADGameDescription), swordGames) {
 		_guiOptions = GUIO2(GUIO_NOMIDI, GUIO_NOASPECT);
-		_maxScanDepth = 2;
+		_flags = kADFlagMatchFullPaths;
 		_directoryGlobs = directoryGlobs;
 	}
 

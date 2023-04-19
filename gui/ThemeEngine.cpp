@@ -23,12 +23,12 @@
 #include "common/config-manager.h"
 #include "common/file.h"
 #include "common/fs.h"
-#include "common/unzip.h"
+#include "common/compression/unzip.h"
 #include "common/tokenizer.h"
 #include "common/translation.h"
 #include "common/unicode-bidi.h"
 
-#include "graphics/conversion.h"
+#include "graphics/blit.h"
 #include "graphics/cursorman.h"
 #include "graphics/fontman.h"
 #include "graphics/surface.h"
@@ -443,6 +443,9 @@ void ThemeEngine::setGraphicsMode(GraphicsMode mode) {
 		} else if (g_system->getOverlayFormat().bytesPerPixel == 2) {
 			_bytesPerPixel = sizeof(uint16);
 			break;
+		} else if (g_system->getOverlayFormat().bytesPerPixel == 1) {
+			_bytesPerPixel = sizeof(uint8);
+			break;
 		}
 		// fall through
 	default:
@@ -647,36 +650,22 @@ bool ThemeEngine::addBitmap(const Common::String &filename, const Common::String
 	// Nothing has to be done if the bitmap already has been loaded.
 	Graphics::ManagedSurface *surf = _bitmaps[filename];
 	if (surf) {
-		surf->free();
-		delete surf;
-		surf = nullptr;
-
-		_bitmaps.erase(filename);
+		return true;
 	}
 
 	if (!scalablefile.empty()) {
-		Graphics::SVGBitmap *image = nullptr;
 		Common::ArchiveMemberList members;
 		_themeFiles.listMatchingMembers(members, scalablefile);
 		for (Common::ArchiveMemberList::const_iterator i = members.begin(), end = members.end(); i != end; ++i) {
 			Common::SeekableReadStream *stream = (*i)->createReadStream();
 			if (stream) {
-				image = new Graphics::SVGBitmap(stream);
+				_bitmaps[filename] = new Graphics::SVGBitmap(stream, width * _scaleFactor, height * _scaleFactor);
 				delete stream;
-				break;
+				return true;
 			}
 		}
 
-		if (image) {
-			_bitmaps[filename] = new Graphics::ManagedSurface(width * _scaleFactor, height * _scaleFactor, *image->getPixelFormat());
-			image->render(*_bitmaps[filename], width * _scaleFactor, height * _scaleFactor);
-
-			delete image;
-		} else {
-			return false;
-		}
-
-		return true;
+		return false;
 	}
 
 	const Graphics::Surface *srcSurface = nullptr;
@@ -723,15 +712,23 @@ bool ThemeEngine::addBitmap(const Common::String &filename, const Common::String
 
 		if (srcSurface && srcSurface->format.bytesPerPixel != 1)
 			surf = new Graphics::ManagedSurface(srcSurface->convertTo(_overlayFormat));
+
+		if (surf)
+			surf->setTransparentColor(surf->format.RGBToColor(0xFF, 0x00, 0xFF));
 	}
 
 	if (_scaleFactor != 1.0 && surf) {
 		Graphics::Surface *tmp2 = surf->rawSurface().scale(surf->w * _scaleFactor, surf->h * _scaleFactor, false);
 
+		Graphics::ManagedSurface *surf2 = new Graphics::ManagedSurface(tmp2);
+
+		if (surf->hasTransparentColor())
+			surf2->setTransparentColor(surf->getTransparentColor());
+
 		surf->free();
 		delete surf;
 
-		surf = new Graphics::ManagedSurface(tmp2);
+		surf = surf2;
 	}
 	// Store the surface into our hashmap (attention, may store NULL entries!)
 	_bitmaps[filename] = surf;
@@ -1057,7 +1054,7 @@ void ThemeEngine::drawLineSeparator(const Common::Rect &r) {
 	drawDD(kDDSeparator, r);
 }
 
-void ThemeEngine::drawCheckbox(const Common::Rect &r, int spacing, const Common::U32String &str, bool checked, 
+void ThemeEngine::drawCheckbox(const Common::Rect &r, int spacing, const Common::U32String &str, bool checked,
 							   WidgetStateInfo state, bool overrideText, bool rtl) {
 	if (!ready())
 		return;
@@ -1088,7 +1085,7 @@ void ThemeEngine::drawCheckbox(const Common::Rect &r, int spacing, const Common:
 	}
 
 	if (r2.right > r2.left) {
-		TextColor color = overrideText ? GUI::TextColor::kTextColorOverride : getTextColor(dd); 
+		TextColor color = overrideText ? GUI::TextColor::kTextColorOverride : getTextColor(dd);
 		drawDDText(getTextData(dd), color, r2, str, true, false, convertTextAlignH(_widgets[dd]->_textAlignH, rtl),
 		           _widgets[dd]->_textAlignV);
 	}
@@ -1242,7 +1239,7 @@ void ThemeEngine::drawPopUpWidget(const Common::Rect &r, const Common::U32String
 	}
 }
 
-void ThemeEngine::drawSurface(const Common::Point &p, const Graphics::ManagedSurface &surface, bool themeTrans) {
+void ThemeEngine::drawManagedSurface(const Common::Point &p, const Graphics::ManagedSurface &surface) {
 	if (!ready())
 		return;
 
@@ -1250,7 +1247,7 @@ void ThemeEngine::drawSurface(const Common::Point &p, const Graphics::ManagedSur
 		return;
 
 	_vectorRenderer->setClippingRect(_clip);
-	_vectorRenderer->blitKeyBitmap(&surface, p, themeTrans);
+	_vectorRenderer->blitManagedSurface(&surface, p);
 
 	Common::Rect dirtyRect = Common::Rect(p.x, p.y, p.x + surface.w, p.y + surface.h);
 	dirtyRect.clip(_clip);
@@ -1359,7 +1356,7 @@ void ThemeEngine::drawText(const Common::Rect &r, const Common::U32String &str, 
 	case kFontColorNormal:
 		if (inverted) {
 			colorId = kTextColorNormalInverted;
-			break; 
+			break;
 		}
 
 		switch (state) {
@@ -1383,7 +1380,7 @@ void ThemeEngine::drawText(const Common::Rect &r, const Common::U32String &str, 
 	case kFontColorAlternate:
 		if (inverted) {
 			colorId = kTextColorAlternativeInverted;
-			break; 
+			break;
 		}
 
 		switch (state) {
@@ -1404,12 +1401,12 @@ void ThemeEngine::drawText(const Common::Rect &r, const Common::U32String &str, 
 		}
 		break;
 
-	case kFontColorOverride: 
+	case kFontColorOverride:
 		if (inverted) {
-			colorId = kTextColorOverrideInverted; 
-			break; 
+			colorId = kTextColorOverrideInverted;
+			break;
 		}
-			
+
 		switch (state) {
 		case kStateDisabled:
 			colorId = kTextColorAlternativeDisabled;
@@ -1593,7 +1590,8 @@ bool ThemeEngine::createCursor(const Common::String &filename, int hotspotX, int
 	memset(_cursor, 0xFF, sizeof(byte) * _cursorWidth * _cursorHeight);
 
 	// the transparent color is 0xFF00FF
-	const uint32 colTransparent = _overlayFormat.RGBToColor(0xFF, 0, 0xFF);
+	const uint32 colTransparent = cursor->format.RGBToColor(0xFF, 0, 0xFF);
+	const uint32 alphaMask = cursor->format.ARGBToColor(0x80, 0, 0, 0);
 
 	// Now, scan the bitmap. We have to convert it from 16 bit color mode
 	// to 8 bit mode, and have to create a suitable palette on the fly.
@@ -1614,7 +1612,9 @@ bool ThemeEngine::createCursor(const Common::String &filename, int hotspotX, int
 			src += cursor->format.bytesPerPixel;
 
 			// Skip transparency
-			if (color == colTransparent)
+			if (color == colTransparent
+			    // Replace with transparent is alpha is present and < 50%
+			    || (alphaMask != 0 && (color & alphaMask) == 0))
 				continue;
 
 			cursor->format.colorToRGB(color, r, g, b);

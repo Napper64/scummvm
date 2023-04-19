@@ -77,11 +77,20 @@ void Text::initVoxBank(TextBankId bankIdx) {
 	if ((int)bankIdx < 0 || (int)bankIdx >= ARRAYSIZE(LanguageSuffixTypes)) {
 		error("bankIdx is out of bounds: %i", (int)bankIdx);
 	}
-	// get the correct vox hqr file
-	_currentVoxBankFile = Common::String::format("%s%s" VOX_EXT, LanguageTypes[_engine->_cfgfile.LanguageId].id, LanguageSuffixTypes[(int)bankIdx]);
-	_currentOggBaseFile = Common::String::format("%s%s_", LanguageTypes[_engine->_cfgfile.LanguageId].id, LanguageSuffixTypes[(int)bankIdx]);
-	// TODO: loop through other languages and take the scummvm settings regarding voices into account...
+	// get the correct vox hqr file - english is the default
+	_currentVoxBankFile = Common::String::format("%s%s" VOX_EXT, LanguageTypes[0].id, LanguageSuffixTypes[(int)bankIdx]);
+	_currentOggBaseFile = Common::String::format("%s%s_", LanguageTypes[0].id, LanguageSuffixTypes[(int)bankIdx]);
 
+	const int voice = ConfMan.getInt("audio_language");
+	const int32 length = ARRAYSIZE(LanguageTypes);
+	for (int32 i = 0; i < length; i++) {
+		if (LanguageTypes[i].voice == voice) {
+			_currentVoxBankFile = Common::String::format("%s%s" VOX_EXT, LanguageTypes[i].id, LanguageSuffixTypes[(int)bankIdx]);
+			_currentOggBaseFile = Common::String::format("%s%s_", LanguageTypes[i].id, LanguageSuffixTypes[(int)bankIdx]);
+			return;
+		}
+	}
+	warning("Could not find voice mapping for %i", voice);
 	// TODO check the rest to reverse
 }
 
@@ -99,7 +108,8 @@ bool Text::initVoxToPlay(const TextEntry *text) {
 		return false;
 	}
 
-	if (!_engine->_cfgfile.Voice) {
+	const int voice = ConfMan.getInt("audio_language");
+	if (voice <= 0) {
 		debug(3, "Voices are disabled");
 		return false;
 	}
@@ -108,7 +118,7 @@ bool Text::initVoxToPlay(const TextEntry *text) {
 }
 
 bool Text::playVox(const TextEntry *text) {
-	if (!_engine->_cfgfile.Voice) {
+	if (ConfMan.getInt("audio_language") <= 0) {
 		return false;
 	}
 	if (text == nullptr) {
@@ -148,7 +158,7 @@ bool Text::stopVox(const TextEntry *text) {
 	return true;
 }
 
-void Text::initTextBank(TextBankId bankIdx) {
+void Text::initDial(TextBankId bankIdx) {
 	// don't load if we already have the dialogue text bank loaded
 	if (bankIdx == _currentBankIdx) {
 		return;
@@ -159,7 +169,7 @@ void Text::initTextBank(TextBankId bankIdx) {
 }
 
 void Text::initSceneTextBank() {
-	initTextBank((TextBankId)((int)_engine->_scene->_sceneTextBank + (int)TextBankId::Citadel_Island));
+	initDial((TextBankId)((int)_engine->_scene->_sceneTextBank + (int)TextBankId::Citadel_Island));
 }
 
 void Text::drawCharacter(int32 x, int32 y, uint8 character) {
@@ -458,7 +468,7 @@ void Text::processTextLine() {
 	_progressiveTextBufferPtr = _progressiveTextBuffer;
 }
 
-void Text::renderContinueReadingTriangle() {
+void Text::renderContinueReadingTriangle() { // AffFleche
 	const int32 border = 3;
 	const int32 size = 21;
 	const int16 color = 136;
@@ -467,17 +477,17 @@ void Text::renderContinueReadingTriangle() {
 	const int32 top = _dialTextBox.bottom - (size + border);
 	const int32 bottom = _dialTextBox.bottom - border;
 
-	Vertex vertices[3];
+	ComputedVertex vertices[3];
 
-	vertices[0].colorIndex = color;
+	vertices[0].intensity = color;
 	vertices[0].x = right;
 	vertices[0].y = top;
 
-	vertices[1].colorIndex = color;
+	vertices[1].intensity = color;
 	vertices[1].x = left;
 	vertices[1].y = bottom;
 
-	vertices[2].colorIndex = color;
+	vertices[2].intensity = color;
 	vertices[2].x = right;
 	vertices[2].y = bottom;
 
@@ -485,7 +495,7 @@ void Text::renderContinueReadingTriangle() {
 	polygon.numVertices = ARRAYSIZE(vertices);
 	polygon.colorIndex = _dialTextStopColor;
 	polygon.renderType = POLYGONTYPE_FLAT;
-	_engine->_renderer->renderPolygons(polygon, vertices, top, bottom);
+	_engine->_renderer->renderPolygons(polygon, vertices);
 
 	_engine->copyBlockPhys(left, top, right, bottom);
 }
@@ -529,7 +539,7 @@ void Text::fadeInRemainingChars() {
 	--_fadeInCharactersPos;
 }
 
-ProgressiveTextState Text::updateProgressiveText() {
+ProgressiveTextState Text::updateProgressiveText() { // NextDialCar
 	if (!_hasValidTextHandle) {
 		return ProgressiveTextState::End;
 	}
@@ -657,13 +667,13 @@ bool Text::displayText(TextId index, bool showText, bool playVox, bool loop) {
 	return aborted;
 }
 
-bool Text::drawTextProgressive(TextId index, bool playVox, bool loop) {
+bool Text::drawTextProgressive(TextId index, bool playVox, bool loop) { // Dial
 	_engine->exitSceneryView();
-	_engine->_interface->saveClip();
-	_engine->_interface->resetClip();
+	_engine->_interface->memoClip();
+	_engine->_interface->unsetClip();
 	_engine->saveFrontBuffer();
 	const bool aborted = displayText(index, _engine->_cfgfile.FlagDisplayText, playVox, loop);
-	_engine->_interface->loadClip();
+	_engine->_interface->restoreClip();
 	return aborted;
 }
 
@@ -672,7 +682,7 @@ void Text::setFontParameters(int32 spaceBetween, int32 charSpace) {
 	_dialCharSpace = charSpace;
 }
 
-void Text::setFontCrossColor(int32 color) {
+void Text::setFontCrossColor(int32 color) { // TestCoulDial
 	_dialTextStepSize = -1;
 	_dialTextBufferSize = 14;
 	_dialTextStartColor = color * 16;
@@ -683,7 +693,7 @@ void Text::setFontColor(int32 color) {
 	_dialTextColor = color;
 }
 
-void Text::setTextCrossColor(int32 stopColor, int32 startColor, int32 stepSize) {
+void Text::setTextCrossColor(int32 stopColor, int32 startColor, int32 stepSize) { // CoulDial
 	_dialTextStartColor = startColor;
 	_dialTextStopColor = stopColor;
 	_dialTextStepSize = stepSize;
@@ -731,7 +741,7 @@ bool Text::getMenuText(TextId index, char *text, uint32 textSize) {
 	return true;
 }
 
-void Text::textClipFull() {
+void Text::bigWinDial() {
 	const int32 margin = 8;
 	_dialTextBox.left = margin;
 	_dialTextBox.top = margin;
@@ -742,7 +752,7 @@ void Text::textClipFull() {
 	_dialTextBoxMaxX = _engine->width() - 2 * margin - 2 * PADDING;
 }
 
-void Text::textClipSmall() {
+void Text::normalWinDial() {
 	const int32 margin = 16;
 	_dialTextBoxLines = 3;
 	const int32 textHeight = _dialTextBoxLines * lineHeight;
@@ -760,7 +770,7 @@ void Text::drawAskQuestion(TextId index) {
 }
 
 void Text::drawHolomapLocation(TextId index) {
-	textClipSmall();
+	normalWinDial();
 	setFontCrossColor(COLOR_WHITE);
 	_engine->_interface->drawFilledRect(_dialTextBox, COLOR_BLACK);
 	const bool displayText = _engine->_cfgfile.FlagDisplayText;

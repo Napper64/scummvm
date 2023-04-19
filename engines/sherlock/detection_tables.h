@@ -19,6 +19,8 @@
  *
  */
 
+#include "common/translation.h"
+
 namespace Sherlock {
 
 static const SherlockGameDescription gameDescriptions[] = {
@@ -220,11 +222,11 @@ static const SherlockGameDescription gameDescriptions[] = {
 		// Provided by AquariumTroop
 		{
 			"scalpel",
-			_s("Missing game code"), // Reason for being unsupported
+			nullptr,
 			AD_ENTRY1s("talk.lib", "334c7d468860f20eafbcd002891f0c6b", 173935),
 			Common::ZH_TWN,
 			Common::kPlatformDOS,
-			ADGF_UNSUPPORTED,
+			ADGF_NO_FLAGS,
 			GUIO1(GUIO_NOSPEECH)
 		},
 		GType_SerratedScalpel,
@@ -296,9 +298,9 @@ static const SherlockGameDescription gameDescriptions[] = {
 			"rosetattoo",
 			"CD",
 			AD_ENTRY1s("talk.lib", "dfd699efdce02a045f46d15da2d44b76", 582381),
-			Common::ZH_ANY,
+			Common::ZH_CHN,
 			Common::kPlatformDOS,
-			ADGF_UNSTABLE,
+			ADGF_NO_FLAGS,
 			GUIO3(GAMEOPTION_ORIGINAL_SAVES, GAMEOPTION_HELP_STYLE, GAMEOPTION_TRANSPARENT_WINDOWS)
 		},
 		GType_RoseTattoo,

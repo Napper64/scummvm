@@ -24,6 +24,7 @@
 #include "backends/platform/sdl/sdl-window.h"
 
 #include "common/textconsole.h"
+#include "common/util.h"
 
 #include "icons/scummvm.xpm"
 
@@ -51,6 +52,9 @@ SdlWindow::SdlWindow() :
 #elif defined(MAEMO)
 	// All supported Maemo devices have a display resolution of 800x480
 	_desktopRes = Common::Rect(800, 480);
+#elif defined(KOLIBRIOS)
+	// TODO: Use kolibriOS call to determine this.
+	_desktopRes = Common::Rect(640, 480);
 #else
 #error Unable to detect screen resolution
 #endif
@@ -289,7 +293,9 @@ float SdlWindow::getDpiScalingFactor() const {
 	getDisplayDpi(&dpi, &defaultDpi);
 	debug(4, "dpi: %g default: %g", dpi, defaultDpi);
 	float ratio = dpi / defaultDpi;
-	return ratio;
+	// Getting the DPI can be unreliable, so clamp the scaling factor to make sure
+	// we do not return unreasonable values.
+	return CLIP(ratio, 1.0f, 4.0f);
 }
 
 float SdlWindow::getSdlDpiScalingFactor() const {
