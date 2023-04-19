@@ -222,21 +222,21 @@ void KeyframeAnim::KeyframeEntry::loadBinary(Common::SeekableReadStream *data,ch
 	_droll = data->readFloatLE();
 	if (_frame == 20 && strcmp(meshName, "shldr_R1") == 0 && (*fname).equals("bo_coffin_3_you.key")) {
 		_frame = 19;
-		_yaw = 0.575867057;
-		_roll = 239.649811;
-		_dpitch = 16.0314026;
-		_dyaw = 3.32916307;
-		_droll = 3.36254883;
-		_pitch = 69.6633148;
+		_yaw = 0.575867057f;
+		_roll = 239.649811f;
+		_dpitch = 16.0314026f;
+		_dyaw = 3.32916307f;
+		_droll = 3.36254883f;
+		_pitch = 69.6633148f;
 	}
 	if (_frame == 36 && strcmp(meshName, "shldr_L1") == 0 && (*fname).equals("bo_coffin_5_mug.key")) {
 		_frame = 35;
-		_yaw = 150.390915;
-		_roll = 49.3095093;
-		_dpitch = 0.790283203;
-		_dyaw = 11.4147644;
-		_droll = 4.47042847;
-		_pitch = 284.761108;
+		_yaw = 150.390915f;
+		_roll = 49.3095093f;
+		_dpitch = 0.790283203f;
+		_dyaw = 11.4147644f;
+		_droll = 4.47042847f;
+		_pitch = 284.761108f;
 	}
 }
 
